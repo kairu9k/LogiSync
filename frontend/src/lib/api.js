@@ -13,3 +13,16 @@ export async function apiPost(path, body) {
   }
   return data;
 }
+
+export async function apiGet(path) {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "GET",
+    headers: { "Content-Type": "application/json" },
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const message = data?.message || "Request failed";
+    throw new Error(message);
+  }
+  return data;
+}
