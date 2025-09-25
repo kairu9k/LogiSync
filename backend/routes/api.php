@@ -11,8 +11,11 @@ Route::prefix('auth')->group(function () {
     Route::post('/login', [AuthController::class, 'login']);
 });
 
-// Orders listing
+// Orders
 Route::get('/orders', [OrderController::class, 'index']);
+Route::get('/orders/{id}', [OrderController::class, 'show']);
+Route::post('/orders', [OrderController::class, 'store']);
+Route::patch('/orders/{id}/status', [OrderController::class, 'updateStatus']);
 
 Route::post('/quotes', [QuoteController::class, 'store']);
 Route::post('/invoices', [InvoiceController::class, 'store']);

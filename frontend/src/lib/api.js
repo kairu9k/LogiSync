@@ -26,3 +26,17 @@ export async function apiGet(path) {
   }
   return data;
 }
+
+export async function apiPatch(path, body) {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const message = data?.message || "Request failed";
+    throw new Error(message);
+  }
+  return data;
+}

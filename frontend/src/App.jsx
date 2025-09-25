@@ -7,6 +7,8 @@ import AppLayout from './pages/app/AppLayout.jsx'
 import Dashboard from './pages/app/Dashboard.jsx'
 import Quotes from './pages/app/Quotes.jsx'
 import Orders from './pages/app/Orders.jsx'
+import OrderDetail from './pages/app/OrderDetail.jsx'
+import OrderCreate from './pages/app/OrderCreate.jsx'
 import Shipments from './pages/app/Shipments.jsx'
 import Invoices from './pages/app/Invoices.jsx'
 
@@ -20,6 +22,8 @@ function App() {
         <Route index element={<Dashboard />} />
         <Route path="quotes" element={<Quotes />} />
         <Route path="orders" element={<Orders />} />
+        <Route path="orders/new" element={<OrderCreate />} />
+        <Route path="orders/:id" element={<OrderDetail />} />
         <Route path="shipments" element={<Shipments />} />
         <Route path="invoices" element={<Invoices />} />
       </Route>

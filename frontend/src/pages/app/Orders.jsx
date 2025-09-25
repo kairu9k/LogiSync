@@ -1,36 +1,57 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { apiGet } from '../../lib/api'
 
 export default function Orders() {
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [q, setQ] = useState('')
+  const [status, setStatus] = useState('any')
+  const navigate = useNavigate()
+
+  async function fetchOrders(params = {}) {
+    const qs = new URLSearchParams()
+    if (params.q) qs.set('q', params.q)
+    if (params.status && params.status !== 'any') qs.set('status', params.status)
+    const url = '/api/orders' + (qs.toString() ? `?${qs.toString()}` : '')
+    const res = await apiGet(url)
+    return res?.data || []
+  }
 
   useEffect(() => {
     let ignore = false
-    async function load() {
+    ;(async () => {
       setLoading(true)
       setError('')
       try {
-        const res = await apiGet('/api/orders')
-        if (!ignore) setOrders(res?.data || [])
+        const data = await fetchOrders({ q, status })
+        if (!ignore) setOrders(data)
       } catch (e) {
         if (!ignore) setError(e.message || 'Failed to load orders')
       } finally {
         if (!ignore) setLoading(false)
       }
-    }
-    load()
+    })()
     return () => { ignore = true }
-  }, [])
+  }, [q, status])
 
   return (
     <div className="grid" style={{ gap: 16 }}>
       <div className="card">
-        <h2 style={{ marginTop: 0 }}>Orders</h2>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h2 style={{ marginTop: 0 }}>Orders</h2>
+          <button className="btn btn-primary" onClick={() => navigate('/app/orders/new')}>New Order</button>
+        </div>
         <div className="form-row">
-          <input className="input" placeholder="Search orders (PO, customer)" />
-          <input className="input" placeholder="Status: Any" />
+          <input className="input" placeholder="Search orders (PO, customer)" value={q} onChange={(e) => setQ(e.target.value)} />
+          <select className="input" value={status} onChange={(e) => setStatus(e.target.value)}>
+            <option value="any">Status: Any</option>
+            <option value="pending">Pending</option>
+            <option value="processing">Processing</option>
+            <option value="fulfilled">Fulfilled</option>
+            <option value="canceled">Canceled</option>
+          </select>
         </div>
       </div>
 
@@ -40,14 +61,14 @@ export default function Orders() {
       {!loading && !error && (
         <div className="grid" style={{ gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 12 }}>
           {orders.map((o) => (
-            <div key={o.id} className="card" style={{ padding: 16 }}>
+            <button key={o.id} className="card link-card" style={{ padding: 16, textAlign: 'left' }} onClick={() => navigate(`/app/orders/${o.id}`)}>
               <div className="muted">{o.po}</div>
               <div>Customer {o.customer}</div>
               <div>Items: {o.items}</div>
               <div>
                 Status: <span className={`badge ${o.status === 'fulfilled' ? 'success' : 'info'}`}>{o.status}</span>
               </div>
-            </div>
+            </button>
           ))}
           {orders.length === 0 && (
             <div className="card" style={{ padding: 16 }}>

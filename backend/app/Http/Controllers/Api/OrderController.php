@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
 
 class OrderController extends Controller
 {
@@ -29,14 +30,15 @@ class OrderController extends Controller
             ->groupBy('o.order_id', 'o.order_status', 'o.order_date', 'u.username')
             ->orderByDesc('o.order_date');
 
-        if ($status) {
+        if ($status && $status !== 'any') {
             $query->where('o.order_status', $status);
         }
 
         if ($search) {
             $query->where(function ($q) use ($search) {
+                $numeric = (int) preg_replace('/[^0-9]/', '', $search);
                 $q->where('u.username', 'like', "%$search%")
-                  ->orWhere('o.order_id', (int) preg_replace('/[^0-9]/', '', $search));
+                  ->orWhere('o.order_id', $numeric);
             });
         }
 
@@ -56,5 +58,98 @@ class OrderController extends Controller
         return response()->json([
             'data' => $data,
         ])->header('Access-Control-Allow-Origin', '*');
+    }
+
+    public function show(int $id)
+    {
+        $row = DB::table('orders as o')
+            ->leftJoin('users as u', 'o.user_id', '=', 'u.user_id')
+            ->select('o.order_id','o.order_status','o.order_date','u.username')
+            ->where('o.order_id', $id)
+            ->first();
+
+        if (!$row) {
+            return response()->json(['message' => 'Order not found'], 404)
+                ->header('Access-Control-Allow-Origin', '*');
+        }
+
+        $details = DB::table('order_details')->where('order_id', $id)
+            ->select('order_details_id','product_id','quantity')
+            ->get();
+
+        $data = [
+            'id' => (int) $row->order_id,
+            'po' => 'PO-' . str_pad((string) $row->order_id, 5, '0', STR_PAD_LEFT),
+            'customer' => $row->username ?? 'N/A',
+            'status' => $row->order_status,
+            'order_date' => $row->order_date,
+            'items' => (int) ($details->sum('quantity') ?? 0),
+            'details' => $details,
+        ];
+
+        return response()->json(['data' => $data])
+            ->header('Access-Control-Allow-Origin', '*');
+    }
+
+    public function store(Request $request)
+    {
+        $data = $request->all();
+        $validator = Validator::make($data, [
+            'customer' => 'nullable|string|max:255',
+            'user_id' => 'nullable|integer',
+            'status' => 'nullable|string|in:pending,processing,fulfilled,canceled',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422)
+                ->header('Access-Control-Allow-Origin', '*');
+        }
+
+        // Resolve or create a user
+        $userId = $data['user_id'] ?? (DB::table('users')->min('user_id') ?? null);
+        if (!$userId) {
+            $userId = DB::table('users')->insertGetId([
+                'username' => $data['customer'] ?? 'demo',
+                'password' => bcrypt('password'),
+                'role' => 'admin',
+                'email' => ($data['customer'] ?? 'demo') . '@example.com',
+            ], 'user_id');
+        }
+
+        $status = $data['status'] ?? 'pending';
+
+        $id = DB::table('orders')->insertGetId([
+            'user_id' => $userId,
+            'order_status' => $status,
+        ], 'order_id');
+
+        return response()->json([
+            'message' => 'Order created',
+            'order_id' => $id,
+        ], 201)->header('Access-Control-Allow-Origin', '*');
+    }
+
+    public function updateStatus(Request $request, int $id)
+    {
+        $data = $request->all();
+        $validator = Validator::make($data, [
+            'status' => 'required|string|in:pending,processing,fulfilled,canceled',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422)
+                ->header('Access-Control-Allow-Origin', '*');
+        }
+
+        $exists = DB::table('orders')->where('order_id', $id)->exists();
+        if (!$exists) {
+            return response()->json(['message' => 'Order not found'], 404)
+                ->header('Access-Control-Allow-Origin', '*');
+        }
+
+        DB::table('orders')->where('order_id', $id)->update([
+            'order_status' => $data['status'],
+        ]);
+
+        return response()->json(['message' => 'Status updated'])
+            ->header('Access-Control-Allow-Origin', '*');
     }
 }
