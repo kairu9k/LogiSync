@@ -119,13 +119,14 @@ export default function OrderDetail() {
         <form
           onSubmit={async (e) => {
             e.preventDefault()
-            const fd = new FormData(e.currentTarget)
+            const formEl = e.currentTarget
+            const fd = new FormData(formEl)
             const product_id = parseInt(fd.get('product_id') || '0', 10)
             const quantity = parseInt(fd.get('quantity') || '0', 10)
             if (!product_id || !quantity) return
             try {
               await apiPost(`/api/orders/${id}/items`, { product_id, quantity })
-              e.currentTarget.reset()
+              formEl.reset()
               await load()
             } catch (err) {
               alert(err.message || 'Failed to add item')
