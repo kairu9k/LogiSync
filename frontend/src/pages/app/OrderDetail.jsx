@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { apiGet, apiPatch } from '../../lib/api'
+import { apiGet, apiPatch, apiPost } from '../../lib/api'
 
 export default function OrderDetail() {
   const { id } = useParams()
@@ -90,7 +90,7 @@ export default function OrderDetail() {
             const quantity = parseInt(fd.get('quantity') || '0', 10)
             if (!product_id || !quantity) return
             try {
-              await apiPatch(`/api/orders/${id}/items`, { product_id, quantity })
+              await apiPost(`/api/orders/${id}/items`, { product_id, quantity })
               e.currentTarget.reset()
               await load()
             } catch (err) {
