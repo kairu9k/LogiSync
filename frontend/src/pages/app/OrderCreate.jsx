@@ -5,6 +5,9 @@ import { apiPost } from '../../lib/api'
 export default function OrderCreate() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [items, setItems] = useState([])
+  const [p, setP] = useState('')
+  const [q, setQ] = useState('1')
   const navigate = useNavigate()
 
   async function handleSubmit(e) {
@@ -14,6 +17,7 @@ export default function OrderCreate() {
     const payload = {
       customer: form.get('customer') || 'demo',
       status: form.get('status') || 'pending',
+      items: items.map(it => ({ product_id: Number(it.product_id), quantity: Number(it.quantity) })),
     }
     try {
       setSaving(true)
@@ -48,6 +52,27 @@ export default function OrderCreate() {
               </select>
             </label>
           </div>
+          <div className="card" style={{ padding: 12 }}>
+            <div className="label" style={{ marginBottom: 8 }}>Items (optional)</div>
+            <div className="form-row">
+              <input className="input" placeholder="Product ID" type="number" min="1" value={p} onChange={(e) => setP(e.target.value)} />
+              <input className="input" placeholder="Quantity" type="number" min="1" value={q} onChange={(e) => setQ(e.target.value)} />
+              <button className="btn" type="button" onClick={() => {
+                const pid = Number(p); const qty = Number(q);
+                if (!pid || !qty) return;
+                setItems(prev => [...prev, { product_id: pid, quantity: qty }])
+                setP(''); setQ('1')
+              }}>Add</button>
+            </div>
+            {items.length > 0 && (
+              <ul style={{ margin: '8px 0 0', paddingLeft: 18 }}>
+                {items.map((it, i) => (
+                  <li key={i}>Product {it.product_id} — Qty {it.quantity} <button className="btn btn-outline" type="button" onClick={() => setItems(prev => prev.filter((_, idx) => idx !== i))}>Remove</button></li>
+                ))}
+              </ul>
+            )}
+          </div>
+
           {error && <div style={{ color: 'var(--danger-600)' }}>{error}</div>}
           <div className="form-actions">
             <button className="btn btn-primary" type="submit" disabled={saving}>Create</button>

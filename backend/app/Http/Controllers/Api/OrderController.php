@@ -98,6 +98,9 @@ class OrderController extends Controller
             'customer' => 'nullable|string|max:255',
             'user_id' => 'nullable|integer',
             'status' => 'nullable|string|in:pending,processing,fulfilled,canceled',
+            'items' => 'sometimes|array',
+            'items.*.product_id' => 'required_with:items|integer',
+            'items.*.quantity' => 'required_with:items|integer|min:1',
         ]);
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 422)
@@ -121,6 +124,22 @@ class OrderController extends Controller
             'user_id' => $userId,
             'order_status' => $status,
         ], 'order_id');
+
+        // Insert order items if provided
+        if (!empty($data['items']) && is_array($data['items'])) {
+            $rows = [];
+            foreach ($data['items'] as $it) {
+                if (!isset($it['product_id']) || !isset($it['quantity'])) continue;
+                $rows[] = [
+                    'order_id' => $id,
+                    'product_id' => (int) $it['product_id'],
+                    'quantity' => (int) $it['quantity'],
+                ];
+            }
+            if (!empty($rows)) {
+                DB::table('order_details')->insert($rows);
+            }
+        }
 
         return response()->json([
             'message' => 'Order created',
@@ -150,6 +169,59 @@ class OrderController extends Controller
         ]);
 
         return response()->json(['message' => 'Status updated'])
+            ->header('Access-Control-Allow-Origin', '*');
+    }
+
+    public function addItems(Request $request, int $id)
+    {
+        // Accept either items[] or a single product_id + quantity
+        $data = $request->all();
+
+        $exists = DB::table('orders')->where('order_id', $id)->exists();
+        if (!$exists) {
+            return response()->json(['message' => 'Order not found'], 404)
+                ->header('Access-Control-Allow-Origin', '*');
+        }
+
+        $rules = [
+            'items' => 'sometimes|array|min:1',
+            'items.*.product_id' => 'required_with:items|integer',
+            'items.*.quantity' => 'required_with:items|integer|min:1',
+            'product_id' => 'sometimes|integer',
+            'quantity' => 'sometimes|integer|min:1',
+        ];
+        $validator = Validator::make($data, $rules);
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422)
+                ->header('Access-Control-Allow-Origin', '*');
+        }
+
+        $rows = [];
+        if (!empty($data['items']) && is_array($data['items'])) {
+            foreach ($data['items'] as $it) {
+                if (!isset($it['product_id']) || !isset($it['quantity'])) continue;
+                $rows[] = [
+                    'order_id' => $id,
+                    'product_id' => (int) $it['product_id'],
+                    'quantity' => (int) $it['quantity'],
+                ];
+            }
+        } elseif (isset($data['product_id'], $data['quantity'])) {
+            $rows[] = [
+                'order_id' => $id,
+                'product_id' => (int) $data['product_id'],
+                'quantity' => (int) $data['quantity'],
+            ];
+        }
+
+        if (empty($rows)) {
+            return response()->json(['message' => 'No items to add'], 400)
+                ->header('Access-Control-Allow-Origin', '*');
+        }
+
+        DB::table('order_details')->insert($rows);
+
+        return response()->json(['message' => 'Items added', 'count' => count($rows)])
             ->header('Access-Control-Allow-Origin', '*');
     }
 }

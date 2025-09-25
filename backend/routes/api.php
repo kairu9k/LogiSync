@@ -16,6 +16,7 @@ Route::get('/orders', [OrderController::class, 'index']);
 Route::get('/orders/{id}', [OrderController::class, 'show']);
 Route::post('/orders', [OrderController::class, 'store']);
 Route::patch('/orders/{id}/status', [OrderController::class, 'updateStatus']);
+Route::post('/orders/{id}/items', [OrderController::class, 'addItems']);
 
 Route::post('/quotes', [QuoteController::class, 'store']);
 Route::post('/invoices', [InvoiceController::class, 'store']);

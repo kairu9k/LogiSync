@@ -81,6 +81,39 @@ export default function OrderDetail() {
         ) : (
           <div className="muted">No items on this order.</div>
         )}
+
+        <form
+          onSubmit={async (e) => {
+            e.preventDefault()
+            const fd = new FormData(e.currentTarget)
+            const product_id = parseInt(fd.get('product_id') || '0', 10)
+            const quantity = parseInt(fd.get('quantity') || '0', 10)
+            if (!product_id || !quantity) return
+            try {
+              await apiPatch(`/api/orders/${id}/items`, { product_id, quantity })
+              e.currentTarget.reset()
+              await load()
+            } catch (err) {
+              alert(err.message || 'Failed to add item')
+            }
+          }}
+          className="grid"
+          style={{ gap: 12, marginTop: 12 }}
+        >
+          <div className="form-row">
+            <label>
+              <div className="label">Product ID</div>
+              <input name="product_id" className="input" type="number" min="1" placeholder="e.g. 101" required />
+            </label>
+            <label>
+              <div className="label">Quantity</div>
+              <input name="quantity" className="input" type="number" min="1" defaultValue="1" required />
+            </label>
+          </div>
+          <div className="form-actions">
+            <button className="btn btn-primary" type="submit">Add Item</button>
+          </div>
+        </form>
       </div>
     </div>
   )
