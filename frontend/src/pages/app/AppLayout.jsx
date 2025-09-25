@@ -75,12 +75,11 @@ export default function AppLayout() {
       <main className="app-main">
         <header className="app-topbar">
           <div className="container" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: 56 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1 }}>
               <button aria-label="Open menu" className="btn-icon only-mobile" onClick={() => setMobileOpen(true)}>
                 <span className="bar"/><span className="bar"/><span className="bar"/>
               </button>
-              <div>
-                <div className="page-title">{title}</div>
+              <div style={{ flex: 1 }}>
                 <nav className="breadcrumbs">
                   {breadcrumbs.map((c, i) => (
                     <span key={c.to}>
@@ -90,11 +89,12 @@ export default function AppLayout() {
                 </nav>
               </div>
             </div>
-            <div className="muted">v1.0</div>
           </div>
         </header>
         <div className="app-content container section">
-          <Outlet />
+          <div key={location.pathname} className="route-anim">
+            <Outlet />
+          </div>
         </div>
       </main>
       <div className="sidebar-backdrop" onClick={() => setMobileOpen(false)} />
