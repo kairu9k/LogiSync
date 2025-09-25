@@ -172,6 +172,39 @@ class OrderController extends Controller
             ->header('Access-Control-Allow-Origin', '*');
     }
 
+    public function update(Request $request, int $id)
+    {
+        // Currently supports updating status (same validation as updateStatus)
+        $data = $request->all();
+        $validator = Validator::make($data, [
+            'status' => 'sometimes|string|in:pending,processing,fulfilled,canceled',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422)
+                ->header('Access-Control-Allow-Origin', '*');
+        }
+
+        $exists = DB::table('orders')->where('order_id', $id)->exists();
+        if (!$exists) {
+            return response()->json(['message' => 'Order not found'], 404)
+                ->header('Access-Control-Allow-Origin', '*');
+        }
+
+        $updates = [];
+        if (array_key_exists('status', $data)) {
+            $updates['order_status'] = $data['status'];
+        }
+        if (empty($updates)) {
+            return response()->json(['message' => 'No changes provided'], 400)
+                ->header('Access-Control-Allow-Origin', '*');
+        }
+
+        DB::table('orders')->where('order_id', $id)->update($updates);
+
+        return response()->json(['message' => 'Order updated'])
+            ->header('Access-Control-Allow-Origin', '*');
+    }
+
     public function addItems(Request $request, int $id)
     {
         // Accept either items[] or a single product_id + quantity
@@ -222,6 +255,53 @@ class OrderController extends Controller
         DB::table('order_details')->insert($rows);
 
         return response()->json(['message' => 'Items added', 'count' => count($rows)])
+            ->header('Access-Control-Allow-Origin', '*');
+    }
+
+    public function updateItem(Request $request, int $id, int $itemId)
+    {
+        // Ensure item belongs to order
+        $item = DB::table('order_details')->where('order_details_id', $itemId)->first();
+        if (!$item || (int)$item->order_id !== (int)$id) {
+            return response()->json(['message' => 'Order item not found'], 404)
+                ->header('Access-Control-Allow-Origin', '*');
+        }
+
+        $data = $request->all();
+        $validator = Validator::make($data, [
+            'product_id' => 'sometimes|integer',
+            'quantity' => 'sometimes|integer|min:1',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422)
+                ->header('Access-Control-Allow-Origin', '*');
+        }
+
+        $updates = [];
+        if (array_key_exists('product_id', $data)) $updates['product_id'] = (int) $data['product_id'];
+        if (array_key_exists('quantity', $data)) $updates['quantity'] = (int) $data['quantity'];
+        if (empty($updates)) {
+            return response()->json(['message' => 'No changes provided'], 400)
+                ->header('Access-Control-Allow-Origin', '*');
+        }
+
+        DB::table('order_details')->where('order_details_id', $itemId)->update($updates);
+
+        return response()->json(['message' => 'Item updated'])
+            ->header('Access-Control-Allow-Origin', '*');
+    }
+
+    public function deleteItem(int $id, int $itemId)
+    {
+        // Ensure item belongs to order
+        $item = DB::table('order_details')->where('order_details_id', $itemId)->first();
+        if (!$item || (int)$item->order_id !== (int)$id) {
+            return response()->json(['message' => 'Order item not found'], 404)
+                ->header('Access-Control-Allow-Origin', '*');
+        }
+
+        DB::table('order_details')->where('order_details_id', $itemId)->delete();
+        return response()->json(['message' => 'Item deleted'])
             ->header('Access-Control-Allow-Origin', '*');
     }
 }

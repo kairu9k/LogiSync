@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { apiGet, apiPatch, apiPost } from '../../lib/api'
+import { apiGet, apiPatch, apiPost, apiDelete } from '../../lib/api'
 
 export default function OrderDetail() {
   const { id } = useParams()
@@ -9,6 +9,9 @@ export default function OrderDetail() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [updating, setUpdating] = useState(false)
+  const [editingId, setEditingId] = useState(null)
+  const [editProductId, setEditProductId] = useState('')
+  const [editQuantity, setEditQuantity] = useState('1')
 
   async function load() {
     setLoading(true)
@@ -75,7 +78,38 @@ export default function OrderDetail() {
         {order.details?.length ? (
           <ul style={{ margin: 0, paddingLeft: 18 }}>
             {order.details.map((d) => (
-              <li key={d.order_details_id}>Product {d.product_id} — Qty {d.quantity}</li>
+              <li key={d.order_details_id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                {editingId === d.order_details_id ? (
+                  <>
+                    <input className="input" style={{ maxWidth: 120 }} type="number" min="1" value={editProductId} onChange={(e) => setEditProductId(e.target.value)} />
+                    <input className="input" style={{ maxWidth: 120 }} type="number" min="1" value={editQuantity} onChange={(e) => setEditQuantity(e.target.value)} />
+                    <button className="btn btn-primary" type="button" onClick={async () => {
+                      try {
+                        await apiPatch(`/api/orders/${id}/items/${d.order_details_id}`, { product_id: Number(editProductId), quantity: Number(editQuantity) })
+                        setEditingId(null)
+                        await load()
+                      } catch (err) {
+                        alert(err.message || 'Failed to update item')
+                      }
+                    }}>Save</button>
+                    <button className="btn btn-outline" type="button" onClick={() => setEditingId(null)}>Cancel</button>
+                  </>
+                ) : (
+                  <>
+                    <span>Product {d.product_id} — Qty {d.quantity}</span>
+                    <button className="btn" type="button" onClick={() => { setEditingId(d.order_details_id); setEditProductId(String(d.product_id)); setEditQuantity(String(d.quantity)); }}>Edit</button>
+                    <button className="btn btn-danger" type="button" onClick={async () => {
+                      if (!confirm('Delete this item?')) return
+                      try {
+                        await apiDelete(`/api/orders/${id}/items/${d.order_details_id}`)
+                        await load()
+                      } catch (err) {
+                        alert(err.message || 'Failed to delete item')
+                      }
+                    }}>Delete</button>
+                  </>
+                )}
+              </li>
             ))}
           </ul>
         ) : (

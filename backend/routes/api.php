@@ -16,7 +16,10 @@ Route::get('/orders', [OrderController::class, 'index']);
 Route::get('/orders/{id}', [OrderController::class, 'show']);
 Route::post('/orders', [OrderController::class, 'store']);
 Route::patch('/orders/{id}/status', [OrderController::class, 'updateStatus']);
+Route::patch('/orders/{id}', [OrderController::class, 'update']);
 Route::post('/orders/{id}/items', [OrderController::class, 'addItems']);
+Route::patch('/orders/{id}/items/{itemId}', [OrderController::class, 'updateItem']);
+Route::delete('/orders/{id}/items/{itemId}', [OrderController::class, 'deleteItem']);
 
 Route::post('/quotes', [QuoteController::class, 'store']);
 Route::post('/invoices', [InvoiceController::class, 'store']);

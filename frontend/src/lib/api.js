@@ -40,3 +40,13 @@ export async function apiPatch(path, body) {
   }
   return data;
 }
+
+export async function apiDelete(path) {
+  const res = await fetch(`${API_BASE}${path}`, { method: "DELETE" });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const message = data?.message || "Request failed";
+    throw new Error(message);
+  }
+  return data;
+}
