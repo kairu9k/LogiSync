@@ -27,7 +27,7 @@ export default function Quotes() {
     setError('')
     try {
       const res = await apiGet('/api/quotes')
-      setList(res?.data || [])
+      setList((res?.data || []).filter(q => q.status !== 'rejected'))
     } catch (e) {
       setError(e.message || 'Failed to load quotes')
     } finally {
@@ -133,7 +133,7 @@ export default function Quotes() {
                 <div className="muted">Expires {q.expiry_date}</div>
                 <div className="form-actions" style={{ marginTop: 8 }}>
                   <button className="btn" onClick={async()=>{ try { await apiPatch(`/api/quotes/${q.id}/status`, { status: 'approved' }); await refresh() } catch(e){ alert(e.message) }}}>Approve</button>
-                  <button className="btn btn-outline" onClick={async()=>{ try { await apiPatch(`/api/quotes/${q.id}/status`, { status: 'rejected' }); await refresh() } catch(e){ alert(e.message) }}}>Reject</button>
+                  <button className="btn btn-outline" onClick={async()=>{ try { await apiPatch(`/api/quotes/${q.id}/status`, { status: 'rejected' }); setList(prev => prev.filter(item => item.id !== q.id)) } catch(e){ alert(e.message) }}}>Reject</button>
                   <button className="btn btn-primary" onClick={async()=>{ try { const res = await apiPost(`/api/quotes/${q.id}/convert-to-order`, {}); const id = res?.order_id; if (id) navigate(`/app/orders/${id}`); else await refresh(); } catch(e){ alert(e.message) }}}>Convert to Order</button>
                 </div>
               </div>

@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Schema;
 
 class QuoteController extends Controller
 {
@@ -176,11 +177,15 @@ class QuoteController extends Controller
         }
         // Ensure there is a user
         $userId = $q->user_id ?? (DB::table('users')->min('user_id') ?? 1);
-        $orderId = DB::table('orders')->insertGetId([
+        $orderPayload = [
             'user_id' => $userId,
-            'quote_id' => $q->quote_id,
             'order_status' => 'pending',
-        ], 'order_id');
+        ];
+        // Be resilient if migration not applied yet
+        if (Schema::hasColumn('orders', 'quote_id')) {
+            $orderPayload['quote_id'] = $q->quote_id;
+        }
+        $orderId = DB::table('orders')->insertGetId($orderPayload, 'order_id');
         // Optionally, we could translate dims/weight to order_details; keeping minimal here
         // Mark quote approved if not already
         if ($q->status !== 'approved') {
