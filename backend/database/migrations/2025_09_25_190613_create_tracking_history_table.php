@@ -11,7 +11,7 @@ return new class extends Migration
         if (!Schema::hasTable('tracking_history')) {
             Schema::create('tracking_history', function (Blueprint $table) {
                 $table->increments('tracking_history_id');
-                $table->integer('shipment_id');
+                $table->unsignedInteger('shipment_id');
                 $table->timestamp('timestamp')->useCurrent();
                 $table->string('location', 255);
                 $table->string('status', 50);

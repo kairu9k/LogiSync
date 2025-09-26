@@ -12,7 +12,7 @@ return new class extends Migration
             Schema::create('orders', function (Blueprint $table) {
                 $table->increments('order_id');
                 $table->timestamp('order_date')->useCurrent();
-                $table->integer('user_id');
+                $table->unsignedInteger('user_id');
                 $table->string('order_status', 50)->default('pending');
 
                 $table->index('user_id');

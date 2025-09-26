@@ -16,9 +16,9 @@ return new class extends Migration
                 $table->string('registration_number', 255)->unique();
                 $table->string('capacity', 255);
                 $table->text('safety_compliance_details')->nullable();
-                $table->integer('budget_id');
-                $table->integer('schedule_id');
-                $table->integer('driver_id');
+                $table->unsignedInteger('budget_id');
+                $table->unsignedInteger('schedule_id');
+                $table->unsignedInteger('driver_id');
 
                 $table->index('vehicle_id');
                 $table->index('driver_id');

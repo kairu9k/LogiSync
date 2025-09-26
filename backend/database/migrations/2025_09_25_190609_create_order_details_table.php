@@ -11,7 +11,7 @@ return new class extends Migration
         if (!Schema::hasTable('order_details')) {
             Schema::create('order_details', function (Blueprint $table) {
                 $table->increments('order_details_id');
-                $table->integer('order_id');
+                $table->unsignedInteger('order_id');
                 $table->integer('product_id');
                 $table->integer('quantity');
 

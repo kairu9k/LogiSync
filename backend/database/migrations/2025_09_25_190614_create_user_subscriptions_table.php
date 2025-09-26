@@ -11,8 +11,8 @@ return new class extends Migration
         if (!Schema::hasTable('user_subscriptions')) {
             Schema::create('user_subscriptions', function (Blueprint $table) {
                 $table->increments('user_subscription_id');
-                $table->integer('user_id');
-                $table->integer('subscription_id');
+                $table->unsignedInteger('user_id');
+                $table->unsignedInteger('subscription_id');
                 $table->date('start_date');
                 $table->date('end_date');
                 $table->string('status', 50)->default('active');

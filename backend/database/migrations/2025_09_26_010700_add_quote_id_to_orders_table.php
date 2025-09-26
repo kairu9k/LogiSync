@@ -10,7 +10,7 @@ return new class extends Migration
     {
         if (!Schema::hasColumn('orders', 'quote_id')) {
             Schema::table('orders', function (Blueprint $table) {
-                $table->integer('quote_id')->nullable()->after('user_id');
+                $table->unsignedInteger('quote_id')->nullable()->after('user_id');
                 $table->index('quote_id');
             });
             // Add FK separately to avoid errors if quotes table doesn't exist yet

@@ -11,7 +11,7 @@ return new class extends Migration
         if (!Schema::hasTable('invoices')) {
             Schema::create('invoices', function (Blueprint $table) {
                 $table->increments('invoice_id');
-                $table->integer('order_id');
+                $table->unsignedInteger('order_id');
                 $table->string('invoice_type', 255);
                 $table->date('invoice_date');
                 $table->date('due_date');

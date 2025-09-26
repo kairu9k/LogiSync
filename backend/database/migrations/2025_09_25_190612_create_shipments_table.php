@@ -22,8 +22,8 @@ return new class extends Migration
                 $table->integer('charges');
                 $table->string('status', 50)->default('pending');
                 $table->date('departure_date')->nullable();
-                $table->integer('order_id');
-                $table->integer('transport_id');
+                $table->unsignedInteger('order_id');
+                $table->unsignedInteger('transport_id');
 
                 $table->index('order_id');
                 $table->index('transport_id');

@@ -12,7 +12,7 @@ return new class extends Migration
             Schema::create('quotes', function (Blueprint $table) {
                 $table->increments('quote_id');
                 $table->timestamp('creation_date')->useCurrent();
-                $table->integer('user_id');
+                $table->unsignedInteger('user_id');
                 $table->integer('weight');
                 $table->string('dimensions', 255);
                 $table->integer('estimated_cost');

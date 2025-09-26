@@ -11,9 +11,9 @@ return new class extends Migration
         if (!Schema::hasTable('inventory')) {
             Schema::create('inventory', function (Blueprint $table) {
                 $table->increments('inventory_id');
-                $table->integer('warehouse_id');
+                $table->unsignedInteger('warehouse_id');
                 $table->string('location_in_warehouse', 255);
-                $table->integer('order_details_id');
+                $table->unsignedInteger('order_details_id');
 
                 $table->index('warehouse_id');
                 $table->index('order_details_id');
