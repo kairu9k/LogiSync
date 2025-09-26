@@ -120,10 +120,14 @@ class OrderController extends Controller
 
         $status = $data['status'] ?? 'pending';
 
-        $id = DB::table('orders')->insertGetId([
+        $payload = [
             'user_id' => $userId,
             'order_status' => $status,
-        ], 'order_id');
+        ];
+        if (!empty($data['quote_id'])) {
+            $payload['quote_id'] = (int)$data['quote_id'];
+        }
+        $id = DB::table('orders')->insertGetId($payload, 'order_id');
 
         // Insert order items if provided
         if (!empty($data['items']) && is_array($data['items'])) {

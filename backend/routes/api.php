@@ -21,7 +21,13 @@ Route::post('/orders/{id}/items', [OrderController::class, 'addItems']);
 Route::patch('/orders/{id}/items/{itemId}', [OrderController::class, 'updateItem']);
 Route::delete('/orders/{id}/items/{itemId}', [OrderController::class, 'deleteItem']);
 
+// Quotes
+Route::get('/quotes', [QuoteController::class, 'index']);
 Route::post('/quotes', [QuoteController::class, 'store']);
+Route::post('/quotes/calculate', [QuoteController::class, 'calculate']);
+Route::patch('/quotes/{id}/status', [QuoteController::class, 'updateStatus']);
+Route::post('/quotes/{id}/convert-to-order', [QuoteController::class, 'convertToOrder']);
+
 Route::post('/invoices', [InvoiceController::class, 'store']);
 
 // CORS preflight for dev
