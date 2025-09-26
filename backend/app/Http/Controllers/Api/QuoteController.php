@@ -54,7 +54,12 @@ class QuoteController extends Controller
         $status = $request->query('status');
         $query = DB::table('quotes as q')
             ->leftJoin('users as u', 'q.user_id', '=', 'u.user_id')
-            ->select('q.quote_id','q.creation_date','q.user_id','q.weight','q.dimensions','q.distance','q.estimated_cost','q.expiry_date','q.status','u.username')
+            ->leftJoin('orders as o', 'o.quote_id', '=', 'q.quote_id')
+            ->select(
+                'q.quote_id','q.creation_date','q.user_id','q.weight','q.dimensions','q.distance','q.estimated_cost','q.expiry_date','q.status','u.username',
+                DB::raw('MIN(o.order_id) as order_id')
+            )
+            ->groupBy('q.quote_id','q.creation_date','q.user_id','q.weight','q.dimensions','q.distance','q.estimated_cost','q.expiry_date','q.status','u.username')
             ->orderByDesc('q.creation_date');
         if ($status && $status !== 'any') $query->where('q.status', $status);
         $rows = $query->limit(100)->get();
@@ -68,6 +73,8 @@ class QuoteController extends Controller
                 'estimated_cost' => (int) $r->estimated_cost,
                 'expiry_date' => $r->expiry_date,
                 'status' => $r->status,
+                'order_id' => $r->order_id ? (int) $r->order_id : null,
+                'converted' => $r->order_id !== null,
             ];
         });
         return response()->json(['data' => $data])->header('Access-Control-Allow-Origin', '*');

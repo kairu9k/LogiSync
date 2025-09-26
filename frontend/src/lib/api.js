@@ -50,3 +50,33 @@ export async function apiDelete(path) {
   }
   return data;
 }
+
+// Shipment API functions
+export async function getShipments(params = {}) {
+  const qs = new URLSearchParams()
+  if (params.q) qs.set('q', params.q)
+  if (params.status && params.status !== 'any') qs.set('status', params.status)
+  if (params.limit) qs.set('limit', params.limit)
+  const url = '/api/shipments' + (qs.toString() ? `?${qs.toString()}` : '')
+  return apiGet(url)
+}
+
+export async function getShipment(id) {
+  return apiGet(`/api/shipments/${id}`)
+}
+
+export async function createShipmentFromOrder(orderId, shipmentData) {
+  return apiPost(`/api/orders/${orderId}/shipments`, shipmentData)
+}
+
+export async function updateShipmentStatus(shipmentId, statusData) {
+  return apiPatch(`/api/shipments/${shipmentId}/status`, statusData)
+}
+
+export async function trackShipment(trackingNumber) {
+  return apiGet(`/api/track/${trackingNumber}`)
+}
+
+export async function getTransports() {
+  return apiGet('/api/transport')
+}

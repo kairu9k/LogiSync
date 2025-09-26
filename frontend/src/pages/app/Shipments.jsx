@@ -1,35 +1,268 @@
+import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { getShipments, updateShipmentStatus, trackShipment } from '../../lib/api'
+
 export default function Shipments() {
+  const [shipments, setShipments] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [q, setQ] = useState('')
+  const [status, setStatus] = useState('any')
+  const [updating, setUpdating] = useState(null)
+  const [trackingNumber, setTrackingNumber] = useState('')
+  const [trackingResult, setTrackingResult] = useState(null)
+  const [trackingLoading, setTrackingLoading] = useState(false)
+  const navigate = useNavigate()
+
+  async function fetchShipments(params = {}) {
+    setLoading(true)
+    setError('')
+    try {
+      const res = await getShipments(params)
+      setShipments(res?.data || [])
+    } catch (e) {
+      setError(e.message || 'Failed to load shipments')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchShipments({ q, status })
+  }, [q, status])
+
+  async function handleStatusUpdate(shipmentId, newStatus, location, details = '') {
+    try {
+      setUpdating(shipmentId)
+      await updateShipmentStatus(shipmentId, {
+        status: newStatus,
+        location,
+        details
+      })
+      await fetchShipments({ q, status })
+    } catch (e) {
+      alert(e.message || 'Failed to update status')
+    } finally {
+      setUpdating(null)
+    }
+  }
+
+  async function handleTrackShipment() {
+    if (!trackingNumber.trim()) return
+
+    setTrackingLoading(true)
+    try {
+      const res = await trackShipment(trackingNumber.trim())
+      setTrackingResult(res?.data)
+    } catch (e) {
+      setTrackingResult(null)
+      alert(e.message || 'Tracking number not found')
+    } finally {
+      setTrackingLoading(false)
+    }
+  }
+
+  function getStatusBadgeClass(status) {
+    switch (status) {
+      case 'delivered': return 'badge success'
+      case 'in_transit': case 'out_for_delivery': return 'badge info'
+      case 'pending': return 'badge warn'
+      case 'cancelled': return 'badge danger'
+      default: return 'badge'
+    }
+  }
+
   return (
     <div className="grid" style={{ gap: 16 }}>
       <div className="card">
         <h2 style={{ marginTop: 0 }}>Shipments</h2>
         <div className="form-row">
-          <input className="input" placeholder="Track # or Order #" />
-          <input className="input" placeholder="Carrier" />
-          <input className="input" placeholder="Status" />
+          <input
+            className="input"
+            placeholder="Search tracking # or customer"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+          />
+          <select className="input" value={status} onChange={(e) => setStatus(e.target.value)}>
+            <option value="any">Status: Any</option>
+            <option value="pending">Pending</option>
+            <option value="in_transit">In Transit</option>
+            <option value="out_for_delivery">Out for Delivery</option>
+            <option value="delivered">Delivered</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
         </div>
       </div>
-      <div className="grid" style={{ gridTemplateColumns: 'repeat(2, minmax(0,1fr))', gap: 12 }}>
-        {[1,2,3,4].map((i) => (
-          <div key={i} className="card" style={{ padding: 16 }}>
-            <div className="muted">TRK-90{i}2</div>
-            <div>Order PO-1002{i}</div>
-            <div>Carrier: FleetX</div>
-            <div>Status: <span className={i%2?'badge warn':'badge success'}>{i%2?'Delayed':'In Transit'}</span></div>
-            <div className="form-row" style={{ marginTop: 8 }}>
-              <select className="input" defaultValue="update">
-                <option value="update" disabled>Update status…</option>
-                <option>Label Created</option>
-                <option>In Transit</option>
-                <option>Out for Delivery</option>
-                <option>Delivered</option>
-                <option>Delayed</option>
-              </select>
-              <button className="btn btn-outline" type="button">Apply</button>
+
+      <div className="card">
+        <h3 style={{ marginTop: 0 }}>Track Shipment</h3>
+        <div className="form-row">
+          <input
+            className="input"
+            placeholder="Enter tracking number (e.g. LS2024001)"
+            value={trackingNumber}
+            onChange={(e) => setTrackingNumber(e.target.value)}
+          />
+          <button
+            className="btn btn-primary"
+            onClick={handleTrackShipment}
+            disabled={trackingLoading || !trackingNumber.trim()}
+          >
+            {trackingLoading ? 'Tracking...' : 'Track'}
+          </button>
+        </div>
+
+        {trackingResult && (
+          <div className="card" style={{ marginTop: 12, padding: 16, backgroundColor: 'var(--gray-50)' }}>
+            <h4 style={{ marginTop: 0 }}>Tracking: {trackingResult.tracking_number}</h4>
+            <div className="grid" style={{ gridTemplateColumns: 'repeat(2, minmax(0,1fr))', gap: 12 }}>
+              <div>
+                <div className="label">Receiver</div>
+                <div>{trackingResult.receiver_name}</div>
+              </div>
+              <div>
+                <div className="label">Current Status</div>
+                <div><span className={getStatusBadgeClass(trackingResult.current_status)}>{trackingResult.current_status}</span></div>
+              </div>
+              <div>
+                <div className="label">Destination</div>
+                <div>{trackingResult.destination}</div>
+              </div>
+              <div>
+                <div className="label">Driver</div>
+                <div>{trackingResult.driver}</div>
+              </div>
             </div>
+
+            {trackingResult.tracking_history?.length > 0 && (
+              <div style={{ marginTop: 12 }}>
+                <div className="label">Tracking History</div>
+                <div className="grid" style={{ gap: 8, marginTop: 8 }}>
+                  {trackingResult.tracking_history.map((item, index) => (
+                    <div key={index} style={{ padding: 8, border: '1px solid var(--gray-200)', borderRadius: 4 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span className={getStatusBadgeClass(item.status)}>{item.status}</span>
+                        <span className="muted" style={{ fontSize: '0.875rem' }}>
+                          {new Date(item.timestamp).toLocaleString()}
+                        </span>
+                      </div>
+                      <div style={{ fontWeight: 'bold', marginTop: 4 }}>{item.location}</div>
+                      {item.details && <div className="muted" style={{ fontSize: '0.875rem', marginTop: 2 }}>{item.details}</div>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
-        ))}
+        )}
       </div>
+
+      {loading && <div className="card" style={{ padding: 16 }}>Loading shipments…</div>}
+      {error && <div className="card" style={{ padding: 16, color: 'var(--danger-600)' }}>{error}</div>}
+
+      {!loading && !error && (
+        <div className="grid" style={{ gridTemplateColumns: 'repeat(2, minmax(0,1fr))', gap: 12 }}>
+          {shipments.map((s) => (
+            <div key={s.id} className="card" style={{ padding: 16, position: 'relative' }}>
+              <button
+                className="btn btn-outline"
+                onClick={() => navigate(`/app/shipments/${s.id}`)}
+                style={{
+                  position: 'absolute',
+                  top: 12,
+                  right: 12,
+                  padding: '4px 8px',
+                  fontSize: '0.75rem'
+                }}
+              >
+                View Details
+              </button>
+              <div className="muted">{s.tracking_number}</div>
+              <div><strong>{s.receiver}</strong></div>
+              <div>Customer: {s.customer}</div>
+              <div>Driver: {s.driver}</div>
+              <div>Vehicle: {s.vehicle}</div>
+              <div>
+                Status: <span className={getStatusBadgeClass(s.status)}>{s.status}</span>
+              </div>
+              <div className="muted" style={{ fontSize: '0.875rem' }}>
+                Created: {new Date(s.creation_date).toLocaleDateString()}
+                {s.departure_date && ` • Departure: ${new Date(s.departure_date).toLocaleDateString()}`}
+              </div>
+
+              <StatusUpdateForm
+                shipment={s}
+                onUpdate={handleStatusUpdate}
+                updating={updating === s.id}
+              />
+            </div>
+          ))}
+
+          {shipments.length === 0 && (
+            <div className="card" style={{ padding: 16 }}>
+              No shipments found.
+            </div>
+          )}
+        </div>
+      )}
     </div>
+  )
+}
+
+function StatusUpdateForm({ shipment, onUpdate, updating }) {
+  const [newStatus, setNewStatus] = useState('')
+  const [location, setLocation] = useState('')
+  const [details, setDetails] = useState('')
+
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    if (!newStatus || !location) return
+
+    onUpdate(shipment.id, newStatus, location, details)
+    setNewStatus('')
+    setLocation('')
+    setDetails('')
+  }
+
+  return (
+    <form onSubmit={handleSubmit} style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--gray-200)' }}>
+      <div className="grid" style={{ gap: 8 }}>
+        <div className="form-row">
+          <select
+            className="input"
+            value={newStatus}
+            onChange={(e) => setNewStatus(e.target.value)}
+            required
+          >
+            <option value="">Update status…</option>
+            <option value="pending">Pending</option>
+            <option value="in_transit">In Transit</option>
+            <option value="out_for_delivery">Out for Delivery</option>
+            <option value="delivered">Delivered</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+          <input
+            className="input"
+            placeholder="Location"
+            value={location}
+            onChange={(e) => setLocation(e.target.value)}
+            required
+          />
+        </div>
+        <input
+          className="input"
+          placeholder="Details (optional)"
+          value={details}
+          onChange={(e) => setDetails(e.target.value)}
+        />
+        <button
+          className="btn btn-primary"
+          type="submit"
+          disabled={updating || !newStatus || !location}
+        >
+          {updating ? 'Updating...' : 'Update Status'}
+        </button>
+      </div>
+    </form>
   )
 }

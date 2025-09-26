@@ -214,3 +214,19 @@ label .label { font-size: 12px; text-transform: none; letter-spacing: 0; color: 
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+/* Quotes watermark */
+.quote-watermark {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(-20deg);
+  font-size: 48px;
+  font-weight: 900;
+  letter-spacing: 0.2em;
+  color: var(--muted);
+  opacity: 0.12;
+  text-transform: uppercase;
+  pointer-events: none;
+  user-select: none;
+}

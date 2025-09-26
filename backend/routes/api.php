@@ -5,6 +5,9 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\QuoteController;
 use App\Http\Controllers\Api\InvoiceController;
 use App\Http\Controllers\Api\OrderController;
+use App\Http\Controllers\Api\ShipmentController;
+use App\Http\Controllers\Api\TransportController;
+use App\Http\Controllers\Api\DriverController;
 
 Route::prefix('auth')->group(function () {
     Route::post('/register', [AuthController::class, 'register']);
@@ -27,6 +30,22 @@ Route::post('/quotes', [QuoteController::class, 'store']);
 Route::post('/quotes/calculate', [QuoteController::class, 'calculate']);
 Route::patch('/quotes/{id}/status', [QuoteController::class, 'updateStatus']);
 Route::post('/quotes/{id}/convert-to-order', [QuoteController::class, 'convertToOrder']);
+
+// Shipments
+Route::get('/shipments', [ShipmentController::class, 'index']);
+Route::get('/shipments/{id}', [ShipmentController::class, 'show']);
+Route::post('/orders/{orderId}/shipments', [ShipmentController::class, 'createFromOrder']);
+Route::patch('/shipments/{id}/status', [ShipmentController::class, 'updateStatus']);
+Route::get('/track/{trackingNumber}', [ShipmentController::class, 'track']);
+
+// Transport
+Route::get('/transport', [TransportController::class, 'index']);
+
+// Driver Mobile Interface
+Route::post('/driver/login', [DriverController::class, 'login']);
+Route::get('/driver/shipments', [DriverController::class, 'getMyShipments']);
+Route::get('/driver/shipments/{id}', [DriverController::class, 'getShipmentDetail']);
+Route::patch('/driver/shipments/{id}/status', [DriverController::class, 'updateShipmentStatus']);
 
 Route::post('/invoices', [InvoiceController::class, 'store']);
 

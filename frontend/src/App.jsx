@@ -10,7 +10,11 @@ import Orders from './pages/app/Orders.jsx'
 import OrderDetail from './pages/app/OrderDetail.jsx'
 import OrderCreate from './pages/app/OrderCreate.jsx'
 import Shipments from './pages/app/Shipments.jsx'
+import ShipmentDetail from './pages/app/ShipmentDetail.jsx'
 import Invoices from './pages/app/Invoices.jsx'
+import DriverLogin from './pages/DriverLogin.jsx'
+import DriverDashboard from './pages/DriverDashboard.jsx'
+import DriverShipment from './pages/DriverShipment.jsx'
 
 function App() {
   return (
@@ -25,8 +29,14 @@ function App() {
         <Route path="orders/new" element={<OrderCreate />} />
         <Route path="orders/:id" element={<OrderDetail />} />
         <Route path="shipments" element={<Shipments />} />
+        <Route path="shipments/:id" element={<ShipmentDetail />} />
         <Route path="invoices" element={<Invoices />} />
       </Route>
+
+      {/* Driver Mobile Interface Routes */}
+      <Route path="/driver/login" element={<DriverLogin />} />
+      <Route path="/driver/dashboard" element={<DriverDashboard />} />
+      <Route path="/driver/shipment/:id" element={<DriverShipment />} />
     </Routes>
   )
 }

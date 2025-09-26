@@ -124,20 +124,30 @@ export default function Quotes() {
         {error && <div style={{ color: 'var(--danger-600)', padding: 12 }}>{error}</div>}
         {!loading && !error && (
           <div className="grid" style={{ gridTemplateColumns: 'repeat(2, minmax(0,1fr))', gap: 12 }}>
-            {list.map(q => (
-              <div key={q.id} className="card" style={{ padding: 16 }}>
-                <div className="muted">Q-{String(q.id).padStart(5,'0')}</div>
-                <div>Customer {q.customer}</div>
-                <div>Weight {q.weight}kg • Distance {q.distance}km</div>
-                <div>Est. {formatMoney(q.estimated_cost)} • <span className={`badge ${q.status==='approved'?'success': q.status==='rejected'?'danger':'info'}`}>{q.status}</span></div>
-                <div className="muted">Expires {q.expiry_date}</div>
-                <div className="form-actions" style={{ marginTop: 8 }}>
-                  <button className="btn" onClick={async()=>{ try { await apiPatch(`/api/quotes/${q.id}/status`, { status: 'approved' }); await refresh() } catch(e){ alert(e.message) }}}>Approve</button>
-                  <button className="btn btn-outline" onClick={async()=>{ try { await apiPatch(`/api/quotes/${q.id}/status`, { status: 'rejected' }); setList(prev => prev.filter(item => item.id !== q.id)) } catch(e){ alert(e.message) }}}>Reject</button>
-                  <button className="btn btn-primary" onClick={async()=>{ try { const res = await apiPost(`/api/quotes/${q.id}/convert-to-order`, {}); const id = res?.order_id; if (id) navigate(`/app/orders/${id}`); else await refresh(); } catch(e){ alert(e.message) }}}>Convert to Order</button>
+            {list.map(q => {
+              const converted = !!q.order_id || q.converted === true;
+              return (
+                <div key={q.id} className="card" style={{ padding: 16, position: 'relative', overflow: 'hidden', opacity: converted ? 0.6 : 1 }}>
+                  {converted && <div className="quote-watermark">Converted</div>}
+                  <div className="muted">Q-{String(q.id).padStart(5,'0')}</div>
+                  <div>Customer {q.customer}</div>
+                  <div>Weight {q.weight}kg • Distance {q.distance}km</div>
+                  <div>Est. {formatMoney(q.estimated_cost)} • <span className={`badge ${q.status==='approved'?'success': q.status==='rejected'?'danger':'info'}`}>{q.status}</span></div>
+                  <div className="muted">Expires {q.expiry_date}</div>
+                  <div className="form-actions" style={{ marginTop: 8 }}>
+                    {converted ? (
+                      <span className="badge success">Converted</span>
+                    ) : (
+                      <>
+                        <button className="btn" onClick={async()=>{ try { await apiPatch(`/api/quotes/${q.id}/status`, { status: 'approved' }); await refresh() } catch(e){ alert(e.message) }}}>Approve</button>
+                        <button className="btn btn-outline" onClick={async()=>{ try { await apiPatch(`/api/quotes/${q.id}/status`, { status: 'rejected' }); setList(prev => prev.filter(item => item.id !== q.id)) } catch(e){ alert(e.message) }}}>Reject</button>
+                        <button className="btn btn-primary" onClick={async()=>{ try { const res = await apiPost(`/api/quotes/${q.id}/convert-to-order`, {}); const id = res?.order_id; if (id) navigate(`/app/orders/${id}`); else await refresh(); } catch(e){ alert(e.message) }}}>Convert to Order</button>
+                      </>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
             {list.length===0 && <div className="card" style={{ padding: 16 }}>No quotes yet.</div>}
           </div>
         )}
