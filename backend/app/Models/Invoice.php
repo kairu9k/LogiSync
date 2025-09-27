@@ -123,15 +123,29 @@ class Invoice extends Model
     // Static methods
     public static function createFromShipment(Shipment $shipment, array $additionalData = []): self
     {
+        // Validate required data
+        if (!$shipment->order_id) {
+            throw new \InvalidArgumentException('Shipment must have an order_id to create invoice');
+        }
+
         // Calculate amount from shipment charges or related quote
         $amount = $shipment->charges;
 
         // Try to get pricing from related quote if available
         if ($shipment->order && $shipment->order->quote_id) {
             $quote = DB::table('quotes')->where('quote_id', $shipment->order->quote_id)->first();
-            if ($quote && $quote->total_amount) {
-                $amount = $quote->total_amount;
+            if ($quote && $quote->estimated_cost) {
+                $amount = $quote->estimated_cost;
             }
+        }
+
+        // Ensure amount is valid
+        if (!$amount || $amount <= 0) {
+            $amount = 100; // Default minimum amount (1.00 in display currency)
+            \Log::warning('Using default amount for invoice creation', [
+                'shipment_id' => $shipment->shipment_id,
+                'default_amount' => $amount
+            ]);
         }
 
         $invoiceData = array_merge([
@@ -144,6 +158,11 @@ class Invoice extends Model
             'amount' => $amount,
             'status' => self::STATUS_PENDING,
         ], $additionalData);
+
+        \Log::info('Creating invoice with data', [
+            'invoice_data' => $invoiceData,
+            'shipment_id' => $shipment->shipment_id
+        ]);
 
         return self::create($invoiceData);
     }

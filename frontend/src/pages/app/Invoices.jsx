@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { apiGet, apiPatch } from '../../lib/api'
+import { getInvoices, markInvoiceAsPaid, updateInvoiceStatus, apiPatch } from '../../lib/api'
 
 export default function Invoices() {
   const [invoices, setInvoices] = useState([])
@@ -16,8 +16,7 @@ export default function Invoices() {
     setLoading(true)
     setError('')
     try {
-      const res = await apiGet('/api/invoices' +
-        (Object.keys(params).length ? '?' + new URLSearchParams(params).toString() : ''))
+      const res = await getInvoices(params)
       // Sort invoices: put paid invoices last
       const sortedData = (res?.data || []).sort((a, b) => {
         if (a.status === 'paid' && b.status !== 'paid') return 1
@@ -42,13 +41,13 @@ export default function Invoices() {
       setUpdating(invoiceId)
 
       if (newStatus === 'paid') {
-        await apiPatch(`/api/invoices/${invoiceId}/mark-paid`, {
+        await markInvoiceAsPaid(invoiceId, {
           payment_method: paymentData.method || 'Cash',
           payment_date: paymentData.date || new Date().toISOString().split('T')[0],
           notes: paymentData.notes || ''
         })
       } else {
-        await apiPatch(`/api/invoices/${invoiceId}/status`, { status: newStatus })
+        await updateInvoiceStatus(invoiceId, { status: newStatus })
       }
 
       await fetchInvoices({ q, status })
@@ -213,9 +212,18 @@ export default function Invoices() {
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h2 style={{ marginTop: 0 }}>Invoices</h2>
-          <button className="btn btn-outline" onClick={updateOverdueStatuses}>
-            Update Overdue
-          </button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              className="btn btn-outline"
+              onClick={() => fetchInvoices({ q, status })}
+              disabled={loading}
+            >
+              {loading ? 'Refreshing...' : '🔄 Refresh'}
+            </button>
+            <button className="btn btn-outline" onClick={updateOverdueStatuses}>
+              Update Overdue
+            </button>
+          </div>
         </div>
 
         <div className="form-row">

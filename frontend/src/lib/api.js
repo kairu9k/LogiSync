@@ -80,3 +80,29 @@ export async function trackShipment(trackingNumber) {
 export async function getTransports() {
   return apiGet('/api/transport')
 }
+
+// Invoice API functions
+export async function getInvoices(params = {}) {
+  const qs = new URLSearchParams()
+  if (params.q) qs.set('q', params.q)
+  if (params.status && params.status !== 'any') qs.set('status', params.status)
+  if (params.limit) qs.set('limit', params.limit)
+  const url = '/api/invoices' + (qs.toString() ? `?${qs.toString()}` : '')
+  return apiGet(url)
+}
+
+export async function getInvoice(id) {
+  return apiGet(`/api/invoices/${id}`)
+}
+
+export async function createInvoiceFromShipment(shipmentId, data = {}) {
+  return apiPost(`/api/shipments/${shipmentId}/invoice`, data)
+}
+
+export async function markInvoiceAsPaid(invoiceId, paymentData) {
+  return apiPatch(`/api/invoices/${invoiceId}/mark-paid`, paymentData)
+}
+
+export async function updateInvoiceStatus(invoiceId, statusData) {
+  return apiPatch(`/api/invoices/${invoiceId}/status`, statusData)
+}
