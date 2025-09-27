@@ -8,6 +8,9 @@ use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\ShipmentController;
 use App\Http\Controllers\Api\TransportController;
 use App\Http\Controllers\Api\DriverController;
+use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\Api\WarehouseController;
+use App\Http\Controllers\Api\AnalyticsController;
 
 Route::prefix('auth')->group(function () {
     Route::post('/register', [AuthController::class, 'register']);
@@ -47,7 +50,36 @@ Route::get('/driver/shipments', [DriverController::class, 'getMyShipments']);
 Route::get('/driver/shipments/{id}', [DriverController::class, 'getShipmentDetail']);
 Route::patch('/driver/shipments/{id}/status', [DriverController::class, 'updateShipmentStatus']);
 
+// Invoices
+Route::get('/invoices', [InvoiceController::class, 'index']);
+Route::get('/invoices/{id}', [InvoiceController::class, 'show']);
 Route::post('/invoices', [InvoiceController::class, 'store']);
+Route::patch('/invoices/{id}/status', [InvoiceController::class, 'updateStatus']);
+Route::patch('/invoices/{id}/mark-paid', [InvoiceController::class, 'markAsPaid']);
+Route::post('/shipments/{shipmentId}/invoice', [InvoiceController::class, 'createFromShipment']);
+Route::patch('/invoices/update-overdue', [InvoiceController::class, 'updateOverdueStatuses']);
+Route::get('/dashboard/invoice-metrics', [InvoiceController::class, 'getDashboardMetrics']);
+Route::get('/dashboard/metrics', [DashboardController::class, 'getMetrics']);
+
+// Warehouse Management
+Route::get('/warehouses', [WarehouseController::class, 'index']);
+Route::get('/warehouses/{id}', [WarehouseController::class, 'show']);
+Route::post('/warehouses', [WarehouseController::class, 'store']);
+Route::patch('/warehouses/{id}', [WarehouseController::class, 'update']);
+Route::delete('/warehouses/{id}', [WarehouseController::class, 'destroy']);
+Route::get('/inventory', [WarehouseController::class, 'getInventory']);
+Route::post('/inventory/assign', [WarehouseController::class, 'assignItem']);
+Route::patch('/inventory/{id}', [WarehouseController::class, 'updateItemLocation']);
+Route::get('/inventory/unassigned', [WarehouseController::class, 'getUnassignedItems']);
+Route::get('/dashboard/warehouse-metrics', [WarehouseController::class, 'getDashboardMetrics']);
+
+// Analytics and Reporting
+Route::get('/analytics/overview', [AnalyticsController::class, 'getOverviewMetrics']);
+Route::get('/analytics/revenue', [AnalyticsController::class, 'getRevenueAnalytics']);
+Route::get('/analytics/operational', [AnalyticsController::class, 'getOperationalMetrics']);
+Route::get('/analytics/customers', [AnalyticsController::class, 'getCustomerAnalytics']);
+Route::get('/analytics/inventory', [AnalyticsController::class, 'getInventoryAnalytics']);
+Route::get('/analytics/reports', [AnalyticsController::class, 'generateReport']);
 
 // CORS preflight for dev
 Route::options('/{any}', function () {

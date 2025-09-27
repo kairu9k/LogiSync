@@ -2,154 +2,115 @@
 
 This file provides guidance to WARP (warp.dev) when working with code in this repository.
 
-Repository status
-- As of 2025-09-25, no common build/test/lint configuration files (e.g., package.json, pyproject.toml, Makefile, go.mod, Cargo.toml, *.sln) were found in this repository. The commands below are conditional: adopt the section that matches the tooling you add.
+Project overview
+- Monorepo with a Laravel 12 backend in backend/ and a React + Vite SPA in frontend/.
+- Primary flow: Quote -> Order -> Shipment -> Invoice. The backend exposes REST APIs consumed by the SPA. CORS preflight is enabled for development.
+- Tech stack: PHP 8.2, Laravel 12, PHPUnit; Node + Vite + React 19; Tailwind (for Laravel asset pipeline).
 
-Commands (detect and use based on what’s present)
+Common commands
 
-Package manager preference for Node.js
-- If pnpm-lock.yaml exists, use pnpm; if yarn.lock exists, use yarn; if package-lock.json exists, use npm.
+Backend (Laravel)
+- First-time setup
+  ```bash path=null start=null
+  # from backend/
+  composer install
+  copy .env.example .env            # use: cp on macOS/Linux
+  php artisan key:generate
+  
+  # configure DB in .env, then initialize schema + demo data
+  php artisan migrate --seed
+  ```
+- Run dev services (HTTP, queue, logs, Vite for Laravel assets)
+  ```bash path=null start=null
+  # from backend/
+  npm install                       # installs vite/concurrently used by the dev script
+  composer run dev                  # serves API at http://127.0.0.1:8000
+  ```
+- Run tests
+  ```bash path=null start=null
+  # all tests (uses in-memory sqlite per phpunit.xml)
+  composer test
+  
+  # single test class or name
+  php artisan test --filter InvoiceController
+  
+  # single test file
+  php artisan test tests/Feature/ExampleTest.php
+  ```
+- Database utilities
+  ```bash path=null start=null
+  php artisan migrate               # apply migrations
+  php artisan migrate:fresh --seed  # rebuild schema + seed
+  ```
+- Lint/format (Laravel Pint)
+  ```bash path=null start=null
+  # from backend/
+  vendor/bin/pint                   # add --test to check only
+  ```
 
-Node.js/TypeScript (if package.json exists)
-- Install dependencies
-```bash path=null start=null
-npm ci
-# or: pnpm install
-# or: yarn install
-```
-- Build
-```bash path=null start=null
-npm run build
-# or: pnpm build
-# or: yarn build
-```
+Frontend (React + Vite)
+- First-time setup
+  ```bash path=null start=null
+  # from frontend/
+  npm install
+  ```
+- Develop
+  ```bash path=null start=null
+  # serves SPA (default http://127.0.0.1:5173)
+  npm run dev
+  
+  # optionally point the SPA to a non-default API
+  # Windows PowerShell
+  $env:VITE_API_BASE = "http://localhost:8000"
+  npm run dev
+  ```
+- Build and preview
+  ```bash path=null start=null
+  npm run build
+  npm run preview
+  ```
 - Lint
-```bash path=null start=null
-npm run lint
-# If no script: npx eslint .
-```
-- Test (all)
-```bash path=null start=null
-npm test
-# or: pnpm test
-# or: yarn test
-```
-- Test (single)
-```bash path=null start=null
-# Jest
-npx jest path/to/file.test.ts -t "Test name substring"
-# Vitest
-npx vitest run path/to/file.test.ts -t "Test name substring"
-```
+  ```bash path=null start=null
+  npm run lint
+  ```
 
-Python (if pyproject.toml / requirements*.txt exists)
-- Create/activate venv (PowerShell)
-```bash path=null start=null
-python -m venv .venv
-. .\.venv\Scripts\Activate.ps1
-```
-- Install
-```bash path=null start=null
-# pyproject + poetry
-poetry install
-# or: requirements.txt
-python -m pip install -U pip
-python -m pip install -r requirements.txt
-```
-- Lint/format (common)
-```bash path=null start=null
-# Ruff (if configured)
-python -m ruff check .
-# Black (if configured)
-python -m black --check .
-```
-- Test (all) and single
-```bash path=null start=null
-# All tests
-python -m pytest -q
-# Single file / test
-python -m pytest tests/path/test_example.py -k "test_name_substring"
-```
+Integration notes
+- The SPA calls the backend via frontend/src/lib/api.js. API base URL is VITE_API_BASE (defaults to http://localhost:8000). Ensure the backend dev server is running on that port.
+- Backend enables permissive CORS for development (see backend/routes/api.php Route::options). In production, tighten CORS appropriately.
 
-.NET (if *.sln or *.csproj exists)
-- Restore, build, test
-```bash path=null start=null
-dotnet restore
-dotnet build --configuration Release
-dotnet test --configuration Release --no-build
-```
-- Lint/format (if configured)
-```bash path=null start=null
-# Requires dotnet-format or analyzers configured in the solution
-dotnet format
-```
-- Test (single)
-```bash path=null start=null
-# By fully qualified name or trait
-dotnet test --filter "FullyQualifiedName~Namespace.ClassName.TestMethod"
-```
+High-level architecture
 
-Go (if go.mod exists)
-```bash path=null start=null
-# Build
-go build ./...
-# Lint (if golangci-lint is configured)
-golangci-lint run
-# Test (all)
-go test ./...
-# Test (single) by regex
-go test ./pkg/yourpkg -run TestName
-```
+Backend (backend/)
+- Routing: backend/routes/api.php defines REST endpoints for:
+  - Auth: POST /api/auth/register, /api/auth/login
+  - Quotes: calculate/store/index, convert-to-order
+  - Orders: CRUD-like endpoints, item subresources
+  - Shipments: list/show, create from order, status updates, public tracking /api/track/{trackingNumber}
+  - Transport: list vehicles/assignments for selection
+  - Driver-facing endpoints: login and shipment updates constrained by driver_id and transport assignment
+  - Invoices: list/show/create, mark paid, overdue updates, dashboard metrics
+  - Dashboard: /api/dashboard/metrics aggregates operational metrics
+- Controllers: App/Http/Controllers/Api/* implement request validation and data shaping. They primarily use the DB facade for selective joins and computed fields, with targeted use of Eloquent models (Order, Shipment, Transport, Invoice). Notable behavior:
+  - ShipmentController auto-generates invoices when a shipment reaches delivered status
+  - InvoiceController exposes both CRUD and reporting-style endpoints, returning preformatted and summarized data for the SPA
+  - QuoteController encapsulates pricing rules (distance, volumetric vs actual weight, destination multipliers, minimums, markup) and supports conversion to orders
+- Models: App/Models/{Order,Shipment,Transport,Invoice,...} map to normalized tables using custom keys (e.g., order_id, shipment_id). Relationships expose Order->Shipment, Shipment->TrackingHistory, Shipment->Transport, etc.
+- Data layer: database/migrations define schema; database/seeders/DatabaseSeeder seeds core demo data (users, schedules, budgets, transport, orders, shipments, tracking history, invoices) for a usable local environment.
+- Asset pipeline: backend/vite.config.js integrates laravel-vite-plugin and Tailwind for blade-driven pages (separate from the SPA).
 
-Rust (if Cargo.toml exists)
-```bash path=null start=null
-# Build
-cargo build --release
-# Lint
-a) cargo clippy -- -D warnings
-b) cargo fmt -- --check
-# Test (all)
-cargo test
-# Test (single)
-cargo test name_substring
-```
+Frontend (frontend/)
+- SPA structure: React + Vite with react-router-dom. Key areas include:
+  - pages/app/*: business views (Dashboard, Orders, OrderDetail, Shipments, ShipmentDetail, Quotes, Invoices)
+  - components/*: presentational and composite UI (e.g., TrackingWidget)
+  - routes/RequireAuth.jsx: client-side gating for protected routes
+  - lib/api.js: thin fetch wrapper exporting apiGet/apiPost/apiPatch/apiDelete and domain helpers (getShipments, trackShipment, etc.)
+- Communication: The SPA consumes the backend’s JSON shapes as returned by controllers (already formatted/summarized for UI consumption: amounts in cents plus formatted strings, derived labels, counts, etc.).
 
-Makefile (if Makefile exists)
-```bash path=null start=null
-# Discover tasks
-make help
-# Common targets (project-specific)
-make build
-make lint
-make test
-```
+Conventions and gotchas
+- Ports: backend defaults to 8000 (php artisan serve); SPA defaults to 5173.
+- Tests: phpunit.xml configures an in-memory sqlite database; tests won’t use your app’s configured DB.
+- Seeding: DatabaseSeeder wires multiple seeders; use migrate:fresh --seed to restore a coherent demo dataset.
+- Windows shell notes: Prefer PowerShell-style env var assignment when setting VITE_API_BASE during local runs.
 
-Docker (if Dockerfile or docker-compose*.yml exists)
-```bash path=null start=null
-# Build image
-docker build -t your-image:dev .
-# Run tests in container (example)
-docker run --rm your-image:dev npm test
-# Compose
-docker compose up -d --build
-```
-
-High-level architecture and structure
-- No architecture files were detected yet. When code is added, summarize the big picture by reading the following, if present:
-  - Monorepos: package.json (workspaces), pnpm-workspace.yaml, turbo.json, nx.json
-  - Python: pyproject.toml (tool sections for package layout), src/ and tests/ structure
-  - .NET: *.sln to map projects; *.csproj for output types (Exe/Library) and references; Directory.Build.*
-  - Go: go.work/go.mod to map modules; cmd/ (apps) and pkg/internal (libs)
-  - Rust: Cargo.toml/Cargo.lock for workspace members and crates
-  - Containers/ops: Dockerfile, docker-compose*.yml, .github/workflows/*.yml
-- Produce a concise overview:
-  - Identify apps/services vs. shared libraries; call out cross-cutting concerns (auth, config, logging, persistence).
-  - Note how components communicate (direct imports, HTTP/gRPC, messaging) and where interfaces/DTOs live.
-  - Point to the primary entrypoints (e.g., src/main.ts, Program.cs, cmd/<app>/main.go) and composition roots.
-
-Integration with other AI rules/docs
-- No CLAUDE.md, Cursor rules, Copilot instructions, or README.md were found. If any are added later, incorporate their important constraints in this section (naming conventions, code style, architectural rules, generation boundaries).
-
-Maintenance
-- Update the Commands section when build/lint/test tooling is introduced.
-- Add an Architecture summary once the first application and library modules are committed.
+Cross-references
+- docs/LogiSync-Project-Documentation.md outlines the functional scope (shipment/dispatch coordination, fulfillment, quotes, reporting, warehouse, invoice generation, subscription plans) and the intended user roles (admin, head office manager, driver, clients via public tracking). Use it for domain context, not as a source of commands.

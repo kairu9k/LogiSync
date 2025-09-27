@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Shipment;
 use App\Models\Transport;
 use App\Models\Order;
+use App\Models\Invoice;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -228,6 +229,11 @@ class ShipmentController extends Controller
             'details' => $data['details'] ?? null,
         ]);
 
+        // Auto-generate invoice when shipment is delivered
+        if ($data['status'] === 'delivered') {
+            $this->createInvoiceForDeliveredShipment($id);
+        }
+
         return response()->json(['message' => 'Shipment status updated'])
             ->header('Access-Control-Allow-Origin', '*');
     }
@@ -293,5 +299,31 @@ class ShipmentController extends Controller
         } while (DB::table('shipments')->where('tracking_number', $trackingNumber)->exists());
 
         return $trackingNumber;
+    }
+
+    private function createInvoiceForDeliveredShipment(int $shipmentId): void
+    {
+        try {
+            // Check if invoice already exists for this shipment
+            $existingInvoice = Invoice::where('shipment_id', $shipmentId)->first();
+            if ($existingInvoice) {
+                return; // Invoice already exists
+            }
+
+            $shipment = Shipment::with('order')->find($shipmentId);
+            if (!$shipment) {
+                return;
+            }
+
+            // Create invoice automatically with Net 30 terms
+            Invoice::createFromShipment($shipment, [
+                'notes' => 'Auto-generated invoice upon delivery completion'
+            ]);
+        } catch (\Exception $e) {
+            // Log error but don't fail the shipment update
+            \Log::error('Failed to create invoice for delivered shipment: ' . $e->getMessage(), [
+                'shipment_id' => $shipmentId
+            ]);
+        }
     }
 }

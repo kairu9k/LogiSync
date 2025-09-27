@@ -26,7 +26,13 @@ export default function Orders() {
       setError('')
       try {
         const data = await fetchOrders({ q, status })
-        if (!ignore) setOrders(data)
+        // Sort orders: put fulfilled orders last
+        const sortedData = data.sort((a, b) => {
+          if (a.status === 'fulfilled' && b.status !== 'fulfilled') return 1
+          if (a.status !== 'fulfilled' && b.status === 'fulfilled') return -1
+          return 0
+        })
+        if (!ignore) setOrders(sortedData)
       } catch (e) {
         if (!ignore) setError(e.message || 'Failed to load orders')
       } finally {
@@ -61,7 +67,34 @@ export default function Orders() {
       {!loading && !error && (
         <div className="grid" style={{ gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 12 }}>
           {orders.map((o) => (
-            <button key={o.id} className="card link-card" style={{ padding: 16, textAlign: 'left' }} onClick={() => navigate(`/app/orders/${o.id}`)}>
+            <button
+              key={o.id}
+              className="card link-card"
+              style={{
+                padding: 16,
+                textAlign: 'left',
+                opacity: o.status === 'fulfilled' ? 0.6 : 1,
+                position: 'relative',
+                overflow: 'hidden'
+              }}
+              onClick={() => navigate(`/app/orders/${o.id}`)}
+            >
+              {o.status === 'fulfilled' && (
+                <div style={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: '50%',
+                  transform: 'translate(-50%, -50%) rotate(-25deg)',
+                  fontSize: '24px',
+                  fontWeight: 'bold',
+                  color: 'var(--success-300)',
+                  pointerEvents: 'none',
+                  zIndex: 1,
+                  userSelect: 'none'
+                }}>
+                  ✓ FULFILLED
+                </div>
+              )}
               <div className="muted">{o.po}</div>
               <div>Customer {o.customer}</div>
               <div>Items: {o.items}</div>

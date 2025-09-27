@@ -87,134 +87,160 @@ export default function DriverDashboard() {
   }
 
   return (
-    <div className="driver-container">
-      <header className="driver-header">
-        <div className="driver-header-content">
+    <div className="driver-container" style={{ padding: '16px', maxWidth: '1200px', margin: '0 auto' }}>
+      <div className="card" style={{ padding: '16px', marginBottom: '16px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <h1>🚛 Driver Dashboard</h1>
-            <p>Welcome, {driver?.username}</p>
+            <h1 style={{ margin: '0 0 8px 0', fontSize: '24px' }}>🚛 Driver Dashboard</h1>
+            <p style={{ margin: 0, color: 'var(--gray-600)' }}>Welcome, {driver?.username}</p>
           </div>
           <button
-            className="driver-btn driver-btn-outline"
+            className="btn btn-outline"
             onClick={handleLogout}
           >
             🚪 Logout
           </button>
         </div>
-      </header>
+      </div>
 
       {summary && (
-        <div className="driver-summary">
-          <div className="summary-card">
-            <div className="summary-number">{summary.total || 0}</div>
-            <div className="summary-label">Total Shipments</div>
+        <div className="grid" style={{ gridTemplateColumns: 'repeat(4, minmax(0,1fr))', gap: '16px', marginBottom: '16px' }}>
+          <div className="card" style={{ padding: '16px', textAlign: 'center' }}>
+            <div style={{ fontSize: '32px', fontWeight: 'bold', color: 'var(--primary-600)', marginBottom: '8px' }}>
+              {summary.total || 0}
+            </div>
+            <div className="muted" style={{ fontSize: '14px' }}>Total Shipments</div>
           </div>
-          <div className="summary-card">
-            <div className="summary-number">{summary.pending || 0}</div>
-            <div className="summary-label">Pending</div>
+          <div className="card" style={{ padding: '16px', textAlign: 'center' }}>
+            <div style={{ fontSize: '32px', fontWeight: 'bold', color: 'var(--warning-600)', marginBottom: '8px' }}>
+              {summary.pending || 0}
+            </div>
+            <div className="muted" style={{ fontSize: '14px' }}>Pending</div>
           </div>
-          <div className="summary-card">
-            <div className="summary-number">{summary.in_transit || 0}</div>
-            <div className="summary-label">In Transit</div>
+          <div className="card" style={{ padding: '16px', textAlign: 'center' }}>
+            <div style={{ fontSize: '32px', fontWeight: 'bold', color: 'var(--info-600)', marginBottom: '8px' }}>
+              {summary.in_transit || 0}
+            </div>
+            <div className="muted" style={{ fontSize: '14px' }}>In Transit</div>
           </div>
-          <div className="summary-card">
-            <div className="summary-number">{summary.out_for_delivery || 0}</div>
-            <div className="summary-label">For Delivery</div>
+          <div className="card" style={{ padding: '16px', textAlign: 'center' }}>
+            <div style={{ fontSize: '32px', fontWeight: 'bold', color: 'var(--success-600)', marginBottom: '8px' }}>
+              {summary.out_for_delivery || 0}
+            </div>
+            <div className="muted" style={{ fontSize: '14px' }}>For Delivery</div>
           </div>
         </div>
       )}
 
-      <div className="driver-content">
-        {loading && (
-          <div className="driver-loading">
-            <div className="loading-spinner">🔄</div>
-            <p>Loading shipments...</p>
-          </div>
-        )}
+      {loading && (
+        <div className="card" style={{ padding: '40px', textAlign: 'center' }}>
+          <div style={{ fontSize: '32px', marginBottom: '16px' }}>🔄</div>
+          <p style={{ margin: 0, color: 'var(--gray-600)' }}>Loading shipments...</p>
+        </div>
+      )}
 
-        {error && (
-          <div className="driver-error">
-            ⚠️ {error}
-            <button
-              className="driver-btn driver-btn-outline"
-              onClick={() => loadShipments(driver?.id)}
-              style={{ marginTop: 8 }}
+      {error && (
+        <div className="card" style={{ padding: '24px', textAlign: 'center', backgroundColor: 'var(--danger-50)', border: '1px solid var(--danger-200)' }}>
+          <div style={{ fontSize: '24px', marginBottom: '16px', color: 'var(--danger-600)' }}>⚠️</div>
+          <p style={{ margin: '0 0 16px 0', color: 'var(--danger-700)' }}>{error}</p>
+          <button
+            className="btn btn-outline"
+            onClick={() => loadShipments(driver?.id)}
+          >
+            🔄 Retry
+          </button>
+        </div>
+      )}
+
+      {!loading && !error && shipments.length === 0 && (
+        <div className="card" style={{ padding: '40px', textAlign: 'center' }}>
+          <div style={{ fontSize: '48px', marginBottom: '16px' }}>📋</div>
+          <h3 style={{ margin: '0 0 8px 0' }}>No Active Shipments</h3>
+          <p style={{ margin: '0 0 24px 0', color: 'var(--gray-600)' }}>You have no shipments assigned for today.</p>
+          <button
+            className="btn btn-outline"
+            onClick={() => loadShipments(driver?.id)}
+          >
+            🔄 Refresh
+          </button>
+        </div>
+      )}
+
+      {!loading && !error && shipments.length > 0 && (
+        <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '16px' }}>
+          {shipments.map((shipment) => (
+            <div
+              key={shipment.id}
+              className="card"
+              style={{
+                padding: '16px',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                border: '1px solid var(--gray-200)',
+                ':hover': {
+                  borderColor: 'var(--primary-300)',
+                  transform: 'translateY(-2px)',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                }
+              }}
+              onClick={() => navigate(`/driver/shipment/${shipment.id}`)}
             >
-              🔄 Retry
-            </button>
-          </div>
-        )}
-
-        {!loading && !error && shipments.length === 0 && (
-          <div className="driver-empty">
-            <div className="empty-icon">📋</div>
-            <h3>No Active Shipments</h3>
-            <p>You have no shipments assigned for today.</p>
-            <button
-              className="driver-btn driver-btn-outline"
-              onClick={() => loadShipments(driver?.id)}
-            >
-              🔄 Refresh
-            </button>
-          </div>
-        )}
-
-        {!loading && !error && shipments.length > 0 && (
-          <div className="shipments-grid">
-            {shipments.map((shipment) => (
-              <div
-                key={shipment.id}
-                className={`shipment-card ${getPriorityColor(shipment.priority)}`}
-                onClick={() => navigate(`/driver/shipment/${shipment.id}`)}
-              >
-                <div className="shipment-header">
-                  <div className="shipment-tracking">
-                    {shipment.tracking_number}
-                  </div>
-                  <div className={`shipment-status ${getStatusColor(shipment.status)}`}>
-                    {getStatusIcon(shipment.status)} {shipment.status.replace('_', ' ')}
-                  </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                <div className="muted" style={{ fontFamily: 'monospace', fontSize: '14px' }}>
+                  {shipment.tracking_number}
                 </div>
+                <span className={`badge ${
+                  shipment.status === 'delivered' ? 'success' :
+                  shipment.status === 'out_for_delivery' ? 'warn' :
+                  shipment.status === 'in_transit' ? 'info' : ''
+                }`} style={{ fontSize: '12px' }}>
+                  {getStatusIcon(shipment.status)} {shipment.status.replace('_', ' ')}
+                </span>
+              </div>
 
-                <div className="shipment-receiver">
-                  <strong>📍 {shipment.receiver_name}</strong>
+              <div style={{ marginBottom: '8px' }}>
+                <div style={{ fontWeight: 'bold', fontSize: '16px', marginBottom: '4px' }}>
+                  📍 {shipment.receiver_name}
                 </div>
-
-                <div className="shipment-destination">
+                <div style={{ color: 'var(--gray-700)', marginBottom: '4px' }}>
                   {shipment.destination_name}
                 </div>
-
-                <div className="shipment-address">
+                <div className="muted" style={{ fontSize: '14px' }}>
                   {shipment.destination_address}
                 </div>
+              </div>
 
-                <div className="shipment-customer">
+              <div style={{ marginBottom: '12px' }}>
+                <div className="muted" style={{ fontSize: '14px' }}>
                   👤 Customer: {shipment.customer}
                 </div>
-
-                <div className="shipment-footer">
-                  <span className="shipment-vehicle">
-                    🚛 {shipment.vehicle}
-                  </span>
-                  <span className="tap-hint">
-                    👆 Tap to update
-                  </span>
+                <div className="muted" style={{ fontSize: '14px', marginTop: '4px' }}>
+                  🚛 Vehicle: {shipment.vehicle}
                 </div>
               </div>
-            ))}
-          </div>
-        )}
-      </div>
 
-      <div className="driver-refresh">
-        <button
-          className="driver-btn driver-btn-secondary"
-          onClick={() => loadShipments(driver?.id)}
-          disabled={loading}
-        >
-          {loading ? '🔄 Refreshing...' : '🔄 Refresh Shipments'}
-        </button>
-      </div>
+              <div style={{ textAlign: 'center', paddingTop: '8px', borderTop: '1px solid var(--gray-200)' }}>
+                <span className="muted" style={{ fontSize: '12px' }}>
+                  👆 Tap to update status
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {!loading && (
+        <div style={{ marginTop: '24px', textAlign: 'center' }}>
+          <button
+            className="btn btn-outline"
+            onClick={() => loadShipments(driver?.id)}
+            disabled={loading}
+            style={{ minWidth: '200px' }}
+          >
+            {loading ? '🔄 Refreshing...' : '🔄 Refresh Shipments'}
+          </button>
+        </div>
+      )}
     </div>
   )
 }
