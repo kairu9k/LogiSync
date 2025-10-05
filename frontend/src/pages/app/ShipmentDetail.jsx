@@ -1,6 +1,30 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { getShipment, updateShipmentStatus } from '../../lib/api'
+import { getShipment, updateShipmentStatus, apiGet } from '../../lib/api'
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet'
+import 'leaflet/dist/leaflet.css'
+import L from 'leaflet'
+
+// Fix default marker icon issue with Leaflet
+delete L.Icon.Default.prototype._getIconUrl
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+})
+
+// Custom truck icon
+const truckIcon = new L.Icon({
+  iconUrl: 'data:image/svg+xml;base64,' + btoa(`
+    <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">
+      <circle cx="20" cy="20" r="18" fill="#2563eb" stroke="white" stroke-width="3"/>
+      <text x="20" y="28" font-size="20" text-anchor="middle" fill="white">🚛</text>
+    </svg>
+  `),
+  iconSize: [40, 40],
+  iconAnchor: [20, 40],
+  popupAnchor: [0, -40],
+})
 
 export default function ShipmentDetail() {
   const { id } = useParams()
@@ -9,6 +33,8 @@ export default function ShipmentDetail() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [updating, setUpdating] = useState(false)
+  const [gpsLocation, setGpsLocation] = useState(null)
+  const [gpsLoading, setGpsLoading] = useState(false)
 
   async function load() {
     setLoading(true)
@@ -23,7 +49,31 @@ export default function ShipmentDetail() {
     }
   }
 
-  useEffect(() => { load() }, [id])
+  useEffect(() => {
+    load()
+    loadGPSLocation()
+  }, [id])
+
+  // Refresh GPS location every 15 seconds for active shipments
+  useEffect(() => {
+    if (shipment && (shipment.status === 'in_transit' || shipment.status === 'out_for_delivery')) {
+      const interval = setInterval(loadGPSLocation, 15000)
+      return () => clearInterval(interval)
+    }
+  }, [shipment?.status])
+
+  async function loadGPSLocation() {
+    try {
+      setGpsLoading(true)
+      const response = await apiGet(`/api/shipments/${id}/location`)
+      setGpsLocation(response?.location || null)
+    } catch (e) {
+      console.error('Failed to load GPS location:', e)
+      setGpsLocation(null)
+    } finally {
+      setGpsLoading(false)
+    }
+  }
 
   async function handleStatusUpdate(newStatus, location, details = '') {
     try {
@@ -130,6 +180,73 @@ export default function ShipmentDetail() {
           </div>
         </div>
       </div>
+
+      {/* GPS Live Location Map */}
+      {gpsLocation && (
+        <div className="card" style={{ padding: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <h3 style={{ marginTop: 0, marginBottom: 0 }}>📍 Live GPS Location</h3>
+            {gpsLoading && <span style={{ fontSize: '0.875rem', color: '#666' }}>Updating...</span>}
+          </div>
+
+          <div style={{ height: '400px', borderRadius: '8px', overflow: 'hidden', marginBottom: 12 }}>
+            <MapContainer
+              center={[gpsLocation.latitude, gpsLocation.longitude]}
+              zoom={15}
+              style={{ height: '100%', width: '100%' }}
+            >
+              <TileLayer
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+              />
+              <Marker
+                position={[gpsLocation.latitude, gpsLocation.longitude]}
+                icon={truckIcon}
+              >
+                <Popup>
+                  <div style={{ minWidth: '200px' }}>
+                    <strong>{shipment.tracking_number}</strong>
+                    <div style={{ marginTop: '0.5rem' }}>
+                      <div>🚚 Driver: {shipment.driver}</div>
+                      <div>🚛 Vehicle: {shipment.vehicle}</div>
+                      <div>⏰ {new Date(gpsLocation.recorded_at).toLocaleString()}</div>
+                      {gpsLocation.speed > 0 && (
+                        <div>🚀 Speed: {gpsLocation.speed.toFixed(1)} km/h</div>
+                      )}
+                    </div>
+                  </div>
+                </Popup>
+              </Marker>
+            </MapContainer>
+          </div>
+
+          <div className="grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, fontSize: '0.875rem' }}>
+            <div>
+              <div className="label" style={{ fontSize: '0.75rem' }}>Latitude</div>
+              <div style={{ fontFamily: 'monospace' }}>{gpsLocation.latitude.toFixed(6)}</div>
+            </div>
+            <div>
+              <div className="label" style={{ fontSize: '0.75rem' }}>Longitude</div>
+              <div style={{ fontFamily: 'monospace' }}>{gpsLocation.longitude.toFixed(6)}</div>
+            </div>
+            <div>
+              <div className="label" style={{ fontSize: '0.75rem' }}>Accuracy</div>
+              <div>{gpsLocation.accuracy.toFixed(0)}m</div>
+            </div>
+            <div>
+              <div className="label" style={{ fontSize: '0.75rem' }}>Last Update</div>
+              <div>{new Date(gpsLocation.recorded_at).toLocaleTimeString()}</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Show message if no GPS data for active shipment */}
+      {!gpsLocation && (shipment.status === 'in_transit' || shipment.status === 'out_for_delivery') && (
+        <div className="card" style={{ padding: 16, textAlign: 'center', color: '#666' }}>
+          📍 No GPS data available yet. The driver needs to start GPS tracking from their mobile app.
+        </div>
+      )}
 
       <div className="card" style={{ padding: 16 }}>
         <h3 style={{ marginTop: 0 }}>Update Status</h3>

@@ -20,6 +20,7 @@ import TeamManagement from './pages/app/TeamManagement.jsx'
 import SubscriptionPlan from './pages/app/SubscriptionPlan.jsx'
 import SystemSettings from './pages/app/SystemSettings.jsx'
 import Transportation from './pages/app/Transportation.jsx'
+import LiveTracking from './pages/app/LiveTracking.jsx'
 import DriverLogin from './pages/DriverLogin.jsx'
 import DriverDashboard from './pages/DriverDashboard.jsx'
 import DriverShipment from './pages/DriverShipment.jsx'
@@ -43,6 +44,7 @@ function App() {
         <Route path="warehouses" element={<Warehouses />} />
         <Route path="warehouses/inventory" element={<Inventory />} />
         <Route path="transportation" element={<Transportation />} />
+        <Route path="tracking" element={<LiveTracking />} />
         <Route path="reports" element={<Reports />} />
         <Route path="settings/team" element={<TeamManagement />} />
         <Route path="settings/subscription" element={<SubscriptionPlan />} />

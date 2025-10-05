@@ -349,4 +349,98 @@ class ShipmentController extends Controller
             ]);
         }
     }
+
+    // GPS Tracking Methods
+    public function updateLocation(Request $request, int $id)
+    {
+        $validator = Validator::make($request->all(), [
+            'latitude' => 'required|numeric|between:-90,90',
+            'longitude' => 'required|numeric|between:-180,180',
+            'driver_id' => 'required|integer',
+            'speed' => 'nullable|numeric|min:0',
+            'accuracy' => 'nullable|numeric|min:0',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422)
+                ->header('Access-Control-Allow-Origin', '*');
+        }
+
+        // Verify shipment exists
+        $shipment = DB::table('shipments')->where('shipment_id', $id)->first();
+        if (!$shipment) {
+            return response()->json(['message' => 'Shipment not found'], 404)
+                ->header('Access-Control-Allow-Origin', '*');
+        }
+
+        // Store GPS location
+        DB::table('gps_locations')->insert([
+            'shipment_id' => $id,
+            'driver_id' => $request->driver_id,
+            'latitude' => $request->latitude,
+            'longitude' => $request->longitude,
+            'speed' => $request->speed,
+            'accuracy' => $request->accuracy,
+            'recorded_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return response()->json([
+            'message' => 'Location updated successfully',
+            'location' => [
+                'latitude' => (float) $request->latitude,
+                'longitude' => (float) $request->longitude,
+            ]
+        ])->header('Access-Control-Allow-Origin', '*');
+    }
+
+    public function getLocation(int $id)
+    {
+        // Get latest GPS location for shipment
+        $location = DB::table('gps_locations')
+            ->where('shipment_id', $id)
+            ->orderByDesc('recorded_at')
+            ->first();
+
+        if (!$location) {
+            return response()->json([
+                'message' => 'No GPS data available',
+                'location' => null
+            ])->header('Access-Control-Allow-Origin', '*');
+        }
+
+        return response()->json([
+            'location' => [
+                'latitude' => (float) $location->latitude,
+                'longitude' => (float) $location->longitude,
+                'speed' => (float) $location->speed,
+                'accuracy' => (float) $location->accuracy,
+                'recorded_at' => $location->recorded_at,
+            ]
+        ])->header('Access-Control-Allow-Origin', '*');
+    }
+
+    public function getLocationHistory(int $id)
+    {
+        // Get GPS tracking history for shipment
+        $locations = DB::table('gps_locations')
+            ->where('shipment_id', $id)
+            ->orderBy('recorded_at')
+            ->get();
+
+        $data = $locations->map(function ($loc) {
+            return [
+                'latitude' => (float) $loc->latitude,
+                'longitude' => (float) $loc->longitude,
+                'speed' => (float) $loc->speed,
+                'recorded_at' => $loc->recorded_at,
+            ];
+        });
+
+        return response()->json([
+            'history' => $data,
+            'count' => $data->count()
+        ])->header('Access-Control-Allow-Origin', '*');
+    }
 }

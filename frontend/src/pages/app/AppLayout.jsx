@@ -19,7 +19,7 @@ export default function AppLayout() {
 
   // Breadcrumbs and title
   const { breadcrumbs, title } = useMemo(() => {
-    const map = { app: 'Dashboard', quotes: 'Quotes', orders: 'Orders', shipments: 'Shipments', invoices: 'Invoices', warehouses: 'Warehouses', 'warehouses-locations': 'Warehouse Locations', 'warehouses-inventory': 'Warehouse Inventory', inventory: 'Inventory', transportation: 'Transportation', reports: 'Reports', settings: 'Settings', team: 'Team Management', subscription: 'Subscription Plan', system: 'System Settings' }
+    const map = { app: 'Dashboard', quotes: 'Quotes', orders: 'Orders', shipments: 'Shipments', invoices: 'Invoices', warehouses: 'Warehouses', 'warehouses-locations': 'Warehouse Locations', 'warehouses-inventory': 'Warehouse Inventory', inventory: 'Inventory', transportation: 'Transportation', tracking: 'Live Tracking', reports: 'Reports', settings: 'Settings', team: 'Team Management', subscription: 'Subscription Plan', system: 'System Settings' }
     const parts = location.pathname.replace(/^\/+|\/+$/g, '').split('/')
     const crumbs = []
     let pathAcc = ''
@@ -171,6 +171,13 @@ export default function AppLayout() {
             <NavLink to="/app/shipments" aria-label="Shipments">
               <span className="nav-icon">🚚</span>
               <span className="nav-label">Shipments</span>
+            </NavLink>
+          )}
+
+          {can.viewShipments() && (
+            <NavLink to="/app/tracking" aria-label="Live Tracking">
+              <span className="nav-icon">🗺️</span>
+              <span className="nav-label">Live Tracking</span>
             </NavLink>
           )}
 

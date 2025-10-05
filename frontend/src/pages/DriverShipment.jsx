@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { apiGet, apiPatch } from '../lib/api'
+import { apiGet, apiPatch, apiPost } from '../lib/api'
 
 export default function DriverShipment() {
   const { id } = useParams()
@@ -11,6 +11,13 @@ export default function DriverShipment() {
   const [updating, setUpdating] = useState(false)
   const [error, setError] = useState('')
   const [showStatusUpdate, setShowStatusUpdate] = useState(false)
+
+  // GPS Tracking state
+  const [isTracking, setIsTracking] = useState(false)
+  const [currentLocation, setCurrentLocation] = useState(null)
+  const [gpsError, setGpsError] = useState('')
+  const trackingIntervalRef = useRef(null)
+  const watchIdRef = useRef(null)
 
   useEffect(() => {
     // Check if driver is logged in
@@ -65,6 +72,103 @@ export default function DriverShipment() {
       setUpdating(false)
     }
   }
+
+  // GPS Tracking Functions
+  const sendGPSLocation = async (position) => {
+    if (!driver || !shipment) return
+
+    const { latitude, longitude, speed, accuracy } = position.coords
+
+    try {
+      await apiPost(`/api/shipments/${id}/location`, {
+        latitude,
+        longitude,
+        speed: speed || 0,
+        accuracy: accuracy || 0,
+        driver_id: driver.id
+      })
+
+      setCurrentLocation({
+        latitude,
+        longitude,
+        accuracy,
+        timestamp: new Date().toLocaleTimeString()
+      })
+
+      console.log('GPS location sent:', { latitude, longitude })
+    } catch (e) {
+      console.error('Failed to send GPS location:', e)
+      setGpsError('Failed to update location')
+    }
+  }
+
+  const startGPSTracking = () => {
+    if (!navigator.geolocation) {
+      setGpsError('GPS not supported on this device')
+      return
+    }
+
+    setGpsError('')
+    setIsTracking(true)
+
+    // Get initial position
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        sendGPSLocation(position)
+      },
+      (error) => {
+        setGpsError('Failed to get GPS location: ' + error.message)
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    )
+
+    // Watch position continuously and send every 20 seconds
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      (position) => {
+        setCurrentLocation({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracy: position.coords.accuracy,
+          timestamp: new Date().toLocaleTimeString()
+        })
+      },
+      (error) => {
+        setGpsError('GPS tracking error: ' + error.message)
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    )
+
+    // Send location every 20 seconds
+    trackingIntervalRef.current = setInterval(() => {
+      navigator.geolocation.getCurrentPosition(
+        sendGPSLocation,
+        (error) => console.error('GPS error:', error),
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      )
+    }, 20000)
+  }
+
+  const stopGPSTracking = () => {
+    if (watchIdRef.current) {
+      navigator.geolocation.clearWatch(watchIdRef.current)
+      watchIdRef.current = null
+    }
+
+    if (trackingIntervalRef.current) {
+      clearInterval(trackingIntervalRef.current)
+      trackingIntervalRef.current = null
+    }
+
+    setIsTracking(false)
+    setCurrentLocation(null)
+  }
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      stopGPSTracking()
+    }
+  }, [])
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -196,6 +300,67 @@ export default function DriverShipment() {
               </div>
             </div>
           )}
+        </div>
+
+        {/* GPS Tracking Card */}
+        <div className="shipment-detail-card">
+          <div className="detail-header">
+            <h3>📍 GPS Tracking</h3>
+          </div>
+
+          <div className="detail-section">
+            {gpsError && (
+              <div className="driver-error" style={{ marginBottom: '1rem' }}>
+                ⚠️ {gpsError}
+              </div>
+            )}
+
+            {currentLocation && (
+              <div className="detail-info">
+                <div className="info-row">
+                  <span className="info-label">Latitude:</span>
+                  <span className="info-value">{currentLocation.latitude.toFixed(6)}</span>
+                </div>
+                <div className="info-row">
+                  <span className="info-label">Longitude:</span>
+                  <span className="info-value">{currentLocation.longitude.toFixed(6)}</span>
+                </div>
+                <div className="info-row">
+                  <span className="info-label">Accuracy:</span>
+                  <span className="info-value">{currentLocation.accuracy.toFixed(0)}m</span>
+                </div>
+                <div className="info-row">
+                  <span className="info-label">Last Update:</span>
+                  <span className="info-value">{currentLocation.timestamp}</span>
+                </div>
+              </div>
+            )}
+
+            {!isTracking && !currentLocation && (
+              <p style={{ color: '#666', textAlign: 'center', padding: '1rem' }}>
+                Start GPS tracking to share your real-time location
+              </p>
+            )}
+          </div>
+
+          <div className="driver-actions">
+            {!isTracking ? (
+              <button
+                className="driver-btn driver-btn-primary driver-btn-large"
+                onClick={startGPSTracking}
+                disabled={shipment.status === 'delivered'}
+              >
+                📍 Start GPS Tracking
+              </button>
+            ) : (
+              <button
+                className="driver-btn driver-btn-outline driver-btn-large"
+                onClick={stopGPSTracking}
+              >
+                ⏹️ Stop GPS Tracking
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="driver-actions">

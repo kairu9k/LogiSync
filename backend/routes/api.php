@@ -100,6 +100,11 @@ Route::middleware(['role:admin,booking_manager,warehouse_manager'])->group(funct
     Route::post('/orders/{orderId}/shipments', [ShipmentController::class, 'createFromOrder']);
     Route::patch('/shipments/{id}/status', [ShipmentController::class, 'updateStatus']);
 
+    // GPS Tracking
+    Route::get('/shipments/{id}/location', [ShipmentController::class, 'getLocation']);
+    Route::get('/shipments/{id}/location/history', [ShipmentController::class, 'getLocationHistory']);
+    Route::post('/shipments/{id}/location', [ShipmentController::class, 'updateLocation']);
+
     // Transport Management
     Route::get('/transport', [TransportController::class, 'index']);
     Route::get('/transport/{id}', [TransportController::class, 'show']);
