@@ -1,7 +1,33 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { apiGet } from '../../lib/api'
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet'
+import 'leaflet/dist/leaflet.css'
+import L from 'leaflet'
+
+// Fix default marker icon issue with Leaflet
+delete L.Icon.Default.prototype._getIconUrl
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+})
+
+// Custom truck icon
+const truckIcon = new L.Icon({
+  iconUrl: 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(`
+    <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">
+      <circle cx="20" cy="20" r="18" fill="#2563eb" stroke="white" stroke-width="3"/>
+      <text x="20" y="28" font-size="20" text-anchor="middle" fill="white">🚛</text>
+    </svg>
+  `),
+  iconSize: [40, 40],
+  iconAnchor: [20, 40],
+  popupAnchor: [0, -40],
+})
 
 export default function Dashboard() {
+  const navigate = useNavigate()
   const [dashboardData, setDashboardData] = useState({
     orders: { total: 0, fulfilled: 0, processing: 0, pending: 0 },
     shipments: { total: 0, delivered: 0, active: 0, pending: 0 },
@@ -13,6 +39,8 @@ export default function Dashboard() {
     notifications: []
   })
   const [loading, setLoading] = useState(true)
+  const [activeShipments, setActiveShipments] = useState([])
+  const [gpsLoading, setGpsLoading] = useState(true)
 
   useEffect(() => {
     async function loadDashboardData() {
@@ -122,6 +150,51 @@ export default function Dashboard() {
     }
     loadDashboardData()
   }, [])
+
+  // Load active shipments with GPS tracking
+  useEffect(() => {
+    loadActiveShipments()
+    // Refresh every 20 seconds
+    const interval = setInterval(loadActiveShipments, 20000)
+    return () => clearInterval(interval)
+  }, [])
+
+  const loadActiveShipments = async () => {
+    try {
+      setGpsLoading(true)
+      // Get all in-transit and out-for-delivery shipments
+      const response1 = await apiGet('/api/shipments?status=in_transit')
+      const shipments1 = response1?.data || []
+
+      const response2 = await apiGet('/api/shipments?status=out_for_delivery')
+      const shipments2 = response2?.data || []
+
+      const allShipments = [...shipments1, ...shipments2]
+
+      // Get latest location for each shipment
+      const shipmentsWithLocation = await Promise.all(
+        allShipments.map(async (shipment) => {
+          try {
+            const locResponse = await apiGet(`/api/shipments/${shipment.id}/location`)
+            return {
+              ...shipment,
+              location: locResponse?.location || null
+            }
+          } catch (e) {
+            return { ...shipment, location: null }
+          }
+        })
+      )
+
+      // Filter out shipments without GPS data
+      const tracked = shipmentsWithLocation.filter(s => s.location !== null)
+      setActiveShipments(tracked)
+    } catch (e) {
+      console.error('Failed to load active shipments:', e)
+    } finally {
+      setGpsLoading(false)
+    }
+  }
   return (
     <div className="grid" style={{ gap: 16 }}>
       <div className="grid" style={{ gridTemplateColumns: 'repeat(5, minmax(0,1fr))', gap: 16 }}>
@@ -172,6 +245,97 @@ export default function Dashboard() {
             </div>
           )}
         </article>
+      </div>
+
+      {/* Live Tracking Widget */}
+      <div className="card" style={{ padding: 16 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <div>
+            <h3 style={{ margin: 0 }}>🗺️ Active Shipments - Live Tracking</h3>
+            <div style={{ fontSize: '14px', color: '#666', marginTop: 4 }}>
+              {gpsLoading ? 'Loading...' : `${activeShipments.length} shipment${activeShipments.length !== 1 ? 's' : ''} with GPS tracking`}
+            </div>
+          </div>
+          <button
+            className="btn btn-outline"
+            onClick={() => navigate('/app/tracking')}
+            style={{ fontSize: '14px' }}
+          >
+            View Full Map →
+          </button>
+        </div>
+
+        {activeShipments.length > 0 ? (
+          <div style={{ height: '350px', borderRadius: '8px', overflow: 'hidden' }}>
+            <MapContainer
+              center={[activeShipments[0].location.latitude, activeShipments[0].location.longitude]}
+              zoom={12}
+              style={{ height: '100%', width: '100%' }}
+            >
+              <TileLayer
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+              />
+
+              {activeShipments.map(shipment => {
+                if (!shipment.location) return null
+
+                const position = [shipment.location.latitude, shipment.location.longitude]
+
+                return (
+                  <Marker
+                    key={shipment.id}
+                    position={position}
+                    icon={truckIcon}
+                    eventHandlers={{
+                      click: () => navigate(`/app/shipments/${shipment.id}`)
+                    }}
+                  >
+                    <Popup>
+                      <div style={{ minWidth: '200px' }}>
+                        <strong>{shipment.tracking_number}</strong>
+                        <div style={{ marginTop: '0.5rem', fontSize: '14px' }}>
+                          <div>🚚 Driver: {shipment.driver}</div>
+                          <div>🚛 Vehicle: {shipment.vehicle}</div>
+                          <div>📍 Receiver: {shipment.receiver}</div>
+                          <div>⏰ {new Date(shipment.location.recorded_at).toLocaleString()}</div>
+                          {shipment.location.speed > 0 && (
+                            <div>🚀 Speed: {shipment.location.speed.toFixed(1)} km/h</div>
+                          )}
+                        </div>
+                        <button
+                          className="btn btn-primary"
+                          onClick={() => navigate(`/app/shipments/${shipment.id}`)}
+                          style={{ marginTop: '0.5rem', width: '100%', fontSize: '12px' }}
+                        >
+                          View Details
+                        </button>
+                      </div>
+                    </Popup>
+                  </Marker>
+                )
+              })}
+            </MapContainer>
+          </div>
+        ) : (
+          <div style={{
+            height: '350px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: '#f9fafb',
+            borderRadius: '8px',
+            color: '#666',
+            textAlign: 'center',
+            padding: '2rem'
+          }}>
+            <div>
+              <div style={{ fontSize: '48px', marginBottom: '1rem' }}>🗺️</div>
+              <div style={{ fontSize: '16px', marginBottom: '0.5rem' }}>No active shipments with GPS tracking</div>
+              <div style={{ fontSize: '14px' }}>Shipments will appear here once drivers start GPS tracking</div>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="card" style={{ minHeight: 260 }}>

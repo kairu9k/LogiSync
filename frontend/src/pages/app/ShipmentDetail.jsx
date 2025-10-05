@@ -15,7 +15,7 @@ L.Icon.Default.mergeOptions({
 
 // Custom truck icon
 const truckIcon = new L.Icon({
-  iconUrl: 'data:image/svg+xml;base64,' + btoa(`
+  iconUrl: 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(`
     <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">
       <circle cx="20" cy="20" r="18" fill="#2563eb" stroke="white" stroke-width="3"/>
       <text x="20" y="28" font-size="20" text-anchor="middle" fill="white">🚛</text>
