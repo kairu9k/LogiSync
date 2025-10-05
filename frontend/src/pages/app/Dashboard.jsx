@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { apiGet } from '../../lib/api'
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
 
@@ -41,6 +41,9 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [activeShipments, setActiveShipments] = useState([])
   const [gpsLoading, setGpsLoading] = useState(true)
+  const [showFullMap, setShowFullMap] = useState(false)
+  const [selectedShipment, setSelectedShipment] = useState(null)
+  const [locationHistory, setLocationHistory] = useState([])
 
   useEffect(() => {
     async function loadDashboardData() {
@@ -195,6 +198,21 @@ export default function Dashboard() {
       setGpsLoading(false)
     }
   }
+
+  const loadLocationHistory = async (shipmentId) => {
+    try {
+      const response = await apiGet(`/api/shipments/${shipmentId}/location/history`)
+      setLocationHistory(response?.history || [])
+    } catch (e) {
+      console.error('Failed to load location history:', e)
+    }
+  }
+
+  const handleShipmentClick = (shipment) => {
+    setSelectedShipment(shipment)
+    loadLocationHistory(shipment.id)
+  }
+
   return (
     <div className="grid" style={{ gap: 16 }}>
       <div className="grid" style={{ gridTemplateColumns: 'repeat(5, minmax(0,1fr))', gap: 16 }}>
@@ -258,7 +276,7 @@ export default function Dashboard() {
           </div>
           <button
             className="btn btn-outline"
-            onClick={() => navigate('/app/tracking')}
+            onClick={() => setShowFullMap(true)}
             style={{ fontSize: '14px' }}
           >
             View Full Map →
@@ -273,8 +291,8 @@ export default function Dashboard() {
               style={{ height: '100%', width: '100%' }}
             >
               <TileLayer
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
               />
 
               {activeShipments.map(shipment => {
@@ -388,6 +406,195 @@ export default function Dashboard() {
           </ul>
         </div>
       </div>
+
+      {/* Fullscreen Map Modal */}
+      {showFullMap && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.5)',
+          zIndex: 9999,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '20px'
+        }}>
+          <div style={{
+            background: 'white',
+            borderRadius: '12px',
+            width: '100%',
+            height: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)'
+          }}>
+            {/* Modal Header */}
+            <div style={{
+              padding: '20px 24px',
+              borderBottom: '1px solid #e5e7eb',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <div>
+                <h2 style={{ margin: 0, fontSize: '20px' }}>🗺️ Live Fleet Tracking</h2>
+                <div style={{ fontSize: '14px', color: '#666', marginTop: 4 }}>
+                  {activeShipments.length} active shipment{activeShipments.length !== 1 ? 's' : ''} with GPS tracking
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setShowFullMap(false)
+                  setSelectedShipment(null)
+                  setLocationHistory([])
+                }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '24px',
+                  cursor: 'pointer',
+                  padding: '8px',
+                  lineHeight: 1
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Map Content */}
+            <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+              {/* Sidebar */}
+              <div style={{
+                width: '320px',
+                borderRight: '1px solid #e5e7eb',
+                overflowY: 'auto',
+                padding: '16px'
+              }}>
+                <h3 style={{ margin: '0 0 12px 0', fontSize: '16px' }}>Active Shipments</h3>
+                {activeShipments.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>
+                    No active shipments with GPS data
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {activeShipments.map(shipment => (
+                      <div
+                        key={shipment.id}
+                        onClick={() => handleShipmentClick(shipment)}
+                        style={{
+                          padding: '12px',
+                          border: `2px solid ${selectedShipment?.id === shipment.id ? '#2563eb' : '#e5e7eb'}`,
+                          borderRadius: '8px',
+                          cursor: 'pointer',
+                          background: selectedShipment?.id === shipment.id ? '#eff6ff' : 'white',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>
+                          {shipment.tracking_number}
+                        </div>
+                        <div style={{ fontSize: '13px', color: '#666', lineHeight: 1.5 }}>
+                          <div>🚚 {shipment.driver}</div>
+                          <div>🚛 {shipment.vehicle}</div>
+                          <div>📍 {shipment.receiver}</div>
+                        </div>
+                        {shipment.location && (
+                          <div style={{ fontSize: '11px', color: '#999', marginTop: '8px', paddingTop: '8px', borderTop: '1px solid #e5e7eb' }}>
+                            Last update: {new Date(shipment.location.recorded_at).toLocaleTimeString()}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Map */}
+              <div style={{ flex: 1 }}>
+                {activeShipments.length > 0 ? (
+                  <MapContainer
+                    center={[activeShipments[0].location.latitude, activeShipments[0].location.longitude]}
+                    zoom={12}
+                    style={{ height: '100%', width: '100%' }}
+                  >
+                    <TileLayer
+                      url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+                    />
+
+                    {activeShipments.map(shipment => {
+                      if (!shipment.location) return null
+
+                      const position = [shipment.location.latitude, shipment.location.longitude]
+
+                      return (
+                        <Marker
+                          key={shipment.id}
+                          position={position}
+                          icon={truckIcon}
+                          eventHandlers={{
+                            click: () => handleShipmentClick(shipment)
+                          }}
+                        >
+                          <Popup>
+                            <div style={{ minWidth: '200px' }}>
+                              <strong>{shipment.tracking_number}</strong>
+                              <div style={{ marginTop: '0.5rem' }}>
+                                <div>🚚 Driver: {shipment.driver}</div>
+                                <div>🚛 Vehicle: {shipment.vehicle}</div>
+                                <div>📍 Receiver: {shipment.receiver}</div>
+                                <div>⏰ {new Date(shipment.location.recorded_at).toLocaleString()}</div>
+                                {shipment.location.speed > 0 && (
+                                  <div>🚀 Speed: {shipment.location.speed.toFixed(1)} km/h</div>
+                                )}
+                              </div>
+                              <button
+                                className="btn btn-primary"
+                                onClick={() => navigate(`/app/shipments/${shipment.id}`)}
+                                style={{ marginTop: '0.5rem', width: '100%', fontSize: '12px' }}
+                              >
+                                View Details
+                              </button>
+                            </div>
+                          </Popup>
+                        </Marker>
+                      )
+                    })}
+
+                    {/* Show route history for selected shipment */}
+                    {selectedShipment && locationHistory.length > 1 && (
+                      <Polyline
+                        positions={locationHistory.map(loc => [loc.latitude, loc.longitude])}
+                        color="#2563eb"
+                        weight={3}
+                        opacity={0.6}
+                      />
+                    )}
+                  </MapContainer>
+                ) : (
+                  <div style={{
+                    height: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    background: '#f9fafb',
+                    color: '#666'
+                  }}>
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ fontSize: '64px', marginBottom: '1rem' }}>🗺️</div>
+                      <div style={{ fontSize: '18px' }}>No active shipments with GPS tracking</div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

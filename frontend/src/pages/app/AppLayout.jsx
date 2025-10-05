@@ -174,13 +174,6 @@ export default function AppLayout() {
             </NavLink>
           )}
 
-          {can.viewShipments() && (
-            <NavLink to="/app/tracking" aria-label="Live Tracking">
-              <span className="nav-icon">🗺️</span>
-              <span className="nav-label">Live Tracking</span>
-            </NavLink>
-          )}
-
           {can.viewInvoices() && (
             <NavLink to="/app/invoices" aria-label="Invoices" style={{ position: 'relative' }}>
               <span className="nav-icon">💳</span>
