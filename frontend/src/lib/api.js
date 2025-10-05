@@ -1,14 +1,36 @@
 export const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
 
+function getAuthHeaders() {
+  const headers = { "Content-Type": "application/json" };
+  const auth = localStorage.getItem("auth");
+  if (auth) {
+    try {
+      const parsed = JSON.parse(auth);
+      if (parsed.user?.user_id) {
+        headers["X-User-Id"] = String(parsed.user.user_id);
+        console.log('[API] Sending request with user_id:', parsed.user.user_id);
+      } else {
+        console.warn('[API] No user_id found in auth data:', parsed);
+      }
+    } catch (e) {
+      console.error("Failed to parse auth", e);
+    }
+  } else {
+    console.warn('[API] No auth data in localStorage');
+  }
+  return headers;
+}
+
 export async function apiPost(path, body) {
   const res = await fetch(`${API_BASE}${path}`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: getAuthHeaders(),
     body: JSON.stringify(body),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     const message = data?.message || "Request failed";
+    console.error(`[API POST ${path}] Failed with status ${res.status}:`, data);
     throw new Error(message);
   }
   return data;
@@ -17,11 +39,12 @@ export async function apiPost(path, body) {
 export async function apiGet(path) {
   const res = await fetch(`${API_BASE}${path}`, {
     method: "GET",
-    headers: { "Content-Type": "application/json" },
+    headers: getAuthHeaders(),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     const message = data?.message || "Request failed";
+    console.error(`[API GET ${path}] Failed with status ${res.status}:`, data);
     throw new Error(message);
   }
   return data;
@@ -30,7 +53,7 @@ export async function apiGet(path) {
 export async function apiPatch(path, body) {
   const res = await fetch(`${API_BASE}${path}`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
+    headers: getAuthHeaders(),
     body: JSON.stringify(body),
   });
   const data = await res.json().catch(() => ({}));
@@ -42,7 +65,10 @@ export async function apiPatch(path, body) {
 }
 
 export async function apiDelete(path) {
-  const res = await fetch(`${API_BASE}${path}`, { method: "DELETE" });
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "DELETE",
+    headers: getAuthHeaders()
+  });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     const message = data?.message || "Request failed";

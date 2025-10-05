@@ -1,6 +1,7 @@
 import { NavLink, Outlet, useNavigate, Link, useLocation } from 'react-router-dom'
 import { useState, useMemo, useEffect } from 'react'
 import { apiGet } from '../../lib/api'
+import { can } from '../../lib/permissions'
 
 export default function AppLayout() {
   const navigate = useNavigate()
@@ -8,6 +9,8 @@ export default function AppLayout() {
   const [collapsed, setCollapsed] = useState(true)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [overdueCount, setOverdueCount] = useState(0)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [warehousesOpen, setWarehousesOpen] = useState(false)
 
   const signOut = () => {
     localStorage.removeItem('auth')
@@ -16,7 +19,7 @@ export default function AppLayout() {
 
   // Breadcrumbs and title
   const { breadcrumbs, title } = useMemo(() => {
-    const map = { app: 'Dashboard', quotes: 'Quotes', orders: 'Orders', shipments: 'Shipments', invoices: 'Invoices', warehouses: 'Warehouses', inventory: 'Inventory', reports: 'Reports' }
+    const map = { app: 'Dashboard', quotes: 'Quotes', orders: 'Orders', shipments: 'Shipments', invoices: 'Invoices', warehouses: 'Warehouses', 'warehouses-locations': 'Warehouse Locations', 'warehouses-inventory': 'Warehouse Inventory', inventory: 'Inventory', transportation: 'Transportation', reports: 'Reports', settings: 'Settings', team: 'Team Management', subscription: 'Subscription Plan', system: 'System Settings' }
     const parts = location.pathname.replace(/^\/+|\/+$/g, '').split('/')
     const crumbs = []
     let pathAcc = ''
@@ -62,58 +65,240 @@ export default function AppLayout() {
           <span className="brand-name">LogiSync</span>
         </div>
         <nav className="navlist">
-          <NavLink to="/app" end aria-label="Dashboard">
-            <span className="nav-icon">📊</span>
-            <span className="nav-label">Dashboard</span>
-          </NavLink>
-          <NavLink to="/app/quotes" aria-label="Quotes">
-            <span className="nav-icon">🧾</span>
-            <span className="nav-label">Quotes</span>
-          </NavLink>
-          <NavLink to="/app/orders" aria-label="Orders">
-            <span className="nav-icon">📦</span>
-            <span className="nav-label">Orders</span>
-          </NavLink>
-          <NavLink to="/app/shipments" aria-label="Shipments">
-            <span className="nav-icon">🚚</span>
-            <span className="nav-label">Shipments</span>
-          </NavLink>
-          <NavLink to="/app/invoices" aria-label="Invoices" style={{ position: 'relative' }}>
-            <span className="nav-icon">💳</span>
-            <span className="nav-label">Invoices</span>
-            {overdueCount > 0 && (
-              <span
-                className="badge danger"
+          {can.viewDashboard() && (
+            <NavLink to="/app" end aria-label="Dashboard">
+              <span className="nav-icon">📊</span>
+              <span className="nav-label">Dashboard</span>
+            </NavLink>
+          )}
+
+          {can.viewQuotes() && (
+            <NavLink to="/app/quotes" aria-label="Quotes">
+              <span className="nav-icon">🧾</span>
+              <span className="nav-label">Quotes</span>
+            </NavLink>
+          )}
+
+          {can.viewOrders() && (
+            <NavLink to="/app/orders" aria-label="Orders">
+              <span className="nav-icon">📦</span>
+              <span className="nav-label">Orders</span>
+            </NavLink>
+          )}
+
+          {/* Warehouses & Inventory Dropdown */}
+          {(can.viewWarehouses() || can.viewInventory()) && (
+            <div style={{ position: 'relative' }}>
+              <button
+                className={`nav-link${warehousesOpen ? ' active' : ''}`}
+                onClick={() => setWarehousesOpen(!warehousesOpen)}
+                aria-label="Warehouses"
                 style={{
-                  position: 'absolute',
-                  top: 8,
-                  right: 8,
-                  fontSize: '10px',
-                  minWidth: '18px',
-                  height: '18px',
-                  borderRadius: '50%',
+                  width: '100%',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center',
-                  padding: 0
+                  padding: '12px 16px',
+                  color: 'inherit',
+                  textAlign: 'left'
                 }}
               >
-                {overdueCount > 99 ? '99+' : overdueCount}
-              </span>
-            )}
-          </NavLink>
-          <NavLink to="/app/warehouses" aria-label="Warehouses">
-            <span className="nav-icon">🏪</span>
-            <span className="nav-label">Warehouses</span>
-          </NavLink>
-          <NavLink to="/app/inventory" aria-label="Inventory">
-            <span className="nav-icon">📋</span>
-            <span className="nav-label">Inventory</span>
-          </NavLink>
-          <NavLink to="/app/reports" aria-label="Reports">
-            <span className="nav-icon">📈</span>
-            <span className="nav-label">Reports</span>
-          </NavLink>
+                <span className="nav-icon">🏪</span>
+                <span className="nav-label">Warehouses</span>
+                <span style={{ marginLeft: 'auto', fontSize: '12px', transition: 'transform 0.2s', transform: warehousesOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+              </button>
+
+              {warehousesOpen && (
+                <div className="settings-dropdown" style={{
+                  background: 'var(--surface-100)',
+                  borderRadius: '8px',
+                  marginTop: '4px',
+                  marginLeft: '8px',
+                  marginRight: '8px',
+                  overflow: 'hidden',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                }}>
+                  {can.viewWarehouses() && (
+                    <NavLink
+                      to="/app/warehouses"
+                      aria-label="Warehouse Locations"
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        padding: '10px 16px',
+                        fontSize: '14px',
+                        textDecoration: 'none',
+                        color: 'inherit'
+                      }}
+                    >
+                      <span style={{ marginRight: '8px' }}>📍</span>
+                      <span className="nav-label">Locations</span>
+                    </NavLink>
+                  )}
+
+                  {can.viewInventory() && (
+                    <NavLink
+                      to="/app/warehouses/inventory"
+                      aria-label="Warehouse Inventory"
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        padding: '10px 16px',
+                        fontSize: '14px',
+                        textDecoration: 'none',
+                        color: 'inherit'
+                      }}
+                    >
+                      <span style={{ marginRight: '8px' }}>📋</span>
+                      <span className="nav-label">Inventory</span>
+                    </NavLink>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {can.viewTransportation() && (
+            <NavLink to="/app/transportation" aria-label="Transportation">
+              <span className="nav-icon">🚛</span>
+              <span className="nav-label">Transportation</span>
+            </NavLink>
+          )}
+
+          {can.viewShipments() && (
+            <NavLink to="/app/shipments" aria-label="Shipments">
+              <span className="nav-icon">🚚</span>
+              <span className="nav-label">Shipments</span>
+            </NavLink>
+          )}
+
+          {can.viewInvoices() && (
+            <NavLink to="/app/invoices" aria-label="Invoices" style={{ position: 'relative' }}>
+              <span className="nav-icon">💳</span>
+              <span className="nav-label">Invoices</span>
+              {overdueCount > 0 && (
+                <span
+                  className="badge danger"
+                  style={{
+                    position: 'absolute',
+                    top: 8,
+                    right: 8,
+                    fontSize: '10px',
+                    minWidth: '18px',
+                    height: '18px',
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: 0
+                  }}
+                >
+                  {overdueCount > 99 ? '99+' : overdueCount}
+                </span>
+              )}
+            </NavLink>
+          )}
+
+          {can.viewReports() && (
+            <NavLink to="/app/reports" aria-label="Reports">
+              <span className="nav-icon">📈</span>
+              <span className="nav-label">Reports</span>
+            </NavLink>
+          )}
+
+          {/* Settings Dropdown - Only show if user has access to any settings */}
+          {(can.viewTeam() || can.viewSubscription() || can.viewSystemSettings()) && (
+            <div style={{ position: 'relative' }}>
+              <button
+                className={`nav-link${settingsOpen ? ' active' : ''}`}
+                onClick={() => setSettingsOpen(!settingsOpen)}
+                aria-label="Settings"
+                style={{
+                  width: '100%',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: '12px 16px',
+                  color: 'inherit',
+                  textAlign: 'left'
+                }}
+              >
+                <span className="nav-icon">⚙️</span>
+                <span className="nav-label">Settings</span>
+                <span style={{ marginLeft: 'auto', fontSize: '12px', transition: 'transform 0.2s', transform: settingsOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+              </button>
+
+              {settingsOpen && (
+                <div className="settings-dropdown" style={{
+                  background: 'var(--surface-100)',
+                  borderRadius: '8px',
+                  marginTop: '4px',
+                  marginLeft: '8px',
+                  marginRight: '8px',
+                  overflow: 'hidden',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                }}>
+                  {can.viewTeam() && (
+                    <NavLink
+                      to="/app/settings/team"
+                      aria-label="Team Management"
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        padding: '10px 16px',
+                        fontSize: '14px',
+                        textDecoration: 'none',
+                        color: 'inherit'
+                      }}
+                    >
+                      <span style={{ marginRight: '8px' }}>👥</span>
+                      <span className="nav-label">Team Management</span>
+                    </NavLink>
+                  )}
+
+                  {can.viewSubscription() && (
+                    <NavLink
+                      to="/app/settings/subscription"
+                      aria-label="Subscription Plan"
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        padding: '10px 16px',
+                        fontSize: '14px',
+                        textDecoration: 'none',
+                        color: 'inherit'
+                      }}
+                    >
+                      <span style={{ marginRight: '8px' }}>💎</span>
+                      <span className="nav-label">Subscription Plan</span>
+                    </NavLink>
+                  )}
+
+                  {can.viewSystemSettings() && (
+                    <NavLink
+                      to="/app/settings/system"
+                      aria-label="System Settings"
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        padding: '10px 16px',
+                        fontSize: '14px',
+                        textDecoration: 'none',
+                        color: 'inherit'
+                      }}
+                    >
+                      <span style={{ marginRight: '8px' }}>🔧</span>
+                      <span className="nav-label">System Settings</span>
+                    </NavLink>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </nav>
         <div style={{ marginTop: 'auto', padding: 16 }}>
           <button className="btn btn-outline" style={{ width: '100%' }} onClick={signOut}>Sign out</button>

@@ -61,6 +61,7 @@ class AuthController extends Controller
                 'user_id' => $user->user_id ?? null,
                 'email' => $user->email,
                 'username' => $user->username ?? null,
+                'role' => $user->role ?? 'admin',
             ],
             'token' => 'demo',
         ])->header('Access-Control-Allow-Origin', '*');

@@ -20,15 +20,24 @@ export default function SignIn() {
   const onSubmit = async (e) => {
     e.preventDefault();
     setSubmitting(true);
+    console.log('Form submitted');
     try {
       const { apiPost } = await import('../lib/api')
-      await apiPost('/api/auth/login', { email: form.email, password: form.password })
-      localStorage.setItem('auth','1');
+      console.log('Attempting login with:', form.email, form.password);
+      const response = await apiPost('/api/auth/login', { email: form.email, password: form.password })
+      console.log('Login response:', response);
+      // Save the full auth response including user role
+      localStorage.setItem('auth', JSON.stringify(response));
+      console.log('Saved to localStorage:', localStorage.getItem('auth'));
       const from = location.state?.from?.pathname || '/app';
+      console.log('Navigating to:', from);
       navigate(from, { replace: true });
+      console.log('Navigation completed');
     } catch (err) {
-      alert(err.message || 'Login failed')
+      console.error('Login error:', err);
+      alert('Login failed: ' + (err.message || 'Unknown error'))
     } finally {
+      console.log('Setting submitting to false');
       setSubmitting(false);
     }
   };

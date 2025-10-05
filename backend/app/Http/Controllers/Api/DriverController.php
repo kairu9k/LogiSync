@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 
 class DriverController extends Controller
@@ -22,7 +23,7 @@ class DriverController extends Controller
                 ->header('Access-Control-Allow-Origin', '*');
         }
 
-        // Simple authentication - find driver by username
+        // Find driver by username
         $driver = DB::table('users')
             ->where('username', $data['username'])
             ->where('role', 'driver')
@@ -33,8 +34,11 @@ class DriverController extends Controller
                 ->header('Access-Control-Allow-Origin', '*');
         }
 
-        // For demo purposes, accept any password for drivers
-        // In production, use proper password hashing verification
+        // Verify password using bcrypt hash
+        if (!Hash::check($data['password'], $driver->password)) {
+            return response()->json(['message' => 'Invalid credentials'], 401)
+                ->header('Access-Control-Allow-Origin', '*');
+        }
 
         return response()->json([
             'message' => 'Login successful',
@@ -42,6 +46,7 @@ class DriverController extends Controller
                 'id' => $driver->user_id,
                 'username' => $driver->username,
                 'email' => $driver->email,
+                'role' => $driver->role,
             ]
         ])->header('Access-Control-Allow-Origin', '*');
     }
