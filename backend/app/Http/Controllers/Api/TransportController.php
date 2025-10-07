@@ -112,7 +112,7 @@ class TransportController extends Controller
             'vehicle_type' => 'required|string|max:255',
             'registration_number' => 'required|string|max:255|unique:transport,registration_number',
             'capacity' => 'required|string|max:255',
-            'safety_compliance_details' => 'nullable|string',
+            'safety_compliance' => 'nullable|boolean',
             'driver_id' => 'required|integer|exists:users,user_id',
             'budget_id' => 'required|integer|exists:budgets,budget_id',
             'schedule_id' => 'required|integer|exists:schedules,schedule_id',
@@ -123,12 +123,15 @@ class TransportController extends Controller
                 ->header('Access-Control-Allow-Origin', '*');
         }
 
+        // Convert boolean to text
+        $safetyCompliance = $request->safety_compliance ? 'Verified' : null;
+
         $id = DB::table('transport')->insertGetId([
             'vehicle_id' => $request->vehicle_id,
             'vehicle_type' => $request->vehicle_type,
             'registration_number' => $request->registration_number,
             'capacity' => $request->capacity,
-            'safety_compliance_details' => $request->safety_compliance_details,
+            'safety_compliance_details' => $safetyCompliance,
             'driver_id' => $request->driver_id,
             'budget_id' => $request->budget_id,
             'schedule_id' => $request->schedule_id,
@@ -147,7 +150,7 @@ class TransportController extends Controller
             'vehicle_type' => 'required|string|max:255',
             'registration_number' => 'required|string|max:255|unique:transport,registration_number,' . $id . ',transport_id',
             'capacity' => 'required|string|max:255',
-            'safety_compliance_details' => 'nullable|string',
+            'safety_compliance' => 'nullable|boolean',
             'driver_id' => 'required|integer|exists:users,user_id',
             'budget_id' => 'required|integer|exists:budgets,budget_id',
             'schedule_id' => 'required|integer|exists:schedules,schedule_id',
@@ -158,12 +161,15 @@ class TransportController extends Controller
                 ->header('Access-Control-Allow-Origin', '*');
         }
 
+        // Convert boolean to text
+        $safetyCompliance = $request->safety_compliance ? 'Verified' : null;
+
         $updated = DB::table('transport')->where('transport_id', $id)->update([
             'vehicle_id' => $request->vehicle_id,
             'vehicle_type' => $request->vehicle_type,
             'registration_number' => $request->registration_number,
             'capacity' => $request->capacity,
-            'safety_compliance_details' => $request->safety_compliance_details,
+            'safety_compliance_details' => $safetyCompliance,
             'driver_id' => $request->driver_id,
             'budget_id' => $request->budget_id,
             'schedule_id' => $request->schedule_id,

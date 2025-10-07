@@ -12,15 +12,23 @@ use App\Http\Controllers\Api\DashboardController;
 use App\Http\Controllers\Api\WarehouseController;
 use App\Http\Controllers\Api\AnalyticsController;
 use App\Http\Controllers\Api\UserController;
+use App\Http\Controllers\Api\SubscriptionController;
+use App\Http\Controllers\Api\BudgetController;
+use App\Http\Controllers\Api\ScheduleController;
 
 // ===== PUBLIC ROUTES (No authentication required) =====
 Route::prefix('auth')->group(function () {
     Route::post('/register', [AuthController::class, 'register']);
     Route::post('/login', [AuthController::class, 'login']);
+    Route::post('/verify-email', [AuthController::class, 'verifyEmail']);
+    Route::post('/resend-verification', [AuthController::class, 'resendVerification']);
 });
 
 // Public tracking
 Route::get('/track/{trackingNumber}', [ShipmentController::class, 'track']);
+
+// Subscription plans (public - anyone can view)
+Route::get('/subscriptions/plans', [SubscriptionController::class, 'index']);
 
 // Driver login (public)
 Route::post('/driver/login', [DriverController::class, 'login']);
@@ -89,6 +97,13 @@ Route::middleware(['role:admin,warehouse_manager'])->group(function () {
     Route::patch('/inventory/{id}', [WarehouseController::class, 'updateItemLocation']);
     Route::get('/inventory/unassigned', [WarehouseController::class, 'getUnassignedItems']);
     Route::get('/dashboard/warehouse-metrics', [WarehouseController::class, 'getDashboardMetrics']);
+
+    // Budget Management (Admin & Warehouse Manager)
+    Route::get('/budgets', [BudgetController::class, 'index']);
+    Route::get('/budgets/{id}', [BudgetController::class, 'show']);
+    Route::post('/budgets', [BudgetController::class, 'store']);
+    Route::patch('/budgets/{id}', [BudgetController::class, 'update']);
+    Route::delete('/budgets/{id}', [BudgetController::class, 'destroy']);
 });
 
 
@@ -117,8 +132,21 @@ Route::middleware(['role:admin,booking_manager,warehouse_manager'])->group(funct
     Route::get('/transport/helpers/budgets', [TransportController::class, 'getBudgets']);
     Route::get('/transport/helpers/schedules', [TransportController::class, 'getSchedules']);
 
+    // Schedule Management (All staff can view/manage)
+    Route::get('/schedules', [ScheduleController::class, 'index']);
+    Route::get('/schedules/{id}', [ScheduleController::class, 'show']);
+    Route::post('/schedules', [ScheduleController::class, 'store']);
+    Route::patch('/schedules/{id}', [ScheduleController::class, 'update']);
+    Route::delete('/schedules/{id}', [ScheduleController::class, 'destroy']);
+
     // Dashboard
     Route::get('/dashboard/metrics', [DashboardController::class, 'getMetrics']);
+
+    // Subscriptions (all authenticated users)
+    Route::get('/subscriptions/current', [SubscriptionController::class, 'getCurrentSubscription']);
+    Route::post('/subscriptions/subscribe', [SubscriptionController::class, 'createPaymentIntent']);
+    Route::post('/subscriptions/{id}/confirm', [SubscriptionController::class, 'confirmPayment']);
+    Route::post('/subscriptions/{id}/cancel', [SubscriptionController::class, 'cancel']);
 });
 
 

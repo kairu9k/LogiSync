@@ -11,6 +11,7 @@ export default function AppLayout() {
   const [overdueCount, setOverdueCount] = useState(0)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [warehousesOpen, setWarehousesOpen] = useState(false)
+  const [transportationOpen, setTransportationOpen] = useState(false)
 
   const signOut = () => {
     localStorage.removeItem('auth')
@@ -19,7 +20,7 @@ export default function AppLayout() {
 
   // Breadcrumbs and title
   const { breadcrumbs, title } = useMemo(() => {
-    const map = { app: 'Dashboard', quotes: 'Quotes', orders: 'Orders', shipments: 'Shipments', invoices: 'Invoices', warehouses: 'Warehouses', 'warehouses-locations': 'Warehouse Locations', 'warehouses-inventory': 'Warehouse Inventory', inventory: 'Inventory', transportation: 'Transportation', tracking: 'Live Tracking', reports: 'Reports', settings: 'Settings', team: 'Team Management', subscription: 'Subscription Plan', system: 'System Settings' }
+    const map = { app: 'Dashboard', quotes: 'Quotes', orders: 'Orders', shipments: 'Shipments', invoices: 'Invoices', warehouses: 'Warehouses', 'warehouses-locations': 'Warehouse Locations', 'warehouses-inventory': 'Warehouse Inventory', inventory: 'Inventory', transportation: 'Transportation', schedules: 'Schedules', tracking: 'Live Tracking', reports: 'Reports', settings: 'Settings', team: 'Team Management', budgets: 'Budget Management', subscription: 'Subscription Plan', system: 'System Settings' }
     const parts = location.pathname.replace(/^\/+|\/+$/g, '').split('/')
     const crumbs = []
     let pathAcc = ''
@@ -83,6 +84,40 @@ export default function AppLayout() {
             <NavLink to="/app/orders" aria-label="Orders">
               <span className="nav-icon">📦</span>
               <span className="nav-label">Orders</span>
+            </NavLink>
+          )}
+
+          {can.viewShipments() && (
+            <NavLink to="/app/shipments" aria-label="Shipments">
+              <span className="nav-icon">🚚</span>
+              <span className="nav-label">Shipments</span>
+            </NavLink>
+          )}
+
+          {can.viewInvoices() && (
+            <NavLink to="/app/invoices" aria-label="Invoices" style={{ position: 'relative' }}>
+              <span className="nav-icon">💳</span>
+              <span className="nav-label">Invoices</span>
+              {overdueCount > 0 && (
+                <span
+                  className="badge danger"
+                  style={{
+                    position: 'absolute',
+                    top: 8,
+                    right: 8,
+                    fontSize: '10px',
+                    minWidth: '18px',
+                    height: '18px',
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: 0
+                  }}
+                >
+                  {overdueCount > 99 ? '99+' : overdueCount}
+                </span>
+              )}
             </NavLink>
           )}
 
@@ -160,61 +195,13 @@ export default function AppLayout() {
             </div>
           )}
 
+          {/* Transportation & Schedules Dropdown */}
           {can.viewTransportation() && (
-            <NavLink to="/app/transportation" aria-label="Transportation">
-              <span className="nav-icon">🚛</span>
-              <span className="nav-label">Transportation</span>
-            </NavLink>
-          )}
-
-          {can.viewShipments() && (
-            <NavLink to="/app/shipments" aria-label="Shipments">
-              <span className="nav-icon">🚚</span>
-              <span className="nav-label">Shipments</span>
-            </NavLink>
-          )}
-
-          {can.viewInvoices() && (
-            <NavLink to="/app/invoices" aria-label="Invoices" style={{ position: 'relative' }}>
-              <span className="nav-icon">💳</span>
-              <span className="nav-label">Invoices</span>
-              {overdueCount > 0 && (
-                <span
-                  className="badge danger"
-                  style={{
-                    position: 'absolute',
-                    top: 8,
-                    right: 8,
-                    fontSize: '10px',
-                    minWidth: '18px',
-                    height: '18px',
-                    borderRadius: '50%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    padding: 0
-                  }}
-                >
-                  {overdueCount > 99 ? '99+' : overdueCount}
-                </span>
-              )}
-            </NavLink>
-          )}
-
-          {can.viewReports() && (
-            <NavLink to="/app/reports" aria-label="Reports">
-              <span className="nav-icon">📈</span>
-              <span className="nav-label">Reports</span>
-            </NavLink>
-          )}
-
-          {/* Settings Dropdown - Only show if user has access to any settings */}
-          {(can.viewTeam() || can.viewSubscription() || can.viewSystemSettings()) && (
             <div style={{ position: 'relative' }}>
               <button
-                className={`nav-link${settingsOpen ? ' active' : ''}`}
-                onClick={() => setSettingsOpen(!settingsOpen)}
-                aria-label="Settings"
+                className={`nav-link${transportationOpen ? ' active' : ''}`}
+                onClick={() => setTransportationOpen(!transportationOpen)}
+                aria-label="Transportation"
                 style={{
                   width: '100%',
                   background: 'none',
@@ -227,12 +214,12 @@ export default function AppLayout() {
                   textAlign: 'left'
                 }}
               >
-                <span className="nav-icon">⚙️</span>
-                <span className="nav-label">Settings</span>
-                <span style={{ marginLeft: 'auto', fontSize: '12px', transition: 'transform 0.2s', transform: settingsOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+                <span className="nav-icon">🚛</span>
+                <span className="nav-label">Transportation</span>
+                <span style={{ marginLeft: 'auto', fontSize: '12px', transition: 'transform 0.2s', transform: transportationOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
               </button>
 
-              {settingsOpen && (
+              {transportationOpen && (
                 <div className="settings-dropdown" style={{
                   background: 'var(--surface-100)',
                   borderRadius: '8px',
@@ -242,66 +229,179 @@ export default function AppLayout() {
                   overflow: 'hidden',
                   boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
                 }}>
-                  {can.viewTeam() && (
-                    <NavLink
-                      to="/app/settings/team"
-                      aria-label="Team Management"
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        padding: '10px 16px',
-                        fontSize: '14px',
-                        textDecoration: 'none',
-                        color: 'inherit'
-                      }}
-                    >
-                      <span style={{ marginRight: '8px' }}>👥</span>
-                      <span className="nav-label">Team Management</span>
-                    </NavLink>
-                  )}
+                  <NavLink
+                    to="/app/transportation"
+                    aria-label="Vehicles"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      padding: '10px 16px',
+                      fontSize: '14px',
+                      textDecoration: 'none',
+                      color: 'inherit'
+                    }}
+                  >
+                    <span style={{ marginRight: '8px' }}>🚗</span>
+                    <span className="nav-label">Vehicles</span>
+                  </NavLink>
 
-                  {can.viewSubscription() && (
-                    <NavLink
-                      to="/app/settings/subscription"
-                      aria-label="Subscription Plan"
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        padding: '10px 16px',
-                        fontSize: '14px',
-                        textDecoration: 'none',
-                        color: 'inherit'
-                      }}
-                    >
-                      <span style={{ marginRight: '8px' }}>💎</span>
-                      <span className="nav-label">Subscription Plan</span>
-                    </NavLink>
-                  )}
-
-                  {can.viewSystemSettings() && (
-                    <NavLink
-                      to="/app/settings/system"
-                      aria-label="System Settings"
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        padding: '10px 16px',
-                        fontSize: '14px',
-                        textDecoration: 'none',
-                        color: 'inherit'
-                      }}
-                    >
-                      <span style={{ marginRight: '8px' }}>🔧</span>
-                      <span className="nav-label">System Settings</span>
-                    </NavLink>
-                  )}
+                  <NavLink
+                    to="/app/schedules"
+                    aria-label="Schedules"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      padding: '10px 16px',
+                      fontSize: '14px',
+                      textDecoration: 'none',
+                      color: 'inherit'
+                    }}
+                  >
+                    <span style={{ marginRight: '8px' }}>📅</span>
+                    <span className="nav-label">Schedules</span>
+                  </NavLink>
                 </div>
               )}
             </div>
           )}
+
+          {can.viewReports() && (
+            <NavLink to="/app/reports" aria-label="Reports">
+              <span className="nav-icon">📈</span>
+              <span className="nav-label">Reports</span>
+            </NavLink>
+          )}
         </nav>
-        <div style={{ marginTop: 'auto', padding: 16 }}>
-          <button className="btn btn-outline" style={{ width: '100%' }} onClick={signOut}>Sign out</button>
+
+        {/* Settings Section at Bottom */}
+        <div style={{ marginTop: 'auto', padding: '8px', borderTop: '1px solid var(--border)' }}>
+          <div style={{ position: 'relative' }}>
+            <button
+              className={`nav-link${settingsOpen ? ' active' : ''}`}
+              onClick={() => setSettingsOpen(!settingsOpen)}
+              aria-label="Settings"
+              style={{
+                width: '100%',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                padding: '12px 14px',
+                color: 'inherit',
+                textAlign: 'left',
+                borderRadius: '10px'
+              }}
+            >
+              <span className="nav-icon">⚙️</span>
+              <span className="nav-label">Settings</span>
+              <span style={{ marginLeft: 'auto', fontSize: '12px', transition: 'transform 0.2s', transform: settingsOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+            </button>
+
+            {settingsOpen && (
+              <div style={{
+                background: 'var(--surface)',
+                borderRadius: '8px',
+                marginTop: '4px',
+                marginLeft: '4px',
+                marginRight: '4px',
+                overflow: 'hidden',
+                border: '1px solid var(--border)'
+              }}>
+                {can.manageWarehouses() && (
+                  <NavLink
+                    to="/app/settings/budgets"
+                    aria-label="Budget Management"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      padding: '10px 14px',
+                      fontSize: '14px',
+                      textDecoration: 'none',
+                      color: 'inherit'
+                    }}
+                  >
+                    <span style={{ marginRight: '8px' }}>💰</span>
+                    <span className="nav-label">Budgets</span>
+                  </NavLink>
+                )}
+
+                {can.viewTeam() && (
+                  <NavLink
+                    to="/app/settings/team"
+                    aria-label="Team Management"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      padding: '10px 14px',
+                      fontSize: '14px',
+                      textDecoration: 'none',
+                      color: 'inherit'
+                    }}
+                  >
+                    <span style={{ marginRight: '8px' }}>👥</span>
+                    <span className="nav-label">Team</span>
+                  </NavLink>
+                )}
+
+                {can.viewSubscription() && (
+                  <NavLink
+                    to="/app/settings/subscription"
+                    aria-label="Subscription Plan"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      padding: '10px 14px',
+                      fontSize: '14px',
+                      textDecoration: 'none',
+                      color: 'inherit'
+                    }}
+                  >
+                    <span style={{ marginRight: '8px' }}>💎</span>
+                    <span className="nav-label">Subscription</span>
+                  </NavLink>
+                )}
+
+                {can.viewSystemSettings() && (
+                  <NavLink
+                    to="/app/settings/system"
+                    aria-label="System Settings"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      padding: '10px 14px',
+                      fontSize: '14px',
+                      textDecoration: 'none',
+                      color: 'inherit'
+                    }}
+                  >
+                    <span style={{ marginRight: '8px' }}>🔧</span>
+                    <span className="nav-label">System</span>
+                  </NavLink>
+                )}
+
+                <button
+                  onClick={signOut}
+                  style={{
+                    width: '100%',
+                    background: 'none',
+                    border: 'none',
+                    borderTop: '1px solid var(--border)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    padding: '10px 14px',
+                    fontSize: '14px',
+                    color: '#ef4444',
+                    textAlign: 'left'
+                  }}
+                >
+                  <span style={{ marginRight: '8px' }}>🚪</span>
+                  <span className="nav-label">Sign Out</span>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </aside>
       <main className="app-main">

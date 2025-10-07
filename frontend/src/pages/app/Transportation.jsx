@@ -20,7 +20,7 @@ export default function Transportation() {
     vehicle_type: '',
     registration_number: '',
     capacity: '',
-    safety_compliance_details: '',
+    safety_compliance: false,
     driver_id: '',
     budget_id: '',
     schedule_id: ''
@@ -69,11 +69,11 @@ export default function Transportation() {
   const openCreateModal = () => {
     setEditingId(null)
     setFormData({
-      vehicle_id: '',
+      vehicle_id: `VEH-${Date.now().toString().slice(-6)}`, // Auto-generate
       vehicle_type: '',
       registration_number: '',
       capacity: '',
-      safety_compliance_details: '',
+      safety_compliance: false,
       driver_id: '',
       budget_id: '',
       schedule_id: ''
@@ -89,7 +89,7 @@ export default function Transportation() {
       vehicle_type: transport.vehicle_type,
       registration_number: transport.registration_number,
       capacity: transport.capacity,
-      safety_compliance_details: transport.safety_compliance || '',
+      safety_compliance: Boolean(transport.safety_compliance),
       driver_id: String(transport.driver_id),
       budget_id: String(transport.budget_id || ''),
       schedule_id: String(transport.schedule_id || '')
@@ -251,13 +251,13 @@ export default function Transportation() {
             <form onSubmit={handleSubmit} style={{ display: 'grid', gap: 12 }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <label>
-                  <div className="label">Vehicle ID *</div>
+                  <div className="label">Vehicle ID (Auto-generated)</div>
                   <input
                     className="input"
                     value={formData.vehicle_id}
-                    onChange={(e) => setFormData({ ...formData, vehicle_id: e.target.value })}
-                    placeholder="e.g. VEH-001"
-                    required
+                    readOnly
+                    disabled
+                    style={{ backgroundColor: 'var(--gray-100)', cursor: 'not-allowed' }}
                   />
                 </label>
                 <label>
@@ -331,33 +331,32 @@ export default function Transportation() {
                 </label>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <label>
-                  <div className="label">Schedule *</div>
-                  <select
-                    className="input"
-                    value={formData.schedule_id}
-                    onChange={(e) => setFormData({ ...formData, schedule_id: e.target.value })}
-                    required
-                  >
-                    <option value="">Select schedule...</option>
-                    {schedules.map(s => (
-                      <option key={s.id} value={s.id}>
-                        {s.schedule_name} ({new Date(s.start_time).toLocaleDateString()})
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  <div className="label">Safety Compliance</div>
-                  <input
-                    className="input"
-                    value={formData.safety_compliance_details}
-                    onChange={(e) => setFormData({ ...formData, safety_compliance_details: e.target.value })}
-                    placeholder="e.g. All checks passed"
-                  />
-                </label>
-              </div>
+              <label>
+                <div className="label">Schedule *</div>
+                <select
+                  className="input"
+                  value={formData.schedule_id}
+                  onChange={(e) => setFormData({ ...formData, schedule_id: e.target.value })}
+                  required
+                >
+                  <option value="">Select schedule...</option>
+                  {schedules.map(s => (
+                    <option key={s.id} value={s.id}>
+                      {s.schedule_name} ({new Date(s.start_time).toLocaleDateString()})
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={formData.safety_compliance}
+                  onChange={(e) => setFormData({ ...formData, safety_compliance: e.target.checked })}
+                  style={{ width: 18, height: 18, cursor: 'pointer' }}
+                />
+                <span className="label" style={{ marginBottom: 0 }}>Safety Compliance Verified</span>
+              </label>
 
               <div className="form-actions" style={{ marginTop: 8 }}>
                 <button
