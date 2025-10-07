@@ -66,43 +66,47 @@ export default function Orders() {
 
       {!loading && !error && (
         <div className="grid" style={{ gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 12 }}>
-          {orders.map((o) => (
-            <button
-              key={o.id}
-              className="card link-card"
-              style={{
-                padding: 16,
-                textAlign: 'left',
-                opacity: o.status === 'fulfilled' ? 0.6 : 1,
-                position: 'relative',
-                overflow: 'hidden'
-              }}
-              onClick={() => navigate(`/app/orders/${o.id}`)}
-            >
-              {o.status === 'fulfilled' && (
-                <div style={{
-                  position: 'absolute',
-                  top: '50%',
-                  left: '50%',
-                  transform: 'translate(-50%, -50%) rotate(-25deg)',
-                  fontSize: '24px',
-                  fontWeight: 'bold',
-                  color: 'var(--success-300)',
-                  pointerEvents: 'none',
-                  zIndex: 1,
-                  userSelect: 'none'
-                }}>
-                  ✓ FULFILLED
+          {orders.map((o) => {
+            const getBadgeClass = (status) => {
+              switch(status) {
+                case 'fulfilled': return 'success'
+                case 'processing': return 'info'
+                case 'canceled': return 'danger'
+                default: return 'warn'
+              }
+            }
+
+            return (
+              <button
+                key={o.id}
+                className="card link-card"
+                style={{
+                  padding: 16,
+                  textAlign: 'left',
+                  opacity: o.status === 'fulfilled' ? 0.6 : 1,
+                  position: 'relative',
+                  overflow: 'hidden'
+                }}
+                onClick={() => navigate(`/app/orders/${o.id}`)}
+              >
+                {o.status === 'fulfilled' && (
+                  <div className="quote-watermark">Fulfilled</div>
+                )}
+                <div className="muted">{o.po}</div>
+                <div><strong>{o.customer}</strong></div>
+                <div className="muted" style={{ fontSize: '0.875rem', marginTop: 4 }}>
+                  {o.order_date ? new Date(o.order_date).toLocaleDateString() : 'N/A'}
                 </div>
-              )}
-              <div className="muted">{o.po}</div>
-              <div>Customer {o.customer}</div>
-              <div>Items: {o.items}</div>
-              <div>
-                Status: <span className={`badge ${o.status === 'fulfilled' ? 'success' : 'info'}`}>{o.status}</span>
-              </div>
-            </button>
-          ))}
+                <div style={{ marginTop: 8 }}>Items: {o.items}</div>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <span className={`badge ${getBadgeClass(o.status)}`}>{o.status}</span>
+                  {!o.has_shipment && o.status !== 'canceled' && (
+                    <span className="badge warn" style={{ fontSize: '11px' }}>⚠ No Shipment</span>
+                  )}
+                </div>
+              </button>
+            )
+          })}
           {orders.length === 0 && (
             <div className="card" style={{ padding: 16 }}>
               No orders found.

@@ -29,6 +29,12 @@ export async function apiPost(path, body) {
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
+    // Handle validation errors (422 status)
+    if (data?.errors && typeof data.errors === 'object') {
+      const firstError = Object.values(data.errors)[0];
+      const message = Array.isArray(firstError) ? firstError[0] : firstError;
+      throw new Error(message);
+    }
     const message = data?.message || "Request failed";
     console.error(`[API POST ${path}] Failed with status ${res.status}:`, data);
     throw new Error(message);

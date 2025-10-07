@@ -20,12 +20,14 @@ class OrderController extends Controller
         $query = DB::table('orders as o')
             ->leftJoin('users as u', 'o.user_id', '=', 'u.user_id')
             ->leftJoin('order_details as od', 'o.order_id', '=', 'od.order_id')
+            ->leftJoin('shipments as s', 'o.order_id', '=', 's.order_id')
             ->select(
                 'o.order_id',
                 'o.order_status',
                 'o.order_date',
                 'u.username',
-                DB::raw('COUNT(od.order_details_id) as items')
+                DB::raw('COUNT(DISTINCT od.order_details_id) as items'),
+                DB::raw('COUNT(DISTINCT s.shipment_id) as shipment_count')
             )
             ->groupBy('o.order_id', 'o.order_status', 'o.order_date', 'u.username')
             ->orderByDesc('o.order_date');
@@ -52,6 +54,7 @@ class OrderController extends Controller
                 'items' => (int) $row->items,
                 'status' => $row->order_status,
                 'order_date' => $row->order_date,
+                'has_shipment' => (int) $row->shipment_count > 0,
             ];
         });
 

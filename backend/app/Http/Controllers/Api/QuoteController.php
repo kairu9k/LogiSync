@@ -54,19 +54,24 @@ class QuoteController extends Controller
         $status = $request->query('status');
         $query = DB::table('quotes as q')
             ->leftJoin('users as u', 'q.user_id', '=', 'u.user_id')
+            ->leftJoin('users as creator', 'q.created_by_user_id', '=', 'creator.user_id')
             ->leftJoin('orders as o', 'o.quote_id', '=', 'q.quote_id')
             ->select(
-                'q.quote_id','q.creation_date','q.user_id','q.weight','q.dimensions','q.distance','q.estimated_cost','q.expiry_date','q.status','u.username',
+                'q.quote_id','q.creation_date','q.user_id','q.weight','q.dimensions','q.distance','q.estimated_cost','q.expiry_date','q.status',
+                'q.customer_name',
+                'u.username',
+                'creator.username as created_by_username',
                 DB::raw('MIN(o.order_id) as order_id')
             )
-            ->groupBy('q.quote_id','q.creation_date','q.user_id','q.weight','q.dimensions','q.distance','q.estimated_cost','q.expiry_date','q.status','u.username')
+            ->groupBy('q.quote_id','q.creation_date','q.user_id','q.weight','q.dimensions','q.distance','q.estimated_cost','q.expiry_date','q.status','q.customer_name','u.username','creator.username')
             ->orderByDesc('q.creation_date');
         if ($status && $status !== 'any') $query->where('q.status', $status);
         $rows = $query->limit(100)->get();
         $data = $rows->map(function ($r) {
             return [
                 'id' => (int) $r->quote_id,
-                'customer' => $r->username ?? 'N/A',
+                'customer' => $r->customer_name ?? $r->username ?? 'N/A',
+                'created_by' => $r->created_by_username ?? 'System',
                 'weight' => (int) $r->weight,
                 'dimensions' => $r->dimensions,
                 'distance' => (int) $r->distance,
@@ -113,28 +118,25 @@ class QuoteController extends Controller
         $data = $request->all();
         $validator = Validator::make($data, [
             'user_id' => 'nullable|integer',
-            'customer' => 'nullable|string|max:255',
+            'customer' => 'required|string|max:255',
             'destination' => 'nullable|string',
             'weight' => 'required|integer|min:0',
             'L' => 'required|numeric|min:0',
             'W' => 'required|numeric|min:0',
             'H' => 'required|numeric|min:0',
             'distance' => 'required|integer|min:0',
+            'created_by_user_id' => 'nullable|integer',
         ]);
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 422)
                 ->header('Access-Control-Allow-Origin', '*');
         }
 
-        $userId = $data['user_id'] ?? (DB::table('users')->min('user_id') ?? null);
-        if (!$userId) {
-            $userId = DB::table('users')->insertGetId([
-                'username' => $data['customer'] ?? 'demo',
-                'password' => bcrypt('password'),
-                'role' => 'admin',
-                'email' => ($data['customer'] ?? 'demo') . '@example.com',
-            ], 'user_id');
-        }
+        // Get a default user_id (for backward compatibility)
+        $userId = $data['user_id'] ?? (DB::table('users')->min('user_id') ?? 1);
+
+        // Get the creator (logged-in user who created the quote)
+        $createdByUserId = $data['created_by_user_id'] ?? null;
 
         $dims = [ 'L' => (float)$data['L'], 'W' => (float)$data['W'], 'H' => (float)$data['H'] ];
         $cost = $this->calculateCost((int)$data['weight'], $dims, (int)$data['distance'], $data['destination'] ?? 'standard');
@@ -142,6 +144,8 @@ class QuoteController extends Controller
 
         $id = DB::table('quotes')->insertGetId([
             'user_id' => $userId,
+            'customer_name' => $data['customer'],
+            'created_by_user_id' => $createdByUserId,
             'weight' => (int)$data['weight'],
             'dimensions' => json_encode($dims),
             'estimated_cost' => $cost,

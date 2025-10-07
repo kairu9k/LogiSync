@@ -291,8 +291,8 @@ export default function Dashboard() {
               style={{ height: '100%', width: '100%' }}
             >
               <TileLayer
-                url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+                url="https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png"
+                attribution='&copy; <a href="https://stadiamaps.com/">Stadia Maps</a>, &copy; <a href="https://openmaptiles.org/">OpenMapTiles</a> &copy; <a href="http://openstreetmap.org">OpenStreetMap</a> contributors'
               />
 
               {activeShipments.map(shipment => {
@@ -341,24 +341,140 @@ export default function Dashboard() {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            background: '#f9fafb',
+            background: 'var(--bg-2)',
             borderRadius: '8px',
-            color: '#666',
+            color: 'var(--muted)',
             textAlign: 'center',
-            padding: '2rem'
+            padding: '2rem',
+            border: '1px solid var(--border)'
           }}>
             <div>
               <div style={{ fontSize: '48px', marginBottom: '1rem' }}>🗺️</div>
-              <div style={{ fontSize: '16px', marginBottom: '0.5rem' }}>No active shipments with GPS tracking</div>
+              <div style={{ fontSize: '16px', marginBottom: '0.5rem', color: 'var(--text)' }}>No active shipments with GPS tracking</div>
               <div style={{ fontSize: '14px' }}>Shipments will appear here once drivers start GPS tracking</div>
             </div>
           </div>
         )}
       </div>
 
-      <div className="card" style={{ minHeight: 260 }}>
-        <div className="label">Fulfillment performance (last 30 days)</div>
-        <div className="skeleton" style={{ height: 180, marginTop: 12 }} />
+      <div className="card" style={{ padding: 20 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+          <h3 style={{ margin: 0 }}>Fulfillment Performance</h3>
+          <div style={{ fontSize: '14px', color: '#6b7280' }}>
+            Total: <strong>{dashboardData.shipments.total}</strong> shipments
+          </div>
+        </div>
+
+        {loading ? (
+          <div className="skeleton" style={{ height: 180 }} />
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            {/* Delivered Progress Bar */}
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: '20px' }}>✅</span>
+                  <span style={{ fontWeight: '600', fontSize: '15px' }}>Delivered</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <span style={{ fontSize: '24px', fontWeight: 'bold', color: '#059669' }}>
+                    {dashboardData.shipments.delivered}
+                  </span>
+                  <span style={{ fontSize: '14px', color: '#6b7280' }}>
+                    {dashboardData.shipments.total > 0
+                      ? Math.round((dashboardData.shipments.delivered / dashboardData.shipments.total) * 100)
+                      : 0}%
+                  </span>
+                </div>
+              </div>
+              <div style={{
+                height: '12px',
+                background: '#f3f4f6',
+                borderRadius: '6px',
+                overflow: 'hidden'
+              }}>
+                <div style={{
+                  height: '100%',
+                  background: 'linear-gradient(90deg, #059669 0%, #10b981 100%)',
+                  width: `${dashboardData.shipments.total > 0
+                    ? Math.round((dashboardData.shipments.delivered / dashboardData.shipments.total) * 100)
+                    : 0}%`,
+                  transition: 'width 0.3s ease'
+                }} />
+              </div>
+            </div>
+
+            {/* In Transit Progress Bar */}
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: '20px' }}>🚚</span>
+                  <span style={{ fontWeight: '600', fontSize: '15px' }}>In Transit</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <span style={{ fontSize: '24px', fontWeight: 'bold', color: '#2563eb' }}>
+                    {dashboardData.shipments.active}
+                  </span>
+                  <span style={{ fontSize: '14px', color: '#6b7280' }}>
+                    {dashboardData.shipments.total > 0
+                      ? Math.round((dashboardData.shipments.active / dashboardData.shipments.total) * 100)
+                      : 0}%
+                  </span>
+                </div>
+              </div>
+              <div style={{
+                height: '12px',
+                background: '#f3f4f6',
+                borderRadius: '6px',
+                overflow: 'hidden'
+              }}>
+                <div style={{
+                  height: '100%',
+                  background: 'linear-gradient(90deg, #2563eb 0%, #3b82f6 100%)',
+                  width: `${dashboardData.shipments.total > 0
+                    ? Math.round((dashboardData.shipments.active / dashboardData.shipments.total) * 100)
+                    : 0}%`,
+                  transition: 'width 0.3s ease'
+                }} />
+              </div>
+            </div>
+
+            {/* Pending Progress Bar */}
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: '20px' }}>⏳</span>
+                  <span style={{ fontWeight: '600', fontSize: '15px' }}>Pending Dispatch</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <span style={{ fontSize: '24px', fontWeight: 'bold', color: '#d97706' }}>
+                    {dashboardData.shipments.pending}
+                  </span>
+                  <span style={{ fontSize: '14px', color: '#6b7280' }}>
+                    {dashboardData.shipments.total > 0
+                      ? Math.round((dashboardData.shipments.pending / dashboardData.shipments.total) * 100)
+                      : 0}%
+                  </span>
+                </div>
+              </div>
+              <div style={{
+                height: '12px',
+                background: '#f3f4f6',
+                borderRadius: '6px',
+                overflow: 'hidden'
+              }}>
+                <div style={{
+                  height: '100%',
+                  background: 'linear-gradient(90deg, #d97706 0%, #f59e0b 100%)',
+                  width: `${dashboardData.shipments.total > 0
+                    ? Math.round((dashboardData.shipments.pending / dashboardData.shipments.total) * 100)
+                    : 0}%`,
+                  transition: 'width 0.3s ease'
+                }} />
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="grid" style={{ gridTemplateColumns: '1.2fr 0.8fr', gap: 16 }}>
@@ -415,7 +531,7 @@ export default function Dashboard() {
           left: 0,
           right: 0,
           bottom: 0,
-          background: 'rgba(0,0,0,0.5)',
+          background: 'rgba(0,0,0,0.8)',
           zIndex: 9999,
           display: 'flex',
           alignItems: 'center',
@@ -423,26 +539,28 @@ export default function Dashboard() {
           padding: '20px'
         }}>
           <div style={{
-            background: 'white',
+            background: 'var(--surface)',
             borderRadius: '12px',
             width: '100%',
             height: '100%',
             display: 'flex',
             flexDirection: 'column',
             overflow: 'hidden',
-            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)'
+            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
+            border: '1px solid var(--border)'
           }}>
             {/* Modal Header */}
             <div style={{
               padding: '20px 24px',
-              borderBottom: '1px solid #e5e7eb',
+              borderBottom: '1px solid var(--border)',
               display: 'flex',
               justifyContent: 'space-between',
-              alignItems: 'center'
+              alignItems: 'center',
+              background: 'var(--bg-2)'
             }}>
               <div>
-                <h2 style={{ margin: 0, fontSize: '20px' }}>🗺️ Live Fleet Tracking</h2>
-                <div style={{ fontSize: '14px', color: '#666', marginTop: 4 }}>
+                <h2 style={{ margin: 0, fontSize: '20px', color: 'var(--text)' }}>🗺️ Live Fleet Tracking</h2>
+                <div style={{ fontSize: '14px', color: 'var(--muted)', marginTop: 4 }}>
                   {activeShipments.length} active shipment{activeShipments.length !== 1 ? 's' : ''} with GPS tracking
                 </div>
               </div>
@@ -452,13 +570,12 @@ export default function Dashboard() {
                   setSelectedShipment(null)
                   setLocationHistory([])
                 }}
+                className="btn btn-ghost"
                 style={{
-                  background: 'none',
-                  border: 'none',
                   fontSize: '24px',
-                  cursor: 'pointer',
                   padding: '8px',
-                  lineHeight: 1
+                  lineHeight: 1,
+                  color: 'var(--text)'
                 }}
               >
                 ✕
@@ -470,13 +587,14 @@ export default function Dashboard() {
               {/* Sidebar */}
               <div style={{
                 width: '320px',
-                borderRight: '1px solid #e5e7eb',
+                borderRight: '1px solid var(--border)',
                 overflowY: 'auto',
-                padding: '16px'
+                padding: '16px',
+                background: 'var(--bg-2)'
               }}>
-                <h3 style={{ margin: '0 0 12px 0', fontSize: '16px' }}>Active Shipments</h3>
+                <h3 style={{ margin: '0 0 12px 0', fontSize: '16px', color: 'var(--text)' }}>Active Shipments</h3>
                 {activeShipments.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>
+                  <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--muted)' }}>
                     No active shipments with GPS data
                   </div>
                 ) : (
@@ -487,23 +605,23 @@ export default function Dashboard() {
                         onClick={() => handleShipmentClick(shipment)}
                         style={{
                           padding: '12px',
-                          border: `2px solid ${selectedShipment?.id === shipment.id ? '#2563eb' : '#e5e7eb'}`,
+                          border: `2px solid ${selectedShipment?.id === shipment.id ? 'var(--primary)' : 'var(--border)'}`,
                           borderRadius: '8px',
                           cursor: 'pointer',
-                          background: selectedShipment?.id === shipment.id ? '#eff6ff' : 'white',
+                          background: selectedShipment?.id === shipment.id ? 'var(--surface)' : 'var(--surface)',
                           transition: 'all 0.2s'
                         }}
                       >
-                        <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>
+                        <div style={{ fontWeight: 'bold', marginBottom: '4px', color: 'var(--text)' }}>
                           {shipment.tracking_number}
                         </div>
-                        <div style={{ fontSize: '13px', color: '#666', lineHeight: 1.5 }}>
+                        <div style={{ fontSize: '13px', color: 'var(--muted)', lineHeight: 1.5 }}>
                           <div>🚚 {shipment.driver}</div>
                           <div>🚛 {shipment.vehicle}</div>
                           <div>📍 {shipment.receiver}</div>
                         </div>
                         {shipment.location && (
-                          <div style={{ fontSize: '11px', color: '#999', marginTop: '8px', paddingTop: '8px', borderTop: '1px solid #e5e7eb' }}>
+                          <div style={{ fontSize: '11px', color: 'var(--muted)', marginTop: '8px', paddingTop: '8px', borderTop: '1px solid var(--border)' }}>
                             Last update: {new Date(shipment.location.recorded_at).toLocaleTimeString()}
                           </div>
                         )}
@@ -522,8 +640,8 @@ export default function Dashboard() {
                     style={{ height: '100%', width: '100%' }}
                   >
                     <TileLayer
-                      url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+                      url="https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png"
+                      attribution='&copy; <a href="https://stadiamaps.com/">Stadia Maps</a>, &copy; <a href="https://openmaptiles.org/">OpenMapTiles</a> &copy; <a href="http://openstreetmap.org">OpenStreetMap</a> contributors'
                     />
 
                     {activeShipments.map(shipment => {
