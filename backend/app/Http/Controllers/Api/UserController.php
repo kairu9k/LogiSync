@@ -90,6 +90,7 @@ class UserController extends Controller
             'email' => $data['email'],
             'password' => Hash::make($data['password']),
             'role' => $data['role'],
+            'email_verified' => true, // Admin-created accounts are automatically verified
         ], 'user_id');
 
         return response()->json([

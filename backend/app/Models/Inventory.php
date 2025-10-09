@@ -14,7 +14,7 @@ class Inventory extends Model
     protected $fillable = [
         'warehouse_id',
         'location_in_warehouse',
-        'order_details_id',
+        'order_id',
     ];
 
     public function warehouse(): BelongsTo
@@ -22,46 +22,44 @@ class Inventory extends Model
         return $this->belongsTo(Warehouse::class, 'warehouse_id', 'warehouse_id');
     }
 
-    public function orderDetail(): BelongsTo
+    public function order(): BelongsTo
     {
-        return $this->belongsTo(OrderDetail::class, 'order_details_id', 'order_details_id');
+        return $this->belongsTo(Order::class, 'order_id', 'order_id');
     }
 
     // Get full inventory item information with related data
     public function getFullDetailsAttribute(): array
     {
-        $orderDetail = $this->orderDetail;
-        $order = $orderDetail ? $orderDetail->order : null;
+        $order = $this->order;
         $customer = $order ? $order->user : null;
 
         return [
             'inventory_id' => $this->inventory_id,
             'location' => $this->location_in_warehouse,
             'warehouse' => $this->warehouse ? $this->warehouse->warehouse_name : 'Unknown',
-            'product_id' => $orderDetail ? $orderDetail->product_id : null,
-            'quantity' => $orderDetail ? $orderDetail->quantity : 0,
             'order_id' => $order ? $order->order_id : null,
+            'po' => $order ? ('PO-' . str_pad($order->order_id, 5, '0', STR_PAD_LEFT)) : 'N/A',
             'order_status' => $order ? $order->order_status : 'unknown',
             'customer' => $customer ? $customer->username : 'Unknown',
             'order_date' => $order ? $order->order_date : null,
         ];
     }
 
-    public static function assignToWarehouse(int $orderDetailsId, int $warehouseId, string $location): self
+    public static function assignToWarehouse(int $orderId, int $warehouseId, string $location): self
     {
         return self::create([
             'warehouse_id' => $warehouseId,
             'location_in_warehouse' => $location,
-            'order_details_id' => $orderDetailsId,
+            'order_id' => $orderId,
         ]);
     }
 
     public static function getItemsByStatus(string $status = null): \Illuminate\Database\Eloquent\Collection
     {
-        $query = self::with(['warehouse', 'orderDetail.order.user']);
+        $query = self::with(['warehouse', 'order.user']);
 
         if ($status) {
-            $query->whereHas('orderDetail.order', function ($q) use ($status) {
+            $query->whereHas('order', function ($q) use ($status) {
                 $q->where('order_status', $status);
             });
         }
@@ -71,16 +69,26 @@ class Inventory extends Model
 
     public static function searchItems(string $search): \Illuminate\Database\Eloquent\Collection
     {
-        return self::with(['warehouse', 'orderDetail.order.user'])
-            ->where(function ($query) use ($search) {
+        // Check if search is a PO number format (PO-00001)
+        $orderIdFromPO = null;
+        if (preg_match('/^PO-0*(\d+)$/i', $search, $matches)) {
+            $orderIdFromPO = (int) $matches[1];
+        }
+
+        return self::with(['warehouse', 'order.user'])
+            ->where(function ($query) use ($search, $orderIdFromPO) {
                 $query->where('location_in_warehouse', 'like', "%{$search}%")
                     ->orWhereHas('warehouse', function ($q) use ($search) {
                         $q->where('warehouse_name', 'like', "%{$search}%");
                     })
-                    ->orWhereHas('orderDetail', function ($q) use ($search) {
-                        $q->where('product_id', 'like', "%{$search}%");
+                    ->orWhereHas('order', function ($q) use ($search, $orderIdFromPO) {
+                        $q->where('order_id', 'like', "%{$search}%");
+                        // Also search by extracted order ID from PO number
+                        if ($orderIdFromPO !== null) {
+                            $q->orWhere('order_id', $orderIdFromPO);
+                        }
                     })
-                    ->orWhereHas('orderDetail.order.user', function ($q) use ($search) {
+                    ->orWhereHas('order.user', function ($q) use ($search) {
                         $q->where('username', 'like', "%{$search}%");
                     });
             })

@@ -13,22 +13,24 @@ class QuoteController extends Controller
 {
     private function calculateCost(int $weightKg, array $dimsCm, int $distanceKm, string $destination = 'standard'): int
     {
-        // Pricing rules:
-        // - Base per km: $0.50/km
-        // - Weight component: $0.20/kg per 100 km
-        // - Volumetric weight: (L*W*H)/5000, use higher of actual vs volumetric
-        // - Destination multiplier: international 1.5, remote 1.3, standard 1.0
-        // - Minimum charge: $15
-        // - Markup: +15%
-        $basePerKm = 0.50; // USD per km
-        $weightPer100Km = 0.20; // USD per kg per 100 km
-        $minCharge = 15.0;
-        $mult = match (strtolower($destination)) {
-            'international' => 1.5,
-            'remote' => 1.3,
-            default => 1.0,
-        };
+        // Get pricing configuration from database
+        $config = DB::table('pricing_config')->first();
 
+        // Fallback to default values if config not found
+        if (!$config) {
+            $config = (object)[
+                'base_rate' => 100.00,
+                'per_km_rate' => 15.00,
+                'per_kg_rate' => 5.00,
+                'fuel_surcharge_percent' => 10.00,
+                'insurance_percent' => 2.00,
+                'minimum_charge' => 200.00,
+                'priority_multiplier' => 1.50,
+                'express_multiplier' => 2.00,
+            ];
+        }
+
+        // Calculate volumetric weight (L*W*H)/5000, use higher of actual vs volumetric
         $volumetric = 0.0;
         if (!empty($dimsCm)) {
             $L = (float)($dimsCm['L'] ?? 0);
@@ -40,13 +42,30 @@ class QuoteController extends Controller
         }
         $chargeableWeight = max($weightKg, $volumetric);
 
-        $distanceCost = $distanceKm * $basePerKm;
-        $weightCost = ($distanceKm / 100.0) * $weightPer100Km * $chargeableWeight;
-        $raw = ($distanceCost + $weightCost) * $mult;
-        $raw = max($raw, $minCharge);
-        $withMarkup = $raw * 1.15; // 15%
+        // Calculate base cost
+        $baseCost = (float) $config->base_rate;
+        $distanceCost = $distanceKm * (float) $config->per_km_rate;
+        $weightCost = $chargeableWeight * (float) $config->per_kg_rate;
+        $subtotal = $baseCost + $distanceCost + $weightCost;
 
-        return (int) round($withMarkup * 100); // in cents
+        // Apply surcharges
+        $fuelSurcharge = $subtotal * ((float) $config->fuel_surcharge_percent / 100);
+        $insurance = $subtotal * ((float) $config->insurance_percent / 100);
+        $totalBeforeMultiplier = $subtotal + $fuelSurcharge + $insurance;
+
+        // Apply service type multiplier (destination-based)
+        $multiplier = match (strtolower($destination)) {
+            'remote' => (float) $config->express_multiplier, // Remote areas (provinces, islands)
+            'standard' => (float) $config->priority_multiplier, // Standard destinations
+            default => (float) $config->priority_multiplier, // Default to standard
+        };
+
+        $total = $totalBeforeMultiplier * $multiplier;
+
+        // Apply minimum charge
+        $finalTotal = max($total, (float) $config->minimum_charge);
+
+        return (int) round($finalTotal * 100); // in cents (₱ to centavos)
     }
 
     public function index(Request $request)
@@ -108,7 +127,7 @@ class QuoteController extends Controller
         return response()->json([
             'amount_cents' => $cents,
             'amount' => round($cents / 100, 2),
-            'currency' => 'USD',
+            'currency' => 'PHP',
             'expiry_date' => Carbon::now()->addDays(14)->toDateString(),
         ])->header('Access-Control-Allow-Origin', '*');
     }
@@ -192,6 +211,10 @@ class QuoteController extends Controller
             'user_id' => $userId,
             'order_status' => 'pending',
         ];
+        // Copy customer name from quote
+        if (Schema::hasColumn('orders', 'customer_name') && !empty($q->customer_name)) {
+            $orderPayload['customer_name'] = $q->customer_name;
+        }
         // Be resilient if migration not applied yet
         if (Schema::hasColumn('orders', 'quote_id')) {
             $orderPayload['quote_id'] = $q->quote_id;

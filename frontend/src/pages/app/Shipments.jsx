@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getShipments, updateShipmentStatus, trackShipment } from '../../lib/api'
+import { getShipments, updateShipmentStatus } from '../../lib/api'
 
 export default function Shipments() {
   const [shipments, setShipments] = useState([])
@@ -9,9 +9,6 @@ export default function Shipments() {
   const [q, setQ] = useState('')
   const [status, setStatus] = useState('any')
   const [updating, setUpdating] = useState(null)
-  const [trackingNumber, setTrackingNumber] = useState('')
-  const [trackingResult, setTrackingResult] = useState(null)
-  const [trackingLoading, setTrackingLoading] = useState(false)
   const navigate = useNavigate()
 
   async function fetchShipments(params = {}) {
@@ -53,21 +50,6 @@ export default function Shipments() {
     }
   }
 
-  async function handleTrackShipment() {
-    if (!trackingNumber.trim()) return
-
-    setTrackingLoading(true)
-    try {
-      const res = await trackShipment(trackingNumber.trim())
-      setTrackingResult(res?.data)
-    } catch (e) {
-      setTrackingResult(null)
-      alert(e.message || 'Tracking number not found')
-    } finally {
-      setTrackingLoading(false)
-    }
-  }
-
   function getStatusBadgeClass(status) {
     switch (status) {
       case 'delivered': return 'badge success'
@@ -98,69 +80,6 @@ export default function Shipments() {
             <option value="cancelled">Cancelled</option>
           </select>
         </div>
-      </div>
-
-      <div className="card">
-        <h3 style={{ marginTop: 0 }}>Track Shipment</h3>
-        <div className="form-row">
-          <input
-            className="input"
-            placeholder="Enter tracking number (e.g. LS2024001)"
-            value={trackingNumber}
-            onChange={(e) => setTrackingNumber(e.target.value)}
-          />
-          <button
-            className="btn btn-primary"
-            onClick={handleTrackShipment}
-            disabled={trackingLoading || !trackingNumber.trim()}
-          >
-            {trackingLoading ? 'Tracking...' : 'Track'}
-          </button>
-        </div>
-
-        {trackingResult && (
-          <div className="card" style={{ marginTop: 12, padding: 16, backgroundColor: 'var(--gray-50)' }}>
-            <h4 style={{ marginTop: 0 }}>Tracking: {trackingResult.tracking_number}</h4>
-            <div className="grid" style={{ gridTemplateColumns: 'repeat(2, minmax(0,1fr))', gap: 12 }}>
-              <div>
-                <div className="label">Receiver</div>
-                <div>{trackingResult.receiver_name}</div>
-              </div>
-              <div>
-                <div className="label">Current Status</div>
-                <div><span className={getStatusBadgeClass(trackingResult.current_status)}>{trackingResult.current_status}</span></div>
-              </div>
-              <div>
-                <div className="label">Destination</div>
-                <div>{trackingResult.destination}</div>
-              </div>
-              <div>
-                <div className="label">Driver</div>
-                <div>{trackingResult.driver}</div>
-              </div>
-            </div>
-
-            {trackingResult.tracking_history?.length > 0 && (
-              <div style={{ marginTop: 12 }}>
-                <div className="label">Tracking History</div>
-                <div className="grid" style={{ gap: 8, marginTop: 8 }}>
-                  {trackingResult.tracking_history.map((item, index) => (
-                    <div key={index} style={{ padding: 8, border: '1px solid var(--gray-200)', borderRadius: 4 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span className={getStatusBadgeClass(item.status)}>{item.status}</span>
-                        <span className="muted" style={{ fontSize: '0.875rem' }}>
-                          {new Date(item.timestamp).toLocaleString()}
-                        </span>
-                      </div>
-                      <div style={{ fontWeight: 'bold', marginTop: 4 }}>{item.location}</div>
-                      {item.details && <div className="muted" style={{ fontSize: '0.875rem', marginTop: 2 }}>{item.details}</div>}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
       </div>
 
       {loading && <div className="card" style={{ padding: 16 }}>Loading shipments…</div>}
@@ -210,8 +129,8 @@ export default function Shipments() {
                 View Details
               </button>
               <div className="muted">{s.tracking_number}</div>
-              <div><strong>{s.receiver}</strong></div>
-              <div>Customer: {s.customer}</div>
+              <div><strong>Customer: {s.receiver}</strong></div>
+              <div>Prepared by: {s.customer}</div>
               <div>Driver: {s.driver}</div>
               <div>Vehicle: {s.vehicle}</div>
               <div>

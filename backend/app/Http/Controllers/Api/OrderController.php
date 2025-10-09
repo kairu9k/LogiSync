@@ -25,11 +25,12 @@ class OrderController extends Controller
                 'o.order_id',
                 'o.order_status',
                 'o.order_date',
+                'o.customer_name',
                 'u.username',
                 DB::raw('COUNT(DISTINCT od.order_details_id) as items'),
                 DB::raw('COUNT(DISTINCT s.shipment_id) as shipment_count')
             )
-            ->groupBy('o.order_id', 'o.order_status', 'o.order_date', 'u.username')
+            ->groupBy('o.order_id', 'o.order_status', 'o.order_date', 'o.customer_name', 'u.username')
             ->orderByDesc('o.order_date');
 
         if ($status && $status !== 'any') {
@@ -47,10 +48,13 @@ class OrderController extends Controller
         $rows = $query->limit($limit)->get();
 
         $data = $rows->map(function ($row) {
+            // Use customer_name if available, fallback to username
+            $customerDisplay = $row->customer_name ?? $row->username ?? 'N/A';
+
             return [
                 'id' => (int) $row->order_id,
                 'po' => 'PO-' . str_pad((string) $row->order_id, 5, '0', STR_PAD_LEFT),
-                'customer' => $row->username ?? 'N/A',
+                'customer' => $customerDisplay,
                 'items' => (int) $row->items,
                 'status' => $row->order_status,
                 'order_date' => $row->order_date,
@@ -67,7 +71,19 @@ class OrderController extends Controller
     {
         $row = DB::table('orders as o')
             ->leftJoin('users as u', 'o.user_id', '=', 'u.user_id')
-            ->select('o.order_id','o.order_status','o.order_date','u.username')
+            ->leftJoin('quotes as q', 'o.quote_id', '=', 'q.quote_id')
+            ->select(
+                'o.order_id',
+                'o.order_status',
+                'o.order_date',
+                'o.customer_name',
+                'o.quote_id',
+                'u.username',
+                'q.weight',
+                'q.dimensions',
+                'q.distance',
+                'q.estimated_cost'
+            )
             ->where('o.order_id', $id)
             ->first();
 
@@ -76,18 +92,20 @@ class OrderController extends Controller
                 ->header('Access-Control-Allow-Origin', '*');
         }
 
-        $details = DB::table('order_details')->where('order_id', $id)
-            ->select('order_details_id','product_id','quantity')
-            ->get();
+        // Use customer_name if available, fallback to username
+        $customerDisplay = $row->customer_name ?? $row->username ?? 'N/A';
 
         $data = [
             'id' => (int) $row->order_id,
             'po' => 'PO-' . str_pad((string) $row->order_id, 5, '0', STR_PAD_LEFT),
-            'customer' => $row->username ?? 'N/A',
+            'customer' => $customerDisplay,
             'status' => $row->order_status,
             'order_date' => $row->order_date,
-            'items' => (int) ($details->sum('quantity') ?? 0),
-            'details' => $details,
+            'quote_id' => $row->quote_id,
+            'weight' => $row->weight,
+            'dimensions' => $row->dimensions,
+            'distance' => $row->distance,
+            'estimated_cost' => $row->estimated_cost,
         ];
 
         return response()->json(['data' => $data])

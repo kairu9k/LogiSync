@@ -5,8 +5,8 @@ export default function CTA() {
     <section id="get-started" className="cta">
       <div className="container cta-inner">
         <div>
-          <h2>Ready to sync your logistics?</h2>
-          <p>Start your free trial in minutes. No credit card required.</p>
+          <h2>Transform your delivery operations today</h2>
+          <p>Join logistics companies across the Philippines using LogiSync. Start your 14-day free trial—no credit card required.</p>
         </div>
         <div>
           <Link className="btn btn-invert" to="/get-started">Start Free Trial</Link>

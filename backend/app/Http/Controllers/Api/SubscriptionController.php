@@ -76,7 +76,7 @@ class SubscriptionController extends Controller
         }
 
         $subscription = DB::table('user_subscriptions as us')
-            ->join('subscriptions as s', 'us.plan_id', '=', 's.subscription_id')
+            ->join('subscriptions as s', 'us.subscription_id', '=', 's.subscription_id')
             ->where('us.user_id', $userId)
             ->where('us.status', 'active')
             ->select('us.*', 's.plan_name', 's.slug', 's.price')
@@ -91,13 +91,12 @@ class SubscriptionController extends Controller
 
         return response()->json([
             'data' => [
-                'id' => $subscription->id,
+                'id' => $subscription->user_subscription_id,
                 'plan_name' => $subscription->plan_name,
                 'slug' => $subscription->slug,
                 'status' => $subscription->status,
-                'started_at' => $subscription->started_at,
-                'expires_at' => $subscription->expires_at,
-                'amount_paid' => (int) $subscription->amount_paid_cents,
+                'started_at' => $subscription->start_date,
+                'expires_at' => $subscription->end_date,
             ]
         ])->header('Access-Control-Allow-Origin', '*');
     }
@@ -133,13 +132,10 @@ class SubscriptionController extends Controller
         if ($plan->price == 0) {
             $subscriptionId = DB::table('user_subscriptions')->insertGetId([
                 'user_id' => $userId,
-                'plan_id' => $plan->subscription_id,
+                'subscription_id' => $plan->subscription_id,
                 'status' => 'active',
-                'amount_paid_cents' => 0,
-                'started_at' => Carbon::now(),
-                'expires_at' => Carbon::now()->addMonths($plan->term_months),
-                'created_at' => Carbon::now(),
-                'updated_at' => Carbon::now(),
+                'start_date' => Carbon::now()->toDateString(),
+                'end_date' => Carbon::now()->addMonths($plan->term_months)->toDateString(),
             ]);
 
             return response()->json([
@@ -164,12 +160,10 @@ class SubscriptionController extends Controller
             // Create pending subscription
             $subscriptionId = DB::table('user_subscriptions')->insertGetId([
                 'user_id' => $userId,
-                'plan_id' => $plan->subscription_id,
+                'subscription_id' => $plan->subscription_id,
                 'status' => 'pending',
-                'paymongo_payment_intent_id' => $paymentIntent->id,
-                'amount_paid_cents' => $plan->price * 100,
-                'created_at' => Carbon::now(),
-                'updated_at' => Carbon::now(),
+                'start_date' => Carbon::now()->toDateString(),
+                'end_date' => Carbon::now()->addMonths($plan->term_months)->toDateString(),
             ]);
 
             return response()->json([
@@ -204,7 +198,7 @@ class SubscriptionController extends Controller
         }
 
         $subscription = DB::table('user_subscriptions')
-            ->where('id', $subscriptionId)
+            ->where('user_subscription_id', $subscriptionId)
             ->where('user_id', $userId)
             ->first();
 
@@ -240,14 +234,12 @@ class SubscriptionController extends Controller
 
             // Check payment status
             if ($paymentIntent->attributes->status === 'succeeded') {
-                $plan = DB::table('subscriptions')->where('subscription_id', $subscription->plan_id)->first();
+                $plan = DB::table('subscriptions')->where('subscription_id', $subscription->subscription_id)->first();
 
-                DB::table('user_subscriptions')->where('id', $subscriptionId)->update([
+                DB::table('user_subscriptions')->where('user_subscription_id', $subscriptionId)->update([
                     'status' => 'active',
-                    'paymongo_payment_method_id' => $data['payment_method_id'],
-                    'started_at' => Carbon::now(),
-                    'expires_at' => Carbon::now()->addMonths($plan->term_months),
-                    'updated_at' => Carbon::now(),
+                    'start_date' => Carbon::now()->toDateString(),
+                    'end_date' => Carbon::now()->addMonths($plan->term_months)->toDateString(),
                 ]);
 
                 return response()->json([
@@ -280,7 +272,7 @@ class SubscriptionController extends Controller
         }
 
         $subscription = DB::table('user_subscriptions')
-            ->where('id', $subscriptionId)
+            ->where('user_subscription_id', $subscriptionId)
             ->where('user_id', $userId)
             ->first();
 
@@ -289,10 +281,8 @@ class SubscriptionController extends Controller
                 ->header('Access-Control-Allow-Origin', '*');
         }
 
-        DB::table('user_subscriptions')->where('id', $subscriptionId)->update([
+        DB::table('user_subscriptions')->where('user_subscription_id', $subscriptionId)->update([
             'status' => 'cancelled',
-            'cancelled_at' => Carbon::now(),
-            'updated_at' => Carbon::now(),
         ]);
 
         return response()->json([

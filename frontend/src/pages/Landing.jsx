@@ -1,9 +1,14 @@
-import { Header, Hero, Features, Pricing, CTA, Footer } from '../components'
+import { useEffect } from 'react'
+import { Header, Hero, Features, HowItWorks, Pricing, CTA, Footer } from '../components'
 import TrackingWidget from '../components/TrackingWidget'
 import { useNavigate } from 'react-router-dom'
 
 export default function Landing() {
   const navigate = useNavigate()
+
+  useEffect(() => {
+    document.title = 'LogiSync - Logistics Management System'
+  }, [])
 
   return (
     <div className="page">
@@ -17,8 +22,8 @@ export default function Landing() {
 
       {/* Driver Access Section */}
       <section style={{
-        padding: '40px 20px',
-        backgroundColor: 'var(--primary-600)',
+        padding: '60px 20px',
+        background: 'linear-gradient(to right, #3b82f6, #8b5cf6)',
         color: 'white',
         textAlign: 'center'
       }}>
@@ -70,6 +75,7 @@ export default function Landing() {
       </section>
 
       <Features />
+      <HowItWorks />
       <Pricing />
       <CTA />
       <Footer />

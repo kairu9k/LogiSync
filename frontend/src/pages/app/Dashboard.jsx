@@ -45,6 +45,21 @@ export default function Dashboard() {
   const [selectedShipment, setSelectedShipment] = useState(null)
   const [locationHistory, setLocationHistory] = useState([])
 
+  // Get user info from localStorage
+  const user = (() => {
+    try {
+      const authData = localStorage.getItem('auth')
+      if (authData) {
+        const parsed = JSON.parse(authData)
+        // The backend returns { user: {...}, token: ... }
+        return parsed.user || parsed
+      }
+    } catch (e) {
+      console.error('Failed to parse user data:', e)
+    }
+    return null
+  })()
+
   useEffect(() => {
     async function loadDashboardData() {
       try {
@@ -215,6 +230,62 @@ export default function Dashboard() {
 
   return (
     <div className="grid" style={{ gap: 16 }}>
+      {/* Welcome Card */}
+      {user && (
+        <div className="card" style={{
+          padding: '24px',
+          background: 'linear-gradient(135deg, var(--primary-50), var(--primary-100))',
+          border: '1px solid var(--primary-200)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div>
+              <h2 style={{ margin: '0 0 8px 0', fontSize: '24px', color: 'var(--text)' }}>
+                Welcome back, {user.username || user.email}!
+              </h2>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '12px' }}>
+                <span style={{ fontSize: '14px', color: 'var(--text-muted)', fontWeight: 500 }}>Your Role:</span>
+                <span style={{
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  padding: '4px 12px',
+                  borderRadius: '16px',
+                  background: user.role === 'admin' ? 'var(--primary-600)' :
+                              user.role === 'booking_manager' ? 'var(--success-600)' :
+                              user.role === 'warehouse_manager' ? 'var(--warning-600)' : 'var(--gray-600)',
+                  color: 'white'
+                }}>
+                  {user.role === 'admin' ? '👑 Administrator' :
+                   user.role === 'booking_manager' ? '📋 Booking Manager' :
+                   user.role === 'warehouse_manager' ? '📦 Warehouse Manager' : user.role}
+                </span>
+              </div>
+              <div style={{ marginTop: '16px', fontSize: '14px', color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                {user.role === 'admin' && (
+                  <>
+                    <strong style={{ color: 'var(--text)' }}>Full System Access:</strong> Manage users, configure pricing, view all reports, and control system settings.
+                  </>
+                )}
+                {user.role === 'booking_manager' && (
+                  <>
+                    <strong style={{ color: 'var(--text)' }}>Booking Operations:</strong> Create quotes, manage orders, assign shipments, and track deliveries.
+                  </>
+                )}
+                {user.role === 'warehouse_manager' && (
+                  <>
+                    <strong style={{ color: 'var(--text)' }}>Warehouse Operations:</strong> Manage inventory, track stock levels, and coordinate with booking team.
+                  </>
+                )}
+              </div>
+            </div>
+            <div style={{ fontSize: '64px', opacity: 0.8 }}>
+              {user.role === 'admin' ? '👑' :
+               user.role === 'booking_manager' ? '📋' :
+               user.role === 'warehouse_manager' ? '📦' : '👤'}
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="grid" style={{ gridTemplateColumns: 'repeat(5, minmax(0,1fr))', gap: 16 }}>
         <article className="card">
           <div className="label">Total Orders</div>

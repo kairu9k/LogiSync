@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { apiGet, apiPost, apiPatch } from '../../lib/api'
-import { getCurrentUser } from '../../lib/permissions'
+import { getCurrentUser, can } from '../../lib/permissions'
 
 function formatMoney(cents) { return `₱${(cents/100).toFixed(2)}` }
 
@@ -81,8 +81,9 @@ export default function Quotes() {
 
   return (
     <div className="grid" style={{ gap: 16 }}>
-      <div className="card">
-        <h2 style={{ marginTop: 0 }}>Quote Calculator</h2>
+      {can.manageQuotes() && (
+        <div className="card">
+          <h2 style={{ marginTop: 0 }}>Quote Calculator</h2>
         <div className="grid" style={{ gap: 12 }}>
           <div className="form-row">
             <label>
@@ -172,6 +173,7 @@ export default function Quotes() {
           </div>
         </div>
       </div>
+      )}
 
       <div className="card">
         <h2 style={{ marginTop: 0 }}>Quotes</h2>
@@ -209,12 +211,20 @@ export default function Quotes() {
                       <span className="badge success">Converted</span>
                     ) : q.status === 'approved' ? (
                       <>
-                        <button className="btn btn-primary" onClick={async()=>{ try { const res = await apiPost(`/api/quotes/${q.id}/convert-to-order`, {}); const id = res?.order_id; if (id) navigate(`/app/orders/${id}`); else await refresh(); } catch(e){ alert(e.message) }}}>Convert to Order</button>
+                        {can.manageQuotes() && (
+                          <button className="btn btn-primary" onClick={async()=>{ try { const res = await apiPost(`/api/quotes/${q.id}/convert-to-order`, {}); const id = res?.order_id; if (id) navigate(`/app/orders/${id}`); else await refresh(); } catch(e){ alert(e.message) }}}>Convert to Order</button>
+                        )}
                       </>
                     ) : (
                       <>
-                        <button className="btn" onClick={async()=>{ try { await apiPatch(`/api/quotes/${q.id}/status`, { status: 'approved' }); await refresh() } catch(e){ alert(e.message) }}}>Approve</button>
-                        <button className="btn btn-outline" onClick={async()=>{ try { await apiPatch(`/api/quotes/${q.id}/status`, { status: 'rejected' }); setList(prev => prev.filter(item => item.id !== q.id)) } catch(e){ alert(e.message) }}}>Reject</button>
+                        {can.manageQuotes() ? (
+                          <>
+                            <button className="btn" onClick={async()=>{ try { await apiPatch(`/api/quotes/${q.id}/status`, { status: 'approved' }); await refresh() } catch(e){ alert(e.message) }}}>Approve</button>
+                            <button className="btn btn-outline" onClick={async()=>{ try { await apiPatch(`/api/quotes/${q.id}/status`, { status: 'rejected' }); setList(prev => prev.filter(item => item.id !== q.id)) } catch(e){ alert(e.message) }}}>Reject</button>
+                          </>
+                        ) : (
+                          <span className="badge info">Pending Approval</span>
+                        )}
                       </>
                     )}
                   </div>

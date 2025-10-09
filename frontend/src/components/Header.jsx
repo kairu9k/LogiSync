@@ -6,8 +6,8 @@ export default function Header() {
   return (
     <header className="header">
       <div className="container nav">
-        <Link className="brand" to="/" onClick={() => setMobileOpen(false)}>
-          <span className="brand-mark">⟂</span>
+        <Link className="brand" to="/" onClick={() => setMobileOpen(false)} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <img src="/logo_for_logisync.png" alt="LogiSync" style={{ height: '40px', width: 'auto' }} />
           <span className="brand-name">LogiSync</span>
         </Link>
 

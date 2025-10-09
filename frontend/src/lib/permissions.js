@@ -50,11 +50,11 @@ export const can = {
   // Dashboard - All staff
   viewDashboard: () => hasAnyRole('admin', 'booking_manager', 'warehouse_manager'),
 
-  // Quotes & Orders - Admin and Booking Manager
-  viewQuotes: () => hasAnyRole('admin', 'booking_manager'),
-  manageQuotes: () => hasAnyRole('admin', 'booking_manager'),
-  viewOrders: () => hasAnyRole('admin', 'booking_manager'),
-  manageOrders: () => hasAnyRole('admin', 'booking_manager'),
+  // Quotes & Orders
+  viewQuotes: () => hasAnyRole('admin', 'booking_manager'), // Booking managers can view quotes for reference
+  manageQuotes: () => isAdmin(), // Only admin can create and approve quotes
+  viewOrders: () => hasAnyRole('admin', 'booking_manager'), // Booking managers can view orders
+  manageOrders: () => isAdmin(), // Only admin can create orders
 
   // Shipments - All staff
   viewShipments: () => hasAnyRole('admin', 'booking_manager', 'warehouse_manager'),
@@ -81,8 +81,8 @@ export const can = {
   viewTeam: () => isAdmin(),
   manageTeam: () => isAdmin(),
 
-  // Settings
-  viewSubscription: () => hasAnyRole('admin', 'booking_manager', 'warehouse_manager'),
+  // Settings - Subscription is admin only (company-wide subscription, not per-user)
+  viewSubscription: () => isAdmin(),
   manageSubscription: () => isAdmin(),
   viewSystemSettings: () => isAdmin(),
   manageSystemSettings: () => isAdmin(),

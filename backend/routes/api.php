@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\SubscriptionController;
 use App\Http\Controllers\Api\BudgetController;
 use App\Http\Controllers\Api\ScheduleController;
+use App\Http\Controllers\Api\PricingController;
 
 // ===== PUBLIC ROUTES (No authentication required) =====
 Route::prefix('auth')->group(function () {
@@ -147,6 +148,11 @@ Route::middleware(['role:admin,booking_manager,warehouse_manager'])->group(funct
     Route::post('/subscriptions/subscribe', [SubscriptionController::class, 'createPaymentIntent']);
     Route::post('/subscriptions/{id}/confirm', [SubscriptionController::class, 'confirmPayment']);
     Route::post('/subscriptions/{id}/cancel', [SubscriptionController::class, 'cancel']);
+
+    // Pricing Configuration (all staff can view, only admin can update will be handled in controller)
+    Route::get('/pricing/config', [PricingController::class, 'getConfig']);
+    Route::post('/pricing/config', [PricingController::class, 'updateConfig']);
+    Route::post('/pricing/preview', [PricingController::class, 'previewCalculation']);
 });
 
 

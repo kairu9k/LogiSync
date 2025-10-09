@@ -2,6 +2,28 @@ export const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000"
 
 function getAuthHeaders() {
   const headers = { "Content-Type": "application/json" };
+
+  // Only use driver auth for driver-specific API routes
+  const isDriverRoute = window.location.pathname.startsWith('/driver');
+
+  if (isDriverRoute) {
+    // Check for driver auth
+    const driverAuth = localStorage.getItem("driver");
+    if (driverAuth) {
+      try {
+        const parsed = JSON.parse(driverAuth);
+        if (parsed.id) {
+          headers["X-User-Id"] = String(parsed.id);
+          console.log('[API] Sending request with driver user_id:', parsed.id);
+          return headers;
+        }
+      } catch (e) {
+        console.error("Failed to parse driver auth", e);
+      }
+    }
+  }
+
+  // Check for regular user auth
   const auth = localStorage.getItem("auth");
   if (auth) {
     try {

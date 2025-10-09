@@ -43,10 +43,21 @@ class ShipmentController extends Controller
         }
 
         if ($search) {
-            $query->where(function ($q) use ($search) {
+            // Check if search is a PO number format (PO-00001)
+            $orderIdFromPO = null;
+            if (preg_match('/^PO-0*(\d+)$/i', $search, $matches)) {
+                $orderIdFromPO = (int) $matches[1];
+            }
+
+            $query->where(function ($q) use ($search, $orderIdFromPO) {
                 $q->where('s.tracking_number', 'like', "%$search%")
                   ->orWhere('s.receiver_name', 'like', "%$search%")
                   ->orWhere('u.username', 'like', "%$search%");
+
+                // Search by order_id if PO number format detected
+                if ($orderIdFromPO !== null) {
+                    $q->orWhere('o.order_id', $orderIdFromPO);
+                }
             });
         }
 
@@ -136,6 +147,7 @@ class ShipmentController extends Controller
         $validator = Validator::make($data, [
             'transport_id' => 'required|integer|exists:transport,transport_id',
             'receiver_name' => 'required|string|max:255',
+            'receiver_contact' => 'required|string|max:50',
             'receiver_address' => 'required|string',
             'origin_name' => 'required|string|max:255',
             'origin_address' => 'required|string',
@@ -172,6 +184,7 @@ class ShipmentController extends Controller
         $shipmentId = DB::table('shipments')->insertGetId([
             'tracking_number' => $trackingNumber,
             'receiver_name' => $data['receiver_name'],
+            'receiver_contact' => $data['receiver_contact'],
             'receiver_address' => $data['receiver_address'],
             'origin_name' => $data['origin_name'],
             'origin_address' => $data['origin_address'],

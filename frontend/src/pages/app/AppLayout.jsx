@@ -13,6 +13,21 @@ export default function AppLayout() {
   const [warehousesOpen, setWarehousesOpen] = useState(false)
   const [transportationOpen, setTransportationOpen] = useState(false)
 
+  // Get user info from localStorage
+  const user = useMemo(() => {
+    try {
+      const authData = localStorage.getItem('auth')
+      if (authData) {
+        const parsed = JSON.parse(authData)
+        // The backend returns { user: {...}, token: ... }
+        return parsed.user || parsed
+      }
+    } catch (e) {
+      console.error('Failed to parse user data:', e)
+    }
+    return null
+  }, [])
+
   const signOut = () => {
     localStorage.removeItem('auth')
     navigate('/signin')
@@ -61,8 +76,8 @@ export default function AppLayout() {
         onMouseEnter={() => setCollapsed(false)}
         onMouseLeave={() => setCollapsed(true)}
       >
-        <div className="brand" style={{ padding: '16px 16px 8px' }}>
-          <span className="brand-mark">⟂</span>
+        <div className="brand" style={{ padding: '16px 16px 8px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <img src="/logo_for_logisync.png" alt="LogiSync" style={{ height: '32px', width: 'auto' }} />
           <span className="brand-name">LogiSync</span>
         </div>
         <nav className="navlist">

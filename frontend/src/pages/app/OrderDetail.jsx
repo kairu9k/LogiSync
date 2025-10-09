@@ -9,9 +9,6 @@ export default function OrderDetail() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [updating, setUpdating] = useState(false)
-  const [editingId, setEditingId] = useState(null)
-  const [editProductId, setEditProductId] = useState('')
-  const [editQuantity, setEditQuantity] = useState('1')
   const [shipment, setShipment] = useState(null)
   const [showCreateShipment, setShowCreateShipment] = useState(false)
   const [creatingShipment, setCreatingShipment] = useState(false)
@@ -25,13 +22,16 @@ export default function OrderDetail() {
 
       // Check if order has a shipment by searching shipments
       try {
-        const shipmentsRes = await apiGet(`/api/shipments?q=PO-${String(id).padStart(5, '0')}&limit=1`)
+        const poNumber = `PO-${String(id).padStart(5, '0')}`
+        const shipmentsRes = await apiGet(`/api/shipments?q=${poNumber}&limit=1`)
         if (shipmentsRes?.data?.length > 0) {
           const shipmentDetail = await getShipment(shipmentsRes.data[0].id)
           setShipment(shipmentDetail?.data)
+        } else {
+          setShipment(null)
         }
-      } catch {
-        // No shipment exists, which is fine
+      } catch (e) {
+        setShipment(null)
       }
     } catch (e) {
       setError(e.message || 'Failed to load order')
@@ -59,6 +59,8 @@ export default function OrderDetail() {
       setCreatingShipment(true)
       await createShipmentFromOrder(id, shipmentData)
       setShowCreateShipment(false)
+      // Small delay to ensure shipment is created before reloading
+      await new Promise(resolve => setTimeout(resolve, 500))
       await load() // Reload to get the new shipment
     } catch (e) {
       let errorMessage = e.message || 'Failed to create shipment'
@@ -94,18 +96,133 @@ export default function OrderDetail() {
           </div>
           <div>
             <div className="label">Status</div>
-            <div><span className={`badge ${order.status === 'fulfilled' ? 'success' : 'info'}`}>{order.status}</span></div>
+            <div>
+              <span className={`badge ${
+                order.status === 'fulfilled' ? 'success' :
+                order.status === 'processing' ? 'info' :
+                order.status === 'canceled' ? 'danger' :
+                'warn'
+              }`}>
+                {order.status === 'fulfilled' ? 'Ready to Ship' : order.status}
+              </span>
+            </div>
           </div>
           <div>
             <div className="label">Order Date</div>
             <div>{String(order.order_date).replace('T', ' ').replace('Z','')}</div>
           </div>
         </div>
+
+        {/* Workflow Guide */}
+        {order.status !== 'canceled' && !shipment && (
+          <div style={{
+            marginTop: 16,
+            padding: 12,
+            background: 'var(--gray-50)',
+            border: '1px solid var(--gray-200)',
+            borderRadius: 8
+          }}>
+            <div style={{ fontSize: '0.875rem', fontWeight: 600, marginBottom: 8 }}>📋 Order Workflow</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: '0.875rem' }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4,
+                color: order.status === 'pending' ? 'var(--primary-600)' : 'var(--gray-500)'
+              }}>
+                {order.status === 'pending' ? '🔵' : '✅'} Pending
+              </div>
+              <div>→</div>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4,
+                color: order.status === 'processing' ? 'var(--primary-600)' : order.status === 'fulfilled' ? 'var(--gray-500)' : 'var(--gray-400)'
+              }}>
+                {order.status === 'processing' ? '🔵' : order.status === 'fulfilled' ? '✅' : '⚪'} Processing
+              </div>
+              <div>→</div>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4,
+                color: order.status === 'fulfilled' ? 'var(--primary-600)' : 'var(--gray-400)'
+              }}>
+                {order.status === 'fulfilled' ? '🔵' : '⚪'} Ready to Ship
+              </div>
+              <div>→</div>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4,
+                color: shipment ? 'var(--success-600)' : 'var(--gray-400)'
+              }}>
+                {shipment ? '✅' : '⚪'} Shipment
+              </div>
+            </div>
+
+            {/* Status-specific instructions */}
+            {order.status === 'pending' && (
+              <div style={{ marginTop: 8, fontSize: '0.875rem', color: 'var(--gray-600)' }}>
+                💡 <strong>Next:</strong> Click "Start Processing" when items arrive at warehouse
+              </div>
+            )}
+            {order.status === 'processing' && (
+              <div style={{ marginTop: 8, fontSize: '0.875rem', color: 'var(--gray-600)' }}>
+                💡 <strong>Next:</strong> Go to Inventory page → Assign items to warehouse shelves → Return here and click "Ready to Ship"
+              </div>
+            )}
+            {order.status === 'fulfilled' && !shipment && (
+              <div style={{ marginTop: 8, fontSize: '0.875rem', color: 'var(--gray-600)' }}>
+                💡 <strong>Next:</strong> Items are packed and ready! Click "Create Shipment" below to assign driver and vehicle
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Context-Aware Action Buttons */}
         <div className="form-actions" style={{ marginTop: 12 }}>
-          <button className="btn" disabled={updating} onClick={() => setStatus('pending')}>Mark Pending</button>
-          <button className="btn btn-outline" disabled={updating} onClick={() => setStatus('processing')}>Mark Processing</button>
-          <button className="btn btn-success" disabled={updating} onClick={() => setStatus('fulfilled')}>Mark Fulfilled</button>
-          <button className="btn btn-danger" disabled={updating} onClick={() => setStatus('canceled')}>Cancel</button>
+          {order.status === 'pending' && (
+            <>
+              <button className="btn btn-primary" disabled={updating} onClick={() => setStatus('processing')}>
+                📦 Start Processing
+              </button>
+              <button className="btn btn-danger" disabled={updating} onClick={() => setStatus('canceled')}>
+                Cancel Order
+              </button>
+            </>
+          )}
+
+          {order.status === 'processing' && (
+            <>
+              <button className="btn btn-success" disabled={updating} onClick={() => setStatus('fulfilled')}>
+                ✅ Ready to Ship
+              </button>
+              <button className="btn btn-outline" disabled={updating} onClick={() => setStatus('pending')}>
+                ⏮️ Back to Pending
+              </button>
+              <button className="btn btn-danger" disabled={updating} onClick={() => setStatus('canceled')}>
+                Cancel Order
+              </button>
+            </>
+          )}
+
+          {order.status === 'fulfilled' && !shipment && (
+            <>
+              <button className="btn btn-outline" disabled={updating} onClick={() => setStatus('processing')}>
+                ⏮️ Back to Processing
+              </button>
+              <button className="btn btn-danger" disabled={updating} onClick={() => setStatus('canceled')}>
+                Cancel Order
+              </button>
+            </>
+          )}
+
+          {order.status === 'canceled' && (
+            <button className="btn" disabled={updating} onClick={() => setStatus('pending')}>
+              🔄 Restore Order
+            </button>
+          )}
         </div>
       </div>
 
@@ -206,6 +323,7 @@ export default function OrderDetail() {
 
         {showCreateShipment && (
           <CreateShipmentForm
+            order={order}
             onSubmit={handleCreateShipment}
             onCancel={() => setShowCreateShipment(false)}
             creating={creatingShipment}
@@ -213,127 +331,180 @@ export default function OrderDetail() {
         )}
       </div>
 
+      {/* Package Summary */}
       <div className="card" style={{ padding: 16 }}>
-        <h3 style={{ marginTop: 0 }}>Items</h3>
-        {order.details?.length ? (
-          <ul style={{ margin: 0, paddingLeft: 18 }}>
-            {order.details.map((d) => (
-              <li key={d.order_details_id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                {editingId === d.order_details_id ? (
-                  <>
-                    <input className="input" style={{ maxWidth: 120 }} type="number" min="1" value={editProductId} onChange={(e) => setEditProductId(e.target.value)} />
-                    <input className="input" style={{ maxWidth: 120 }} type="number" min="1" value={editQuantity} onChange={(e) => setEditQuantity(e.target.value)} />
-                    <button className="btn btn-primary" type="button" onClick={async () => {
-                      try {
-                        await apiPatch(`/api/orders/${id}/items/${d.order_details_id}`, { product_id: Number(editProductId), quantity: Number(editQuantity) })
-                        setEditingId(null)
-                        await load()
-                      } catch (err) {
-                        alert(err.message || 'Failed to update item')
-                      }
-                    }}>Save</button>
-                    <button className="btn btn-outline" type="button" onClick={() => setEditingId(null)}>Cancel</button>
-                  </>
-                ) : (
-                  <>
-                    <span>Product {d.product_id} — Qty {d.quantity}</span>
-                    <button className="btn" type="button" onClick={() => { setEditingId(d.order_details_id); setEditProductId(String(d.product_id)); setEditQuantity(String(d.quantity)); }}>Edit</button>
-                    <button className="btn btn-danger" type="button" onClick={async () => {
-                      if (!confirm('Delete this item?')) return
-                      try {
-                        await apiDelete(`/api/orders/${id}/items/${d.order_details_id}`)
-                        await load()
-                      } catch (err) {
-                        alert(err.message || 'Failed to delete item')
-                      }
-                    }}>Delete</button>
-                  </>
-                )}
-              </li>
-            ))}
-          </ul>
+        <h3 style={{ marginTop: 0 }}>📦 Package Information</h3>
+
+        {order.quote_id ? (
+          <div className="grid" style={{ gridTemplateColumns: 'repeat(2, minmax(0,1fr))', gap: 16 }}>
+            <div>
+              <div className="label">Weight</div>
+              <div style={{ fontSize: '1.1rem', fontWeight: 500 }}>
+                {order.weight ? `${order.weight} kg` : 'N/A'}
+              </div>
+            </div>
+
+            <div>
+              <div className="label">Dimensions</div>
+              <div style={{ fontSize: '1.1rem', fontWeight: 500 }}>
+                {order.dimensions || 'N/A'}
+              </div>
+            </div>
+
+            <div>
+              <div className="label">Distance</div>
+              <div style={{ fontSize: '1.1rem', fontWeight: 500 }}>
+                {order.distance ? `${order.distance} km` : 'N/A'}
+              </div>
+            </div>
+
+            <div>
+              <div className="label">Shipping Cost</div>
+              <div style={{ fontSize: '1.1rem', fontWeight: 500, color: 'var(--primary-600)' }}>
+                {order.estimated_cost ? `₱${(order.estimated_cost / 100).toFixed(2)}` : 'N/A'}
+              </div>
+            </div>
+          </div>
         ) : (
-          <div className="muted">No items on this order.</div>
+          <div className="muted" style={{ padding: 16, background: 'var(--gray-50)', borderRadius: 8 }}>
+            ℹ️ Package information not available. This order was not created from a quote.
+          </div>
         )}
 
-        <form
-          onSubmit={async (e) => {
-            e.preventDefault()
-            const formEl = e.currentTarget
-            const fd = new FormData(formEl)
-            const product_id = parseInt(fd.get('product_id') || '0', 10)
-            const quantity = parseInt(fd.get('quantity') || '0', 10)
-            if (!product_id || !quantity) return
-            try {
-              await apiPost(`/api/orders/${id}/items`, { product_id, quantity })
-              formEl.reset()
-              await load()
-            } catch (err) {
-              alert(err.message || 'Failed to add item')
-            }
-          }}
-          className="grid"
-          style={{ gap: 12, marginTop: 12 }}
-        >
-          <div className="form-row">
-            <label>
-              <div className="label">Product ID</div>
-              <input name="product_id" className="input" type="number" min="1" placeholder="e.g. 101" required />
-            </label>
-            <label>
-              <div className="label">Quantity</div>
-              <input name="quantity" className="input" type="number" min="1" defaultValue="1" required />
-            </label>
+        {order.quote_id && (
+          <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--gray-200)' }}>
+            <div className="muted" style={{ fontSize: '0.875rem' }}>
+              📋 Source: Quote Q-{String(order.quote_id).padStart(5, '0')}
+            </div>
           </div>
-          <div className="form-actions">
-            <button className="btn btn-primary" type="submit">Add Item</button>
-          </div>
-        </form>
+        )}
       </div>
     </div>
   )
 }
 
-function CreateShipmentForm({ onSubmit, onCancel, creating }) {
+function CreateShipmentForm({ order, onSubmit, onCancel, creating }) {
   const [formData, setFormData] = useState({
     transport_id: '',
-    receiver_name: '',
-    receiver_address: '',
-    origin_name: 'Main Warehouse',
-    origin_address: 'Warehouse District, Business Park',
+    receiver_name: order.customer || '',
+    receiver_contact: '',
+    receiver_address: '', // Will be same as destination_address
+    origin_name: '',
+    origin_address: '',
     destination_name: '',
     destination_address: '',
-    charges: '',
+    charges: order.estimated_cost ? Math.round(order.estimated_cost / 100) : '',
     departure_date: ''
   })
   const [transports, setTransports] = useState([])
   const [loadingTransports, setLoadingTransports] = useState(true)
+  const [inventory, setInventory] = useState(null)
 
   useEffect(() => {
-    async function loadTransports() {
+    async function loadData() {
+      const orderId = order?.id || order?.order_id
+      if (!orderId) return
+
       try {
+        // Load transports
         const res = await getTransports()
         setTransports(res?.data || [])
+
+        // Load inventory to get warehouse info
+        try {
+          const poNumber = `PO-${String(orderId).padStart(5, '0')}`
+          const invRes = await apiGet(`/api/inventory?search=${poNumber}`)
+
+          if (invRes?.data?.length > 0) {
+            const inv = invRes.data[0]
+            setInventory(inv)
+
+            // Auto-populate origin from warehouse
+            const newOriginName = inv.warehouse || ''
+            const newOriginAddress = inv.warehouse && inv.location ? `${inv.warehouse} - ${inv.location}` : ''
+
+            setFormData(prev => ({
+              ...prev,
+              origin_name: newOriginName,
+              origin_address: newOriginAddress
+            }))
+          }
+        } catch (e) {
+          console.error('Failed to load inventory:', e)
+        }
       } catch (e) {
         console.error('Failed to load transports:', e)
       } finally {
         setLoadingTransports(false)
       }
     }
-    loadTransports()
-  }, [])
+    loadData()
+  }, [order?.id, order?.order_id])
 
   const handleSubmit = (e) => {
     e.preventDefault()
 
     // Basic validation
-    if (!formData.transport_id || !formData.receiver_name || !formData.charges) {
+    if (!formData.transport_id || !formData.receiver_name || !formData.charges || !formData.destination_address) {
       alert('Please fill in all required fields')
       return
     }
 
+    // Capacity validation
+    const selectedTransport = transports.find(t => t.id === parseInt(formData.transport_id))
+    const packageWeight = order.weight || 0
+
+    if (selectedTransport && packageWeight > 0) {
+      const newLoad = selectedTransport.current_load + packageWeight
+      const utilAfter = Math.round((newLoad / selectedTransport.capacity) * 100)
+
+      // Block if would exceed capacity
+      if (packageWeight > selectedTransport.available_capacity) {
+        alert(`Cannot create shipment: Package weight (${packageWeight}kg) exceeds available vehicle capacity (${selectedTransport.available_capacity}kg).\n\nVehicle: ${selectedTransport.vehicle_id}\nCurrent load: ${selectedTransport.current_load}kg / ${selectedTransport.capacity}kg`)
+        return
+      }
+
+      // Warn if would be over 90% capacity
+      if (utilAfter >= 90) {
+        if (!confirm(`Warning: This will load the vehicle to ${utilAfter}% capacity.\n\nVehicle: ${selectedTransport.vehicle_id}\nCurrent: ${selectedTransport.current_load}kg → After: ${newLoad}kg\nCapacity: ${selectedTransport.capacity}kg\n\nContinue anyway?`)) {
+          return
+        }
+      }
+    }
+
+    // Validate departure date is not in the past
+    if (formData.departure_date) {
+      const selectedDate = new Date(formData.departure_date)
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      if (selectedDate < today) {
+        alert('Departure date cannot be in the past')
+        return
+      }
+    }
+
+    // Warn if charges differ significantly from estimated cost
+    if (order.estimated_cost) {
+      const estimatedCharges = Math.round(order.estimated_cost / 100)
+      const actualCharges = parseInt(formData.charges, 10)
+      const difference = Math.abs(actualCharges - estimatedCharges)
+      const percentDiff = (difference / estimatedCharges) * 100
+
+      if (percentDiff > 20) {
+        if (!confirm(`Warning: Shipping charges (₱${actualCharges}) differ significantly from estimated cost (₱${estimatedCharges}). Continue anyway?`)) {
+          return
+        }
+      }
+    }
+
+    // Set receiver_address same as destination_address (they're the same thing)
+    // Extract destination name from address (first line or "Delivery Address")
+    const destinationName = formData.destination_address.split('\n')[0].split(',')[0] || 'Delivery Address'
+
     onSubmit({
       ...formData,
+      receiver_address: formData.destination_address,
+      destination_name: destinationName,
       charges: parseInt(formData.charges, 10)
     })
   }
@@ -343,52 +514,103 @@ function CreateShipmentForm({ onSubmit, onCancel, creating }) {
   }
 
   return (
-    <div style={{ marginTop: 16, padding: 16, border: '1px solid var(--gray-200)', borderRadius: 4 }}>
+    <div style={{ marginTop: 16, padding: 16, border: '1px solid var(--gray-200)', borderRadius: 8, background: 'var(--gray-50)' }}>
       <h4 style={{ marginTop: 0 }}>Create New Shipment</h4>
-      <form onSubmit={handleSubmit} className="grid" style={{ gap: 12 }}>
-        <div className="form-row">
-          <label>
-            <div className="label">Select Vehicle *</div>
-            {loadingTransports ? (
-              <div className="input" style={{ color: 'var(--gray-500)' }}>Loading vehicles...</div>
-            ) : transports.length === 0 ? (
-              <div>
-                <div className="input" style={{ color: 'var(--danger-600)' }}>No vehicles available</div>
-                <div style={{ fontSize: '0.875rem', color: 'var(--danger-600)', marginTop: 4 }}>
-                  Please run database seeders to add transport data: <code>php artisan db:seed</code>
+
+      <form onSubmit={handleSubmit} className="grid" style={{ gap: 16 }}>
+        {/* Section 1: Transport & Timing */}
+        <div style={{ background: 'var(--gray-100)', padding: 12, borderRadius: 6, border: '1px solid var(--gray-200)' }}>
+          <div style={{ fontSize: '0.875rem', fontWeight: 600, marginBottom: 12, color: 'var(--gray-700)' }}>
+            🚚 Transport & Schedule
+          </div>
+          <div className="form-row">
+            <label>
+              <div className="label">Select Vehicle & Driver *</div>
+              {loadingTransports ? (
+                <div className="input" style={{ color: 'var(--gray-500)' }}>Loading vehicles...</div>
+              ) : transports.length === 0 ? (
+                <div>
+                  <div className="input" style={{ color: 'var(--danger-600)' }}>No vehicles available</div>
+                  <div style={{ fontSize: '0.875rem', color: 'var(--danger-600)', marginTop: 4 }}>
+                    Please run database seeders: <code>php artisan db:seed</code>
+                  </div>
                 </div>
-              </div>
-            ) : (
-              <select
+              ) : (
+                <>
+                  <select
+                    className="input"
+                    value={formData.transport_id}
+                    onChange={(e) => handleInputChange('transport_id', e.target.value)}
+                    required
+                  >
+                    <option value="">Select a vehicle...</option>
+                    {transports
+                      .sort((a, b) => (b.available_capacity || 0) - (a.available_capacity || 0))
+                      .map(transport => {
+                        const packageWeight = order.weight || 0
+                        const wouldExceed = packageWeight > (transport.available_capacity || 0)
+                        const utilAfterAdd = transport.capacity > 0
+                          ? Math.round(((transport.current_load + packageWeight) / transport.capacity) * 100)
+                          : 0
+
+                        return (
+                          <option
+                            key={transport.id}
+                            value={transport.id}
+                            disabled={wouldExceed}
+                          >
+                            {transport.vehicle_id} ({transport.registration_number}) - {transport.driver_name} |
+                            {transport.current_load}kg / {transport.capacity}kg ({transport.utilization_percent}%)
+                            {wouldExceed ? ' - OVERLOAD!' : ` → ${utilAfterAdd}% after`}
+                          </option>
+                        )
+                      })}
+                  </select>
+                  {formData.transport_id && (
+                    <div style={{ fontSize: '0.75rem', marginTop: 4 }}>
+                      {(() => {
+                        const selected = transports.find(t => t.id === parseInt(formData.transport_id))
+                        if (!selected) return null
+                        const packageWeight = order.weight || 0
+                        const utilAfter = selected.capacity > 0
+                          ? Math.round(((selected.current_load + packageWeight) / selected.capacity) * 100)
+                          : 0
+                        const color = utilAfter >= 90 ? 'var(--danger-600)' :
+                                     utilAfter >= 70 ? 'var(--warning-600)' :
+                                     'var(--success-600)'
+                        return (
+                          <div style={{ color }}>
+                            📊 Vehicle will be at {utilAfter}% capacity after adding this package ({packageWeight}kg)
+                          </div>
+                        )
+                      })()}
+                    </div>
+                  )}
+                </>
+              )}
+            </label>
+            <label>
+              <div className="label">Departure Date</div>
+              <input
                 className="input"
-                value={formData.transport_id}
-                onChange={(e) => handleInputChange('transport_id', e.target.value)}
-                required
-              >
-                <option value="">Select a vehicle...</option>
-                {transports.map(transport => (
-                  <option key={transport.id} value={transport.id}>
-                    {transport.label} - Driver: {transport.driver_name}
-                  </option>
-                ))}
-              </select>
-            )}
-          </label>
-          <label>
-            <div className="label">Shipping Charges (PHP) *</div>
-            <input
-              className="input"
-              type="number"
-              min="0"
-              placeholder="e.g. 1500"
-              value={formData.charges}
-              onChange={(e) => handleInputChange('charges', e.target.value)}
-              required
-            />
-          </label>
+                type="date"
+                min={new Date().toISOString().split('T')[0]}
+                value={formData.departure_date}
+                onChange={(e) => handleInputChange('departure_date', e.target.value)}
+              />
+              <div style={{ fontSize: '0.75rem', color: 'var(--gray-600)', marginTop: 4 }}>
+                📅 Earliest: Today
+              </div>
+            </label>
+          </div>
         </div>
 
-        <div className="form-row">
+        {/* Section 2: Delivery Details */}
+        <div style={{ background: 'var(--gray-100)', padding: 12, borderRadius: 6, border: '1px solid var(--gray-200)' }}>
+          <div style={{ fontSize: '0.875rem', fontWeight: 600, marginBottom: 12, color: 'var(--gray-700)' }}>
+            📍 Delivery Details
+          </div>
+
           <label>
             <div className="label">Receiver Name *</div>
             <input
@@ -399,71 +621,73 @@ function CreateShipmentForm({ onSubmit, onCancel, creating }) {
               required
             />
           </label>
-          <label>
-            <div className="label">Departure Date</div>
+
+          <label style={{ marginTop: 12 }}>
+            <div className="label">Contact Number *</div>
             <input
               className="input"
-              type="date"
-              value={formData.departure_date}
-              onChange={(e) => handleInputChange('departure_date', e.target.value)}
+              type="tel"
+              placeholder="e.g. +63 912 345 6789"
+              value={formData.receiver_contact}
+              onChange={(e) => handleInputChange('receiver_contact', e.target.value)}
+              required
             />
+            <div style={{ fontSize: '0.75rem', color: 'var(--gray-600)', marginTop: 4 }}>
+              📞 Driver will use this to contact receiver for delivery
+            </div>
           </label>
-        </div>
 
-        <label>
-          <div className="label">Receiver Address *</div>
-          <textarea
-            className="input"
-            placeholder="Full delivery address"
-            value={formData.receiver_address}
-            onChange={(e) => handleInputChange('receiver_address', e.target.value)}
-            required
-            rows="2"
-          />
-        </label>
-
-        <div className="form-row">
-          <label>
-            <div className="label">Origin Name</div>
+          <label style={{ marginTop: 12 }}>
+            <div className="label">Origin (Pickup Location)</div>
             <input
               className="input"
               value={formData.origin_name}
               onChange={(e) => handleInputChange('origin_name', e.target.value)}
+              placeholder="Warehouse name"
             />
+            {inventory && (
+              <div style={{ fontSize: '0.75rem', color: 'var(--success-600)', marginTop: 4 }}>
+                📦 Package stored at: {inventory.warehouse}
+              </div>
+            )}
           </label>
-          <label>
-            <div className="label">Destination Name *</div>
-            <input
+
+          <label style={{ marginTop: 12 }}>
+            <div className="label">Destination Address *</div>
+            <textarea
               className="input"
-              placeholder="e.g. Manila Hub"
-              value={formData.destination_name}
-              onChange={(e) => handleInputChange('destination_name', e.target.value)}
+              placeholder="Full delivery address (street, city, postal code)"
+              value={formData.destination_address}
+              onChange={(e) => handleInputChange('destination_address', e.target.value)}
               required
+              rows="3"
             />
           </label>
         </div>
 
-        <label>
-          <div className="label">Origin Address</div>
-          <textarea
-            className="input"
-            value={formData.origin_address}
-            onChange={(e) => handleInputChange('origin_address', e.target.value)}
-            rows="2"
-          />
-        </label>
-
-        <label>
-          <div className="label">Destination Address *</div>
-          <textarea
-            className="input"
-            placeholder="Full destination address"
-            value={formData.destination_address}
-            onChange={(e) => handleInputChange('destination_address', e.target.value)}
-            required
-            rows="2"
-          />
-        </label>
+        {/* Section 3: Pricing */}
+        <div style={{ background: 'var(--gray-100)', padding: 12, borderRadius: 6, border: '1px solid var(--gray-200)' }}>
+          <div style={{ fontSize: '0.875rem', fontWeight: 600, marginBottom: 12, color: 'var(--gray-700)' }}>
+            💰 Shipping Charges
+          </div>
+          <label>
+            <div className="label">Charges (PHP) *</div>
+            <input
+              className="input"
+              type="number"
+              min="0"
+              placeholder="e.g. 1500"
+              value={formData.charges}
+              onChange={(e) => handleInputChange('charges', e.target.value)}
+              required
+            />
+            {order.estimated_cost && (
+              <div style={{ fontSize: '0.75rem', color: 'var(--gray-600)', marginTop: 4 }}>
+                💡 Estimated from quote: ₱{Math.round(order.estimated_cost / 100)}
+              </div>
+            )}
+          </label>
+        </div>
 
         <div className="form-actions">
           <button

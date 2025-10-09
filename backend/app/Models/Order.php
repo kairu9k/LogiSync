@@ -37,4 +37,14 @@ class Order extends Model
     {
         return $this->hasMany(OrderDetail::class, 'order_id', 'order_id');
     }
+
+    public function inventory(): HasOne
+    {
+        return $this->hasOne(Inventory::class, 'order_id', 'order_id');
+    }
+
+    public function quote(): BelongsTo
+    {
+        return $this->belongsTo(Quote::class, 'quote_id', 'quote_id');
+    }
 }

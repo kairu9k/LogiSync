@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { apiGet } from '../../lib/api'
+import { can } from '../../lib/permissions'
 
 export default function Orders() {
   const [orders, setOrders] = useState([])
@@ -47,10 +48,12 @@ export default function Orders() {
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h2 style={{ marginTop: 0 }}>Orders</h2>
-          <button className="btn btn-primary" onClick={() => navigate('/app/orders/new')}>New Order</button>
+          {can.manageOrders() && (
+            <button className="btn btn-primary" onClick={() => navigate('/app/orders/new')}>New Order</button>
+          )}
         </div>
         <div className="form-row">
-          <input className="input" placeholder="Search orders (PO, customer)" value={q} onChange={(e) => setQ(e.target.value)} />
+          <input className="input" placeholder="Search orders (PO, username)" value={q} onChange={(e) => setQ(e.target.value)} />
           <select className="input" value={status} onChange={(e) => setStatus(e.target.value)}>
             <option value="any">Status: Any</option>
             <option value="pending">Pending</option>

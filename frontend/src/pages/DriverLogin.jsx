@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { Header, Footer } from '../components'
 import { apiPost } from '../lib/api'
@@ -11,6 +11,10 @@ export default function DriverLogin() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const navigate = useNavigate()
+
+  useEffect(() => {
+    document.title = 'Driver Login - LogiSync'
+  }, [])
 
   const onChange = (e) => {
     const { name, value } = e.target

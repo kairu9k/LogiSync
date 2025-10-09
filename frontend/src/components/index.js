@@ -1,6 +1,7 @@
 export { default as Header } from './Header.jsx'
 export { default as Hero } from './Hero.jsx'
 export { default as Features } from './Features.jsx'
+export { default as HowItWorks } from './HowItWorks.jsx'
 export { default as Pricing } from './Pricing.jsx'
 export { default as CTA } from './CTA.jsx'
 export { default as Footer } from './Footer.jsx'

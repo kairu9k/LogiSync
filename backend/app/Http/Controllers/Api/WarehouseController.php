@@ -18,7 +18,7 @@ class WarehouseController extends Controller
         $limit = (int) ($request->query('limit', 20));
         $limit = max(1, min($limit, 100));
 
-        $query = Warehouse::with(['inventory.orderDetail.order.user']);
+        $query = Warehouse::with(['inventory.order.user']);
 
         if ($search) {
             $query->where(function ($q) use ($search) {
@@ -53,7 +53,7 @@ class WarehouseController extends Controller
 
     public function show(int $id)
     {
-        $warehouse = Warehouse::with(['inventory.orderDetail.order.user'])->find($id);
+        $warehouse = Warehouse::with(['inventory.order.user', 'inventory.order.quote'])->find($id);
 
         if (!$warehouse) {
             return response()->json(['message' => 'Warehouse not found'], 404)
@@ -62,17 +62,22 @@ class WarehouseController extends Controller
 
         $inventoryItems = $warehouse->inventory->map(function ($item) {
             $details = $item->full_details;
+            $order = $item->order;
+            $quote = $order ? $order->quote : null;
+
             return [
                 'inventory_id' => $details['inventory_id'],
                 'location' => $details['location'],
-                'product_id' => $details['product_id'],
-                'formatted_product_id' => 'PROD-' . str_pad((string) $details['product_id'], 4, '0', STR_PAD_LEFT),
-                'quantity' => $details['quantity'],
+                'po' => $details['po'],
                 'order_id' => $details['order_id'],
                 'order_status' => $details['order_status'],
                 'customer' => $details['customer'],
                 'order_date' => $details['order_date'],
                 'storage_date' => $item->created_at ?? null,
+                // Package information from quote
+                'weight' => $quote ? $quote->weight : null,
+                'dimensions' => $quote ? $quote->dimensions : null,
+                'distance' => $quote ? $quote->distance : null,
             ];
         });
 
@@ -165,7 +170,7 @@ class WarehouseController extends Controller
         $limit = (int) ($request->query('limit', 50));
         $limit = max(1, min($limit, 200));
 
-        $query = Inventory::with(['warehouse', 'orderDetail.order.user']);
+        $query = Inventory::with(['warehouse', 'order.user', 'order.quote']);
 
         if ($search) {
             $items = Inventory::searchItems($search);
@@ -183,18 +188,23 @@ class WarehouseController extends Controller
 
         $data = $items->take($limit)->map(function ($item) {
             $details = $item->full_details;
+            $order = $item->order;
+            $quote = $order ? $order->quote : null;
+
             return [
                 'inventory_id' => $details['inventory_id'],
                 'location' => $details['location'],
                 'warehouse' => $details['warehouse'],
                 'warehouse_id' => $item->warehouse_id,
-                'product_id' => $details['product_id'],
-                'formatted_product_id' => 'PROD-' . str_pad((string) $details['product_id'], 4, '0', STR_PAD_LEFT),
-                'quantity' => $details['quantity'],
+                'po' => $details['po'],
                 'order_id' => $details['order_id'],
                 'order_status' => $details['order_status'],
                 'customer' => $details['customer'],
                 'order_date' => $details['order_date'],
+                // Package information from quote
+                'weight' => $quote ? $quote->weight : null,
+                'dimensions' => $quote ? $quote->dimensions : null,
+                'distance' => $quote ? $quote->distance : null,
             ];
         });
 
@@ -206,7 +216,7 @@ class WarehouseController extends Controller
     {
         $data = $request->all();
         $validator = Validator::make($data, [
-            'order_details_id' => 'required|integer|exists:order_details,order_details_id',
+            'order_id' => 'required|integer|exists:orders,order_id',
             'warehouse_id' => 'required|integer|exists:warehouse,warehouse_id',
             'location_in_warehouse' => 'required|string|max:255',
         ]);
@@ -216,21 +226,21 @@ class WarehouseController extends Controller
                 ->header('Access-Control-Allow-Origin', '*');
         }
 
-        // Check if item is already assigned
-        $existingAssignment = Inventory::where('order_details_id', $data['order_details_id'])->first();
+        // Check if order is already assigned
+        $existingAssignment = Inventory::where('order_id', $data['order_id'])->first();
         if ($existingAssignment) {
-            return response()->json(['message' => 'Item already assigned to warehouse'], 400)
+            return response()->json(['message' => 'Package already assigned to warehouse'], 400)
                 ->header('Access-Control-Allow-Origin', '*');
         }
 
         $inventory = Inventory::assignToWarehouse(
-            $data['order_details_id'],
+            $data['order_id'],
             $data['warehouse_id'],
             $data['location_in_warehouse']
         );
 
         return response()->json([
-            'message' => 'Item assigned to warehouse successfully',
+            'message' => 'Package assigned to warehouse successfully',
             'inventory_id' => $inventory->inventory_id,
         ], 201)->header('Access-Control-Allow-Origin', '*');
     }
@@ -262,19 +272,21 @@ class WarehouseController extends Controller
 
     public function getUnassignedItems()
     {
-        $unassignedItems = OrderDetail::getUnassignedItems();
+        $unassignedOrders = OrderDetail::getUnassignedItems();
 
-        $data = $unassignedItems->map(function ($item) {
+        $data = $unassignedOrders->map(function ($order) {
+            $quote = $order->quote;
             return [
-                'order_details_id' => $item->order_details_id,
-                'order_id' => $item->order_id,
-                'product_id' => $item->product_id,
-                'formatted_product_id' => $item->formatted_product_id,
-                'quantity' => $item->quantity,
-                'order_status' => $item->order->order_status,
-                'customer' => $item->order->user->username ?? 'Unknown',
-                'order_date' => $item->order->order_date,
-                'status' => $item->status,
+                'order_id' => $order->order_id,
+                'po' => 'PO-' . str_pad($order->order_id, 5, '0', STR_PAD_LEFT),
+                'order_status' => $order->order_status,
+                'customer' => $order->customer_name ?? $order->user->username ?? 'Unknown',
+                'order_date' => $order->order_date,
+                // Package information from quote
+                'weight' => $quote ? $quote->weight : null,
+                'dimensions' => $quote ? $quote->dimensions : null,
+                'distance' => $quote ? $quote->distance : null,
+                'estimated_cost' => $quote ? $quote->estimated_cost : null,
             ];
         });
 
@@ -288,14 +300,14 @@ class WarehouseController extends Controller
         $unassignedCount = OrderDetail::getUnassignedItems()->count();
 
         // Get recent activity
-        $recentAssignments = Inventory::with(['warehouse', 'orderDetail.order.user'])
+        $recentAssignments = Inventory::with(['warehouse', 'order.user'])
             ->orderBy('inventory_id', 'desc')
             ->limit(5)
             ->get()
             ->map(function ($item) {
                 $details = $item->full_details;
                 return [
-                    'product_id' => 'PROD-' . str_pad((string) $details['product_id'], 4, '0', STR_PAD_LEFT),
+                    'po' => $details['po'],
                     'warehouse' => $details['warehouse'],
                     'location' => $details['location'],
                     'customer' => $details['customer'],

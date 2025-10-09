@@ -20,6 +20,8 @@ export default function DriverShipment() {
   const watchIdRef = useRef(null)
 
   useEffect(() => {
+    document.title = 'Shipment Details - LogiSync'
+
     // Check if driver is logged in
     const driverData = localStorage.getItem('driver')
     if (!driverData) {
@@ -111,20 +113,10 @@ export default function DriverShipment() {
     setGpsError('')
     setIsTracking(true)
 
-    // Get initial position
+    // Try low-accuracy mode first (works better on desktop/localhost)
     navigator.geolocation.getCurrentPosition(
       (position) => {
         sendGPSLocation(position)
-      },
-      (error) => {
-        setGpsError('Failed to get GPS location: ' + error.message)
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-    )
-
-    // Watch position continuously and send every 20 seconds
-    watchIdRef.current = navigator.geolocation.watchPosition(
-      (position) => {
         setCurrentLocation({
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
@@ -133,18 +125,59 @@ export default function DriverShipment() {
         })
       },
       (error) => {
-        setGpsError('GPS tracking error: ' + error.message)
+        console.error('Initial GPS error:', error)
+        if (error.code === 2) {
+          setGpsError('Location unavailable. GPS may not work on localhost/desktop. Use manual location update via status.')
+        } else if (error.code === 1) {
+          setGpsError('Location permission denied')
+          stopGPSTracking()
+          return
+        } else {
+          setGpsError('Getting location... (this may take a moment)')
+        }
       },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 }
     )
 
-    // Send location every 20 seconds
+    // Watch position with low accuracy for desktop compatibility
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      (position) => {
+        setCurrentLocation({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracy: position.coords.accuracy,
+          timestamp: new Date().toLocaleTimeString()
+        })
+        // Clear any previous errors
+        setGpsError('')
+      },
+      (error) => {
+        console.error('GPS tracking error:', error)
+        if (error.code === 2) {
+          setGpsError('Location unavailable. Use status updates to report your location manually.')
+          // Don't keep retrying if position is unavailable
+          stopGPSTracking()
+        } else if (error.code === 3) {
+          setGpsError('GPS timeout - trying again...')
+        } else if (error.code === 1) {
+          setGpsError('Location permission denied')
+          stopGPSTracking()
+        }
+      },
+      { enableHighAccuracy: false, timeout: 15000, maximumAge: 30000 }
+    )
+
+    // Send location every 20 seconds if tracking is active
     trackingIntervalRef.current = setInterval(() => {
-      navigator.geolocation.getCurrentPosition(
-        sendGPSLocation,
-        (error) => console.error('GPS error:', error),
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-      )
+      if (watchIdRef.current) {
+        navigator.geolocation.getCurrentPosition(
+          sendGPSLocation,
+          (error) => {
+            console.error('GPS send error:', error)
+          },
+          { enableHighAccuracy: false, timeout: 10000, maximumAge: 30000 }
+        )
+      }
     }, 20000)
   }
 
@@ -245,41 +278,71 @@ export default function DriverShipment() {
           </div>
 
           <div className="detail-section">
-            <h3>📍 Delivery Information</h3>
+            <h3>📦 Shipment Details</h3>
             <div className="detail-info">
-              <div className="info-row">
-                <span className="info-label">Receiver:</span>
-                <span className="info-value">{shipment.receiver_name}</span>
-              </div>
-              <div className="info-row">
-                <span className="info-label">Destination:</span>
-                <span className="info-value">{shipment.destination_name}</span>
-              </div>
-              <div className="info-row">
-                <span className="info-label">Address:</span>
-                <span className="info-value">{shipment.destination_address}</span>
-              </div>
               <div className="info-row">
                 <span className="info-label">Customer:</span>
                 <span className="info-value">{shipment.customer}</span>
+              </div>
+              <div className="info-row">
+                <span className="info-label">Departure Date:</span>
+                <span className="info-value">{new Date(shipment.departure_date).toLocaleDateString()}</span>
+              </div>
+              <div className="info-row">
+                <span className="info-label">Vehicle:</span>
+                <span className="info-value">{shipment.vehicle}</span>
               </div>
             </div>
           </div>
 
           <div className="detail-section">
-            <h3>🚛 Vehicle Information</h3>
+            <h3>📍 Pickup & Delivery</h3>
             <div className="detail-info">
               <div className="info-row">
-                <span className="info-label">Vehicle:</span>
-                <span className="info-value">{shipment.vehicle}</span>
+                <span className="info-label">Pickup From:</span>
+                <span className="info-value">{shipment.origin_name}</span>
               </div>
               <div className="info-row">
-                <span className="info-label">Tracking:</span>
-                <span className="info-value">{shipment.tracking_number}</span>
+                <span className="info-label">Pickup Address:</span>
+                <span className="info-value">{shipment.origin_address}</span>
               </div>
               <div className="info-row">
-                <span className="info-label">Charges:</span>
-                <span className="info-value">₱{shipment.charges?.toLocaleString()}</span>
+                <span className="info-label">Deliver To:</span>
+                <span className="info-value">{shipment.receiver_name}</span>
+              </div>
+              <div className="info-row">
+                <span className="info-label">Contact Number:</span>
+                <span className="info-value">
+                  {shipment.receiver_contact !== 'N/A' ? (
+                    <a href={`tel:${shipment.receiver_contact}`} style={{ color: 'var(--primary-600)', textDecoration: 'none' }}>
+                      📞 {shipment.receiver_contact}
+                    </a>
+                  ) : (
+                    'N/A'
+                  )}
+                </span>
+              </div>
+              <div className="info-row">
+                <span className="info-label">Delivery Address:</span>
+                <span className="info-value">{shipment.destination_address}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="detail-section">
+            <h3>📦 Package Information</h3>
+            <div className="detail-info">
+              <div className="info-row">
+                <span className="info-label">Weight:</span>
+                <span className="info-value">{shipment.weight}</span>
+              </div>
+              <div className="info-row">
+                <span className="info-label">Dimensions:</span>
+                <span className="info-value">{shipment.dimensions}</span>
+              </div>
+              <div className="info-row">
+                <span className="info-label">Distance:</span>
+                <span className="info-value">{shipment.distance}</span>
               </div>
             </div>
           </div>

@@ -1,37 +1,37 @@
 export default function Features() {
   return (
     <section id="features" className="section container">
-      <h2 className="section-title">Powerful features to run operations</h2>
+      <h2 className="section-title">Everything you need to manage deliveries</h2>
       <div className="grid features">
         <article className="card">
+          <div className="icon">📍</div>
+          <h3>Real-Time GPS Tracking</h3>
+          <p>Track drivers live with GPS location updates every 20 seconds. View routes on interactive maps.</p>
+        </article>
+        <article className="card">
+          <div className="icon">🚛</div>
+          <h3>Smart Capacity Management</h3>
+          <p>Monitor vehicle load in real-time. Prevent overloading with automatic weight-based capacity alerts.</p>
+        </article>
+        <article className="card">
+          <div className="icon">💰</div>
+          <h3>Custom Pricing Formula</h3>
+          <p>Set your own rates for distance, weight, fuel, and insurance. Different pricing for standard vs remote areas.</p>
+        </article>
+        <article className="card">
+          <div className="icon">📱</div>
+          <h3>Mobile Driver Portal</h3>
+          <p>Drivers update shipment status on-the-go. View deliveries, contact info, and package details.</p>
+        </article>
+        <article className="card">
           <div className="icon">📦</div>
-          <h3>Smart Inventory</h3>
-          <p>Forecast demand, reduce stockouts, and keep your warehouse lean.</p>
+          <h3>Warehouse Management</h3>
+          <p>Track inventory across multiple warehouses. Assign items to orders with real-time stock updates.</p>
         </article>
         <article className="card">
-          <div className="icon">🚚</div>
-          <h3>Live Tracking</h3>
-          <p>See shipments in motion and notify customers with precision ETA.</p>
-        </article>
-        <article className="card">
-          <div className="icon">🤝</div>
-          <h3>Collaboration</h3>
-          <p>Bring ops, sales, and support together with shared context.</p>
-        </article>
-        <article className="card">
-          <div className="icon">🔒</div>
-          <h3>Enterprise-grade</h3>
-          <p>SSO, audit logs, granular roles—secure by default.</p>
-        </article>
-        <article className="card">
-          <div className="icon">⚡</div>
-          <h3>Automations</h3>
-          <p>Trigger workflows on exceptions to resolve issues faster.</p>
-        </article>
-        <article className="card">
-          <div className="icon">📈</div>
-          <h3>Analytics</h3>
-          <p>Identify bottlenecks and boost on-time delivery rates.</p>
+          <div className="icon">📊</div>
+          <h3>Quote & Order System</h3>
+          <p>Generate instant quotes with automatic cost calculation. Convert quotes to orders seamlessly.</p>
         </article>
       </div>
     </section>

@@ -40,20 +40,37 @@ class TransportController extends Controller
 
         $transports = $query->orderBy('t.transport_id', 'desc')->get();
 
+        // Calculate current load for each vehicle
         $data = $transports->map(function ($t) {
+            // Get total weight of active shipments for this vehicle
+            $currentLoad = DB::table('shipments as s')
+                ->join('orders as o', 's.order_id', '=', 'o.order_id')
+                ->join('quotes as q', 'o.quote_id', '=', 'q.quote_id')
+                ->where('s.transport_id', $t->transport_id)
+                ->whereIn('s.status', ['pending', 'in_transit', 'out_for_delivery'])
+                ->sum('q.weight');
+
+            $currentLoad = $currentLoad ?? 0;
+            $capacity = (float) $t->capacity;
+            $availableCapacity = $capacity - $currentLoad;
+            $utilizationPercent = $capacity > 0 ? round(($currentLoad / $capacity) * 100, 1) : 0;
+
             return [
                 'id' => (int) $t->transport_id,
                 'vehicle_id' => $t->vehicle_id,
                 'vehicle_type' => $t->vehicle_type,
                 'registration_number' => $t->registration_number,
-                'capacity' => $t->capacity,
+                'capacity' => $capacity,
+                'current_load' => round($currentLoad, 1),
+                'available_capacity' => round($availableCapacity, 1),
+                'utilization_percent' => $utilizationPercent,
                 'safety_compliance' => $t->safety_compliance_details,
                 'driver_id' => (int) $t->driver_id,
                 'driver_name' => $t->driver_name,
                 'driver_email' => $t->driver_email,
                 'budget_name' => $t->budget_name ?? 'N/A',
                 'schedule_name' => $t->schedule_name ?? 'N/A',
-                'label' => "{$t->vehicle_id} ({$t->registration_number}) - {$t->vehicle_type}"
+                'label' => "{$t->vehicle_id} ({$t->registration_number}) - {$t->vehicle_type} [{$currentLoad}kg / {$capacity}kg]"
             ];
         });
 

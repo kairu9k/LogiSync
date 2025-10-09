@@ -96,7 +96,7 @@ export default function Inventory() {
         <div className="grid" style={{ gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 12, marginTop: 16 }}>
           <input
             className="input"
-            placeholder="Search items, products, customers..."
+            placeholder="Search packages, orders, customers..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -126,27 +126,30 @@ export default function Inventory() {
           border: '1px solid var(--warning-200)'
         }}>
           <h3 style={{ marginTop: 0, color: 'var(--warning-800)' }}>
-            📋 Items Awaiting Storage Assignment
+            📋 Packages Awaiting Storage Assignment
           </h3>
           <div style={{ fontSize: '16px', color: 'var(--warning-700)', marginBottom: 12 }}>
-            {unassignedItems.length} item{unassignedItems.length !== 1 ? 's' : ''} need{unassignedItems.length === 1 ? 's' : ''} to be assigned to warehouse locations
+            {unassignedItems.length} package{unassignedItems.length !== 1 ? 's' : ''} need{unassignedItems.length === 1 ? 's' : ''} to be assigned to warehouse locations
           </div>
 
-          <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 8 }}>
+          <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 12 }}>
             {unassignedItems.slice(0, 3).map((item) => (
-              <div key={item.order_details_id} style={{
-                padding: 8,
-                background: 'white',
-                borderRadius: 4,
-                border: '1px solid var(--warning-300)',
+              <div key={item.order_id} style={{
+                padding: 12,
+                background: 'var(--gray-50)',
+                borderRadius: 6,
+                border: '1px solid var(--warning-400)',
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center'
               }}>
                 <div>
-                  <div style={{ fontWeight: 'bold' }}>{item.formatted_product_id}</div>
+                  <div style={{ fontWeight: 'bold', fontSize: '14px', marginBottom: 4 }}>{item.po}</div>
                   <div className="muted" style={{ fontSize: '12px' }}>
-                    Order #{item.order_id} • {item.customer} • Qty: {item.quantity}
+                    {item.customer}
+                  </div>
+                  <div className="muted" style={{ fontSize: '11px', marginTop: 2 }}>
+                    {item.weight ? `${item.weight}kg` : 'N/A'} • {item.dimensions || 'No dims'}
                   </div>
                 </div>
                 <button
@@ -155,7 +158,7 @@ export default function Inventory() {
                     setSelectedItem(item)
                     setShowAssignForm(true)
                   }}
-                  style={{ padding: '4px 8px', fontSize: '12px' }}
+                  style={{ padding: '6px 12px', fontSize: '13px' }}
                 >
                   Assign
                 </button>
@@ -165,7 +168,7 @@ export default function Inventory() {
 
           {unassignedItems.length > 3 && (
             <div className="muted" style={{ marginTop: 8, fontSize: '12px' }}>
-              ...and {unassignedItems.length - 3} more items awaiting assignment
+              ...and {unassignedItems.length - 3} more packages awaiting assignment
             </div>
           )}
         </div>
@@ -184,7 +187,7 @@ export default function Inventory() {
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
                 <div>
-                  <h4 style={{ marginTop: 0, marginBottom: 4 }}>{item.formatted_product_id}</h4>
+                  <h4 style={{ marginTop: 0, marginBottom: 4 }}>{item.po}</h4>
                   <div className="muted" style={{ fontSize: '12px' }}>
                     Inventory ID: {item.inventory_id}
                   </div>
@@ -192,17 +195,6 @@ export default function Inventory() {
                 <span className={getStatusBadgeClass(item.order_status)}>
                   {item.order_status}
                 </span>
-              </div>
-
-              <div className="grid" style={{ gridTemplateColumns: 'repeat(2, minmax(0,1fr))', gap: 8, marginBottom: 12 }}>
-                <div>
-                  <div className="label">Quantity</div>
-                  <div style={{ fontSize: '18px', fontWeight: 'bold' }}>{item.quantity}</div>
-                </div>
-                <div>
-                  <div className="label">Order ID</div>
-                  <div>#{item.order_id}</div>
-                </div>
               </div>
 
               <div style={{ marginBottom: 12 }}>
@@ -228,6 +220,21 @@ export default function Inventory() {
                 </div>
               </div>
 
+              <div className="grid" style={{ gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 8, marginBottom: 12 }}>
+                <div>
+                  <div className="label">Weight</div>
+                  <div style={{ fontSize: '14px' }}>{item.weight ? `${item.weight}kg` : 'N/A'}</div>
+                </div>
+                <div>
+                  <div className="label">Dimensions</div>
+                  <div style={{ fontSize: '14px' }}>{item.dimensions || 'N/A'}</div>
+                </div>
+                <div>
+                  <div className="label">Distance</div>
+                  <div style={{ fontSize: '14px' }}>{item.distance ? `${item.distance}km` : 'N/A'}</div>
+                </div>
+              </div>
+
               <div className="muted" style={{ fontSize: '12px', marginBottom: 12 }}>
                 Order Date: {new Date(item.order_date).toLocaleDateString()}
               </div>
@@ -250,8 +257,8 @@ export default function Inventory() {
           {inventoryItems.length === 0 && (
             <div className="card" style={{ padding: 16, gridColumn: '1 / -1', textAlign: 'center' }}>
               <div style={{ fontSize: '48px', marginBottom: 16 }}>📦</div>
-              <h3 style={{ margin: '0 0 8px 0' }}>No inventory items found</h3>
-              <p className="muted">Items will appear here once they are assigned to warehouse locations.</p>
+              <h3 style={{ margin: '0 0 8px 0' }}>No packages in storage</h3>
+              <p className="muted">Packages will appear here once they are assigned to warehouse locations.</p>
             </div>
           )}
         </div>
@@ -276,7 +283,7 @@ export default function Inventory() {
 
 function AssignItemForm({ item, warehouses, onSubmit, onCancel, assigning }) {
   const [formData, setFormData] = useState({
-    order_details_id: item.order_details_id,
+    order_id: item.order_id,
     warehouse_id: '',
     location_in_warehouse: ''
   })
@@ -289,12 +296,12 @@ function AssignItemForm({ item, warehouses, onSubmit, onCancel, assigning }) {
 
   return (
     <div className="card" style={{ padding: 16, position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 1000, width: '90%', maxWidth: '500px', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}>
-      <h3 style={{ marginTop: 0 }}>Assign Item to Warehouse</h3>
+      <h3 style={{ marginTop: 0 }}>Assign Package to Warehouse</h3>
 
       <div style={{ padding: 12, background: 'var(--gray-50)', borderRadius: 4, marginBottom: 16 }}>
-        <div style={{ fontWeight: 'bold' }}>{item.formatted_product_id}</div>
+        <div style={{ fontWeight: 'bold' }}>{item.po}</div>
         <div className="muted" style={{ fontSize: '12px' }}>
-          Order #{item.order_id} • {item.customer} • Quantity: {item.quantity}
+          {item.customer} • {item.weight ? `${item.weight}kg` : 'N/A'} • {item.dimensions || 'No dimensions'}
         </div>
       </div>
 
@@ -337,7 +344,7 @@ function AssignItemForm({ item, warehouses, onSubmit, onCancel, assigning }) {
             className="btn btn-primary"
             disabled={assigning}
           >
-            {assigning ? 'Assigning...' : 'Assign to Warehouse'}
+            {assigning ? 'Assigning...' : 'Assign Package to Warehouse'}
           </button>
           <button
             type="button"

@@ -61,11 +61,41 @@ class DriverController extends Controller
 
         $today = date('Y-m-d');
 
+        // Get driver's vehicle info with capacity
+        $driverVehicle = DB::table('transport as t')
+            ->where('t.driver_id', $driverId)
+            ->select('t.transport_id', 't.capacity', 't.vehicle_id', 't.registration_number', 't.vehicle_type')
+            ->first();
+
+        $vehicleCapacity = null;
+        if ($driverVehicle) {
+            // Calculate current load
+            $currentLoad = DB::table('shipments as s')
+                ->join('orders as o', 's.order_id', '=', 'o.order_id')
+                ->join('quotes as q', 'o.quote_id', '=', 'q.quote_id')
+                ->where('s.transport_id', $driverVehicle->transport_id)
+                ->whereIn('s.status', ['pending', 'in_transit', 'out_for_delivery'])
+                ->sum('q.weight');
+
+            $currentLoad = $currentLoad ?? 0;
+            $capacity = (float) $driverVehicle->capacity;
+            $utilizationPercent = $capacity > 0 ? round(($currentLoad / $capacity) * 100, 1) : 0;
+
+            $vehicleCapacity = [
+                'vehicle_id' => $driverVehicle->vehicle_id,
+                'registration' => $driverVehicle->registration_number,
+                'vehicle_type' => $driverVehicle->vehicle_type,
+                'capacity' => $capacity,
+                'current_load' => round($currentLoad, 1),
+                'available_capacity' => round($capacity - $currentLoad, 1),
+                'utilization_percent' => $utilizationPercent,
+            ];
+        }
+
         $shipments = DB::table('shipments as s')
             ->join('transport as t', 's.transport_id', '=', 't.transport_id')
             ->join('users as d', 't.driver_id', '=', 'd.user_id')
             ->leftJoin('orders as o', 's.order_id', '=', 'o.order_id')
-            ->leftJoin('users as u', 'o.user_id', '=', 'u.user_id')
             ->where('d.user_id', $driverId)
             ->whereIn('s.status', ['pending', 'in_transit', 'out_for_delivery'])
             ->select(
@@ -73,12 +103,11 @@ class DriverController extends Controller
                 's.tracking_number',
                 's.receiver_name',
                 's.receiver_address',
-                's.destination_name',
                 's.destination_address',
                 's.status',
                 's.creation_date',
                 's.departure_date',
-                'u.username as customer',
+                'o.customer_name as customer',
                 't.registration_number',
                 't.vehicle_type'
             )
@@ -92,7 +121,6 @@ class DriverController extends Controller
                 'tracking_number' => $s->tracking_number,
                 'receiver_name' => $s->receiver_name,
                 'receiver_address' => $s->receiver_address,
-                'destination_name' => $s->destination_name,
                 'destination_address' => $s->destination_address,
                 'status' => $s->status,
                 'customer' => $s->customer ?? 'N/A',
@@ -103,6 +131,7 @@ class DriverController extends Controller
 
         return response()->json([
             'data' => $data,
+            'vehicle_capacity' => $vehicleCapacity,
             'summary' => [
                 'total' => $data->count(),
                 'pending' => $data->where('status', 'pending')->count(),
@@ -200,14 +229,17 @@ class DriverController extends Controller
         $shipment = DB::table('shipments as s')
             ->join('transport as t', 's.transport_id', '=', 't.transport_id')
             ->leftJoin('orders as o', 's.order_id', '=', 'o.order_id')
-            ->leftJoin('users as u', 'o.user_id', '=', 'u.user_id')
+            ->leftJoin('quotes as q', 'o.quote_id', '=', 'q.quote_id')
             ->where('s.shipment_id', $shipmentId)
             ->where('t.driver_id', $driverId)
             ->select(
                 's.*',
-                'u.username as customer',
+                'o.customer_name as customer',
                 't.registration_number',
-                't.vehicle_type'
+                't.vehicle_type',
+                'q.weight',
+                'q.dimensions',
+                'q.distance'
             )
             ->first();
 
@@ -226,13 +258,18 @@ class DriverController extends Controller
             'id' => (int) $shipment->shipment_id,
             'tracking_number' => $shipment->tracking_number,
             'receiver_name' => $shipment->receiver_name,
+            'receiver_contact' => $shipment->receiver_contact ?? 'N/A',
             'receiver_address' => $shipment->receiver_address,
-            'destination_name' => $shipment->destination_name,
             'destination_address' => $shipment->destination_address,
+            'origin_name' => $shipment->origin_name,
+            'origin_address' => $shipment->origin_address,
+            'departure_date' => $shipment->departure_date,
             'status' => $shipment->status,
             'customer' => $shipment->customer ?? 'N/A',
             'vehicle' => $shipment->registration_number . ' (' . $shipment->vehicle_type . ')',
-            'charges' => (int) $shipment->charges,
+            'weight' => $shipment->weight ? number_format($shipment->weight, 1) . ' kg' : 'N/A',
+            'dimensions' => $shipment->dimensions ?? 'N/A',
+            'distance' => $shipment->distance ? number_format($shipment->distance, 1) . ' km' : 'N/A',
             'recent_updates' => $trackingHistory->map(function($item) {
                 return [
                     'timestamp' => $item->timestamp,

@@ -1,6 +1,17 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { apiGet, apiPost, apiPatch, apiDelete } from '../../lib/api'
+import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet'
+import 'leaflet/dist/leaflet.css'
+import L from 'leaflet'
+
+// Fix for default marker icons in React-Leaflet
+delete L.Icon.Default.prototype._getIconUrl
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+})
 
 export default function Warehouses() {
   const [warehouses, setWarehouses] = useState([])
@@ -241,16 +252,60 @@ export default function Warehouses() {
   )
 }
 
+function LocationPicker({ position, setPosition }) {
+  useMapEvents({
+    click(e) {
+      setPosition([e.latlng.lat, e.latlng.lng])
+    },
+  })
+  return position ? <Marker position={position} /> : null
+}
+
 function CreateWarehouseForm({ onSubmit, onCancel, creating }) {
   const [formData, setFormData] = useState({
     warehouse_name: '',
     location: ''
   })
+  // Default to Davao City, Philippines
+  const [mapPosition, setMapPosition] = useState([7.1907, 125.4553])
+  const [addressLoading, setAddressLoading] = useState(false)
+
+  // Reverse geocoding to get address from coordinates
+  const getAddressFromCoords = async (lat, lng) => {
+    setAddressLoading(true)
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`
+      )
+      const data = await response.json()
+      if (data.display_name) {
+        setFormData(prev => ({ ...prev, location: data.display_name }))
+      }
+    } catch (error) {
+      console.error('Error fetching address:', error)
+    } finally {
+      setAddressLoading(false)
+    }
+  }
+
+  // Update address when map position changes
+  useEffect(() => {
+    if (mapPosition) {
+      getAddressFromCoords(mapPosition[0], mapPosition[1])
+    }
+  }, [mapPosition])
 
   const handleSubmit = (e) => {
     e.preventDefault()
     if (!formData.warehouse_name.trim() || !formData.location.trim()) return
-    onSubmit(formData)
+
+    // Include coordinates in the submission
+    const dataWithCoords = {
+      ...formData,
+      latitude: mapPosition[0],
+      longitude: mapPosition[1]
+    }
+    onSubmit(dataWithCoords)
   }
 
   return (
@@ -269,16 +324,46 @@ function CreateWarehouseForm({ onSubmit, onCancel, creating }) {
           />
         </label>
 
+        <div>
+          <div className="label">Location * (Click on map to set location)</div>
+          <div style={{
+            height: '400px',
+            width: '100%',
+            borderRadius: '8px',
+            overflow: 'hidden',
+            border: '1px solid var(--gray-200)',
+            marginBottom: '8px'
+          }}>
+            <MapContainer
+              center={mapPosition}
+              zoom={13}
+              style={{ height: '100%', width: '100%' }}
+            >
+              <TileLayer
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              />
+              <LocationPicker position={mapPosition} setPosition={setMapPosition} />
+            </MapContainer>
+          </div>
+          <div style={{ fontSize: '0.875rem', color: 'var(--gray-600)', marginBottom: '8px' }}>
+            📍 Coordinates: {mapPosition[0].toFixed(6)}, {mapPosition[1].toFixed(6)}
+          </div>
+        </div>
+
         <label>
-          <div className="label">Location *</div>
+          <div className="label">Address {addressLoading && '(Loading...)'}</div>
           <textarea
             className="input"
-            placeholder="e.g., Davao City, Philippines - Industrial Zone A, Building 1"
+            placeholder="Address will be auto-filled from map location"
             value={formData.location}
             onChange={(e) => setFormData(prev => ({ ...prev, location: e.target.value }))}
             rows="3"
             required
           />
+          <div style={{ fontSize: '0.875rem', color: 'var(--gray-600)', marginTop: '4px' }}>
+            💡 Tip: You can edit the address manually if needed
+          </div>
         </label>
 
         <div className="form-actions">

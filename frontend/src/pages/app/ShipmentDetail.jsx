@@ -129,11 +129,11 @@ export default function ShipmentDetail() {
             <div>{new Date(shipment.creation_date).toLocaleDateString()}</div>
           </div>
           <div>
-            <div className="label">Receiver</div>
+            <div className="label">Customer</div>
             <div>{shipment.receiver_name}</div>
           </div>
           <div>
-            <div className="label">Customer</div>
+            <div className="label">Prepared by</div>
             <div>{shipment.customer}</div>
           </div>
           <div>
