@@ -162,10 +162,3 @@ Route::middleware(['role:driver'])->group(function () {
     Route::get('/driver/shipments/{id}', [DriverController::class, 'getShipmentDetail']);
     Route::patch('/driver/shipments/{id}/status', [DriverController::class, 'updateShipmentStatus']);
 });
-
-// CORS preflight for dev
-Route::options('/{any}', function () {
-    return response('')->header('Access-Control-Allow-Origin', '*')
-        ->header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS')
-        ->header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-})->where('any', '.*');
