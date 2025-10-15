@@ -15,14 +15,40 @@ class Cors
      */
     public function handle(Request $request, Closure $next): Response
     {
-        $allowedOrigins = explode(',', env('FRONTEND_URL', 'http://localhost:3000'));
+        // Get allowed origins from environment
+        $frontendUrl = env('FRONTEND_URL', '');
+
+        // Default allowed origins for local development
+        $defaultOrigins = [
+            'http://localhost:3000',
+            'http://localhost:5173',  // Vite default port
+            'http://127.0.0.1:3000',
+            'http://127.0.0.1:5173',
+        ];
+
+        // If FRONTEND_URL is set, parse it (supports comma-separated list)
+        if ($frontendUrl) {
+            $allowedOrigins = array_merge($defaultOrigins, explode(',', $frontendUrl));
+        } else {
+            $allowedOrigins = $defaultOrigins;
+        }
+
+        // Get the request origin
         $origin = $request->header('Origin');
 
         // Check if origin is allowed
-        if (in_array($origin, $allowedOrigins) || in_array('*', $allowedOrigins)) {
-            $allowOrigin = $origin ?: $allowedOrigins[0];
+        if ($origin && in_array($origin, $allowedOrigins)) {
+            $allowOrigin = $origin;
+        } elseif (in_array('*', $allowedOrigins)) {
+            $allowOrigin = '*';
         } else {
-            $allowOrigin = $allowedOrigins[0];
+            // For local development, allow localhost origins by default
+            if (env('APP_ENV') === 'local' && $origin &&
+                (str_starts_with($origin, 'http://localhost') || str_starts_with($origin, 'http://127.0.0.1'))) {
+                $allowOrigin = $origin;
+            } else {
+                $allowOrigin = $allowedOrigins[0] ?? 'http://localhost:3000';
+            }
         }
 
         // Handle preflight OPTIONS request
