@@ -10,35 +10,82 @@ class DashboardController extends Controller
 {
     public function getMetrics()
     {
-        // Get orders metrics
-        $ordersTotal = DB::table('orders')->count();
-        $ordersPending = DB::table('orders')->where('order_status', 'pending')->count();
-        $ordersProcessing = DB::table('orders')->where('order_status', 'processing')->count();
-        $ordersFulfilled = DB::table('orders')->where('order_status', 'fulfilled')->count();
+        // Get authenticated user ID
+        $userId = request()->header('X-User-Id');
 
-        // Get shipments metrics
-        $shipmentsTotal = DB::table('shipments')->count();
-        $shipmentsPending = DB::table('shipments')->where('status', 'pending')->count();
-        $shipmentsInTransit = DB::table('shipments')->whereIn('status', ['in_transit', 'out_for_delivery'])->count();
-        $shipmentsDelivered = DB::table('shipments')->where('status', 'delivered')->count();
+        if (!$userId) {
+            return response()->json(['message' => 'Unauthorized - User ID required'], 401);
+        }
 
-        // Get quotes metrics
-        $quotesTotal = DB::table('quotes')->count();
-        $quotesPending = DB::table('quotes')->where('status', 'pending')->count();
-        $quotesApproved = DB::table('quotes')->where('status', 'approved')->count();
-        $quotesConverted = DB::table('quotes')->where('status', 'converted')->count();
+        // Get orders metrics - filter by user_id
+        $ordersTotal = DB::table('orders')->where('user_id', $userId)->count();
+        $ordersPending = DB::table('orders')->where('user_id', $userId)->where('order_status', 'pending')->count();
+        $ordersProcessing = DB::table('orders')->where('user_id', $userId)->where('order_status', 'processing')->count();
+        $ordersFulfilled = DB::table('orders')->where('user_id', $userId)->where('order_status', 'fulfilled')->count();
 
-        // Get invoices metrics
-        $invoicesTotal = DB::table('invoices')->count();
-        $invoicesPending = DB::table('invoices')->where('status', 'pending')->count();
-        $invoicesPaid = DB::table('invoices')->where('status', 'paid')->count();
-        $invoicesOverdue = DB::table('invoices')->where('status', 'overdue')->count();
-        $totalUnpaid = DB::table('invoices')->whereIn('status', ['pending', 'overdue'])->sum('amount');
+        // Get shipments metrics - filter by user_id through orders join
+        $shipmentsTotal = DB::table('shipments as s')
+            ->join('orders as o', 's.order_id', '=', 'o.order_id')
+            ->where('o.user_id', $userId)
+            ->count();
+        $shipmentsPending = DB::table('shipments as s')
+            ->join('orders as o', 's.order_id', '=', 'o.order_id')
+            ->where('o.user_id', $userId)
+            ->where('s.status', 'pending')
+            ->count();
+        $shipmentsInTransit = DB::table('shipments as s')
+            ->join('orders as o', 's.order_id', '=', 'o.order_id')
+            ->where('o.user_id', $userId)
+            ->whereIn('s.status', ['in_transit', 'out_for_delivery'])
+            ->count();
+        $shipmentsDelivered = DB::table('shipments as s')
+            ->join('orders as o', 's.order_id', '=', 'o.order_id')
+            ->where('o.user_id', $userId)
+            ->where('s.status', 'delivered')
+            ->count();
 
-        // Get recent orders
+        // Get quotes metrics - filter by user_id
+        $quotesTotal = DB::table('quotes')->where('user_id', $userId)->count();
+        $quotesPending = DB::table('quotes')->where('user_id', $userId)->where('status', 'pending')->count();
+        $quotesApproved = DB::table('quotes')->where('user_id', $userId)->where('status', 'approved')->count();
+        $quotesConverted = DB::table('quotes')->where('user_id', $userId)->where('status', 'converted')->count();
+
+        // Get invoices metrics - filter by user_id through shipments/orders join
+        $invoicesTotal = DB::table('invoices as i')
+            ->join('shipments as s', 'i.shipment_id', '=', 's.shipment_id')
+            ->join('orders as o', 's.order_id', '=', 'o.order_id')
+            ->where('o.user_id', $userId)
+            ->count();
+        $invoicesPending = DB::table('invoices as i')
+            ->join('shipments as s', 'i.shipment_id', '=', 's.shipment_id')
+            ->join('orders as o', 's.order_id', '=', 'o.order_id')
+            ->where('o.user_id', $userId)
+            ->where('i.status', 'pending')
+            ->count();
+        $invoicesPaid = DB::table('invoices as i')
+            ->join('shipments as s', 'i.shipment_id', '=', 's.shipment_id')
+            ->join('orders as o', 's.order_id', '=', 'o.order_id')
+            ->where('o.user_id', $userId)
+            ->where('i.status', 'paid')
+            ->count();
+        $invoicesOverdue = DB::table('invoices as i')
+            ->join('shipments as s', 'i.shipment_id', '=', 's.shipment_id')
+            ->join('orders as o', 's.order_id', '=', 'o.order_id')
+            ->where('o.user_id', $userId)
+            ->where('i.status', 'overdue')
+            ->count();
+        $totalUnpaid = DB::table('invoices as i')
+            ->join('shipments as s', 'i.shipment_id', '=', 's.shipment_id')
+            ->join('orders as o', 's.order_id', '=', 'o.order_id')
+            ->where('o.user_id', $userId)
+            ->whereIn('i.status', ['pending', 'overdue'])
+            ->sum('i.amount');
+
+        // Get recent orders - filter by user_id
         $recentOrders = DB::table('orders as o')
             ->leftJoin('users as u', 'o.user_id', '=', 'u.user_id')
             ->select('o.order_id as id', 'o.order_status as status', 'o.order_date', 'u.username as customer')
+            ->where('o.user_id', $userId)
             ->orderByDesc('o.order_date')
             ->limit(5)
             ->get()
@@ -52,21 +99,23 @@ class DashboardController extends Controller
                 ];
             });
 
-        // Get recent shipments with issues (pending or delayed)
+        // Get recent shipments with issues (pending or delayed) - filter by user_id
         $shipmentsWithIssues = DB::table('shipments as s')
             ->leftJoin('orders as o', 's.order_id', '=', 'o.order_id')
             ->leftJoin('users as u', 'o.user_id', '=', 'u.user_id')
             ->select('s.tracking_number', 's.status', 's.creation_date', 'u.username as customer')
+            ->where('o.user_id', $userId)
             ->whereIn('s.status', ['pending'])
             ->where('s.creation_date', '<', Carbon::now()->subDays(2)) // Pending for more than 2 days
             ->orderByDesc('s.creation_date')
             ->limit(3)
             ->get();
 
-        // Get recent quotes
+        // Get recent quotes - filter by user_id
         $recentQuotes = DB::table('quotes as q')
             ->leftJoin('users as u', 'q.user_id', '=', 'u.user_id')
             ->select('q.quote_id as id', 'q.status', 'q.creation_date', 'u.username as customer', 'q.estimated_cost')
+            ->where('q.user_id', $userId)
             ->orderByDesc('q.creation_date')
             ->limit(3)
             ->get()
