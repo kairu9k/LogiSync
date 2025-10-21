@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Warehouse;
 use App\Models\Inventory;
 use App\Models\OrderDetail;
+use App\Helpers\UserHelper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -14,11 +15,19 @@ class WarehouseController extends Controller
 {
     public function index(Request $request)
     {
+        $userId = request()->header('X-User-Id');
+        if (!$userId) {
+            return response()->json(['message' => 'Unauthorized - User ID required'], 401);
+        }
+
+        // Get organization user ID (admin's ID for team members, own ID for admins)
+        $orgUserId = UserHelper::getOrganizationUserId($userId);
+
         $search = $request->query('search');
         $limit = (int) ($request->query('limit', 20));
         $limit = max(1, min($limit, 100));
 
-        $query = Warehouse::with(['inventory.order.user']);
+        $query = Warehouse::with(['inventory.order.user'])->where('organization_id', $orgUserId);
 
         if ($search) {
             $query->where(function ($q) use ($search) {
@@ -99,6 +108,14 @@ class WarehouseController extends Controller
 
     public function store(Request $request)
     {
+        $userId = request()->header('X-User-Id');
+        if (!$userId) {
+            return response()->json(['message' => 'Unauthorized - User ID required'], 401);
+        }
+
+        // Get organization user ID (admin's ID for team members, own ID for admins)
+        $orgUserId = UserHelper::getOrganizationUserId($userId);
+
         $data = $request->all();
         $validator = Validator::make($data, [
             'warehouse_name' => 'required|string|max:255',
@@ -110,6 +127,7 @@ class WarehouseController extends Controller
                 ->header('Access-Control-Allow-Origin', '*');
         }
 
+        $data['user_id'] = $orgUserId;
         $warehouse = Warehouse::create($data);
 
         return response()->json([

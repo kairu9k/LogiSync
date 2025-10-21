@@ -54,18 +54,15 @@ Route::middleware(['role:admin'])->group(function () {
 });
 
 
-// ===== BOOKING MANAGER & ADMIN ROUTES =====
+// ===== BOOKING MANAGER & ADMIN ROUTES (Write Access) =====
 Route::middleware(['role:admin,booking_manager'])->group(function () {
-    // Quotes
-    Route::get('/quotes', [QuoteController::class, 'index']);
+    // Quotes - Write Operations
     Route::post('/quotes', [QuoteController::class, 'store']);
     Route::post('/quotes/calculate', [QuoteController::class, 'calculate']);
     Route::patch('/quotes/{id}/status', [QuoteController::class, 'updateStatus']);
     Route::post('/quotes/{id}/convert-to-order', [QuoteController::class, 'convertToOrder']);
 
-    // Orders
-    Route::get('/orders', [OrderController::class, 'index']);
-    Route::get('/orders/{id}', [OrderController::class, 'show']);
+    // Orders - Write Operations
     Route::post('/orders', [OrderController::class, 'store']);
     Route::patch('/orders/{id}/status', [OrderController::class, 'updateStatus']);
     Route::patch('/orders/{id}', [OrderController::class, 'update']);
@@ -73,43 +70,58 @@ Route::middleware(['role:admin,booking_manager'])->group(function () {
     Route::patch('/orders/{id}/items/{itemId}', [OrderController::class, 'updateItem']);
     Route::delete('/orders/{id}/items/{itemId}', [OrderController::class, 'deleteItem']);
 
-    // Invoices
-    Route::get('/invoices', [InvoiceController::class, 'index']);
-    Route::get('/invoices/{id}', [InvoiceController::class, 'show']);
+    // Invoices - Write Operations
     Route::post('/invoices', [InvoiceController::class, 'store']);
     Route::patch('/invoices/{id}/status', [InvoiceController::class, 'updateStatus']);
     Route::patch('/invoices/{id}/mark-paid', [InvoiceController::class, 'markAsPaid']);
     Route::post('/shipments/{shipmentId}/invoice', [InvoiceController::class, 'createFromShipment']);
     Route::patch('/invoices/update-overdue', [InvoiceController::class, 'updateOverdueStatuses']);
-    Route::get('/dashboard/invoice-metrics', [InvoiceController::class, 'getDashboardMetrics']);
 });
 
 
 // ===== WAREHOUSE MANAGER & ADMIN ROUTES =====
 Route::middleware(['role:admin,warehouse_manager'])->group(function () {
-    // Warehouse Management
-    Route::get('/warehouses', [WarehouseController::class, 'index']);
-    Route::get('/warehouses/{id}', [WarehouseController::class, 'show']);
+    // Warehouse Management (creation/modification restricted to warehouse_manager & admin)
     Route::post('/warehouses', [WarehouseController::class, 'store']);
     Route::patch('/warehouses/{id}', [WarehouseController::class, 'update']);
     Route::delete('/warehouses/{id}', [WarehouseController::class, 'destroy']);
-    Route::get('/inventory', [WarehouseController::class, 'getInventory']);
     Route::post('/inventory/assign', [WarehouseController::class, 'assignItem']);
     Route::patch('/inventory/{id}', [WarehouseController::class, 'updateItemLocation']);
-    Route::get('/inventory/unassigned', [WarehouseController::class, 'getUnassignedItems']);
-    Route::get('/dashboard/warehouse-metrics', [WarehouseController::class, 'getDashboardMetrics']);
 
-    // Budget Management (Admin & Warehouse Manager)
-    Route::get('/budgets', [BudgetController::class, 'index']);
-    Route::get('/budgets/{id}', [BudgetController::class, 'show']);
+    // Budget Management - creation/modification (Admin & Warehouse Manager)
     Route::post('/budgets', [BudgetController::class, 'store']);
     Route::patch('/budgets/{id}', [BudgetController::class, 'update']);
     Route::delete('/budgets/{id}', [BudgetController::class, 'destroy']);
 });
 
 
+// ===== WAREHOUSE & ADMIN ROUTES (Warehouse Manager viewing only) =====
+Route::middleware(['role:admin,warehouse_manager'])->group(function () {
+    // Warehouse Management - viewing (warehouse manager & admin only)
+    Route::get('/warehouses', [WarehouseController::class, 'index']);
+    Route::get('/warehouses/{id}', [WarehouseController::class, 'show']);
+    Route::get('/inventory', [WarehouseController::class, 'getInventory']);
+    Route::get('/inventory/unassigned', [WarehouseController::class, 'getUnassignedItems']);
+});
+
 // ===== ALL STAFF ROUTES (Admin, Booking Manager, Warehouse Manager) =====
 Route::middleware(['role:admin,booking_manager,warehouse_manager'])->group(function () {
+    // Quotes - Read Access (all staff can view)
+    Route::get('/quotes', [QuoteController::class, 'index']);
+
+    // Orders - Read Access (all staff can view)
+    Route::get('/orders', [OrderController::class, 'index']);
+    Route::get('/orders/{id}', [OrderController::class, 'show']);
+
+    // Invoices - Read Access (all staff can view)
+    Route::get('/invoices', [InvoiceController::class, 'index']);
+    Route::get('/invoices/{id}', [InvoiceController::class, 'show']);
+    Route::get('/dashboard/invoice-metrics', [InvoiceController::class, 'getDashboardMetrics']);
+
+    // Budget Management - viewing (all staff can view for transport management)
+    Route::get('/budgets', [BudgetController::class, 'index']);
+    Route::get('/budgets/{id}', [BudgetController::class, 'show']);
+
     // Shipments - All staff can view/manage
     Route::get('/shipments', [ShipmentController::class, 'index']);
     Route::get('/shipments/{id}', [ShipmentController::class, 'show']);
@@ -142,6 +154,7 @@ Route::middleware(['role:admin,booking_manager,warehouse_manager'])->group(funct
 
     // Dashboard
     Route::get('/dashboard/metrics', [DashboardController::class, 'getMetrics']);
+    Route::get('/dashboard/warehouse-metrics', [WarehouseController::class, 'getDashboardMetrics']);
 
     // Subscriptions (all authenticated users)
     Route::get('/subscriptions/current', [SubscriptionController::class, 'getCurrentSubscription']);

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Helpers\UserHelper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -11,7 +12,13 @@ class BudgetController extends Controller
 {
     public function index(Request $request)
     {
-        $query = DB::table('budgets');
+        $userId = request()->header('X-User-Id');
+        if (!$userId) {
+            return response()->json(['message' => 'Unauthorized - User ID required'], 401);
+        }
+
+        $orgUserId = UserHelper::getOrganizationUserId($userId);
+        $query = DB::table('budgets')->where('organization_id', $orgUserId);
 
         // Search functionality
         if ($search = $request->query('q')) {
@@ -36,8 +43,15 @@ class BudgetController extends Controller
 
     public function show($id)
     {
+        $userId = request()->header('X-User-Id');
+        if (!$userId) {
+            return response()->json(['message' => 'Unauthorized - User ID required'], 401);
+        }
+
+        $orgUserId = UserHelper::getOrganizationUserId($userId);
         $budget = DB::table('budgets')
             ->where('budget_id', $id)
+            ->where('organization_id', $orgUserId)
             ->first();
 
         if (!$budget) {
@@ -56,6 +70,12 @@ class BudgetController extends Controller
 
     public function store(Request $request)
     {
+        $userId = request()->header('X-User-Id');
+        if (!$userId) {
+            return response()->json(['message' => 'Unauthorized - User ID required'], 401);
+        }
+
+        $orgUserId = UserHelper::getOrganizationUserId($userId);
         $validator = Validator::make($request->all(), [
             'budget_name' => 'required|string|max:255',
             'start_date' => 'required|date',
@@ -73,6 +93,7 @@ class BudgetController extends Controller
             'start_date' => $request->start_date,
             'end_date' => $request->end_date,
             'total_budget' => $request->total_budget,
+            'user_id' => $orgUserId,
         ]);
 
         return response()->json([
@@ -83,6 +104,12 @@ class BudgetController extends Controller
 
     public function update(Request $request, $id)
     {
+        $userId = request()->header('X-User-Id');
+        if (!$userId) {
+            return response()->json(['message' => 'Unauthorized - User ID required'], 401);
+        }
+
+        $orgUserId = UserHelper::getOrganizationUserId($userId);
         $validator = Validator::make($request->all(), [
             'budget_name' => 'required|string|max:255',
             'start_date' => 'required|date',
@@ -95,7 +122,10 @@ class BudgetController extends Controller
                 ->header('Access-Control-Allow-Origin', '*');
         }
 
-        $updated = DB::table('budgets')->where('budget_id', $id)->update([
+        $updated = DB::table('budgets')
+            ->where('budget_id', $id)
+            ->where('organization_id', $orgUserId)
+            ->update([
             'budget_name' => $request->budget_name,
             'start_date' => $request->start_date,
             'end_date' => $request->end_date,
@@ -113,8 +143,17 @@ class BudgetController extends Controller
 
     public function destroy($id)
     {
+        $userId = request()->header('X-User-Id');
+        if (!$userId) {
+            return response()->json(['message' => 'Unauthorized - User ID required'], 401);
+        }
+
+        $orgUserId = UserHelper::getOrganizationUserId($userId);
         // Check if budget is in use by any vehicles
-        $inUse = DB::table('transport')->where('budget_id', $id)->exists();
+        $inUse = DB::table('transport')
+            ->where('budget_id', $id)
+            ->where('organization_id', $orgUserId)
+            ->exists();
 
         if ($inUse) {
             return response()->json([
@@ -122,7 +161,10 @@ class BudgetController extends Controller
             ], 400)->header('Access-Control-Allow-Origin', '*');
         }
 
-        $deleted = DB::table('budgets')->where('budget_id', $id)->delete();
+        $deleted = DB::table('budgets')
+            ->where('budget_id', $id)
+            ->where('organization_id', $orgUserId)
+            ->delete();
 
         if (!$deleted) {
             return response()->json(['message' => 'Budget not found'], 404)

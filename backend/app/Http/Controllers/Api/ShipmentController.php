@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Helpers\UserHelper;
 use App\Models\Shipment;
 use App\Models\Transport;
 use App\Models\Order;
@@ -15,6 +16,12 @@ class ShipmentController extends Controller
 {
     public function index(Request $request)
     {
+        $userId = request()->header('X-User-Id');
+        if (!$userId) {
+            return response()->json(['message' => 'Unauthorized - User ID required'], 401);
+        }
+
+        $orgUserId = UserHelper::getOrganizationUserId($userId);
         $status = $request->query('status');
         $search = $request->query('q');
         $limit = (int) ($request->query('limit', 20));
@@ -22,9 +29,9 @@ class ShipmentController extends Controller
 
         $query = DB::table('shipments as s')
             ->leftJoin('orders as o', 's.order_id', '=', 'o.order_id')
-            ->leftJoin('users as u', 'o.user_id', '=', 'u.user_id')
             ->leftJoin('transport as t', 's.transport_id', '=', 't.transport_id')
             ->leftJoin('users as d', 't.driver_id', '=', 'd.user_id')
+            ->where('o.organization_id', $orgUserId)
             ->select(
                 's.shipment_id',
                 's.tracking_number',
@@ -32,7 +39,9 @@ class ShipmentController extends Controller
                 's.status',
                 's.creation_date',
                 's.departure_date',
-                'u.username as customer',
+                's.origin_name',
+                's.origin_address',
+                'o.customer_name',
                 'd.username as driver',
                 't.registration_number'
             )
@@ -52,7 +61,7 @@ class ShipmentController extends Controller
             $query->where(function ($q) use ($search, $orderIdFromPO) {
                 $q->where('s.tracking_number', 'like', "%$search%")
                   ->orWhere('s.receiver_name', 'like', "%$search%")
-                  ->orWhere('u.username', 'like', "%$search%");
+                  ->orWhere('o.customer_name', 'like', "%$search%");
 
                 // Search by order_id if PO number format detected
                 if ($orderIdFromPO !== null) {
@@ -68,12 +77,14 @@ class ShipmentController extends Controller
                 'id' => (int) $row->shipment_id,
                 'tracking_number' => $row->tracking_number,
                 'receiver' => $row->receiver_name,
-                'customer' => $row->customer ?? 'N/A',
+                'customer' => $row->customer_name ?? 'N/A',
                 'driver' => $row->driver ?? 'N/A',
                 'vehicle' => $row->registration_number ?? 'N/A',
                 'status' => $row->status,
                 'creation_date' => $row->creation_date,
                 'departure_date' => $row->departure_date,
+                'origin_name' => $row->origin_name,
+                'origin_address' => $row->origin_address,
             ];
         });
 
@@ -84,19 +95,25 @@ class ShipmentController extends Controller
 
     public function show(int $id)
     {
+        $userId = request()->header('X-User-Id');
+        if (!$userId) {
+            return response()->json(['message' => 'Unauthorized - User ID required'], 401);
+        }
+
+        $orgUserId = UserHelper::getOrganizationUserId($userId);
         $shipment = DB::table('shipments as s')
             ->leftJoin('orders as o', 's.order_id', '=', 'o.order_id')
-            ->leftJoin('users as u', 'o.user_id', '=', 'u.user_id')
             ->leftJoin('transport as t', 's.transport_id', '=', 't.transport_id')
             ->leftJoin('users as d', 't.driver_id', '=', 'd.user_id')
+            ->where('s.shipment_id', $id)
+            ->where('o.organization_id', $orgUserId)
             ->select(
                 's.*',
-                'u.username as customer',
+                'o.customer_name',
                 'd.username as driver',
                 't.registration_number',
                 't.vehicle_type'
             )
-            ->where('s.shipment_id', $id)
             ->first();
 
         if (!$shipment) {
@@ -122,7 +139,7 @@ class ShipmentController extends Controller
             'status' => $shipment->status,
             'creation_date' => $shipment->creation_date,
             'departure_date' => $shipment->departure_date,
-            'customer' => $shipment->customer ?? 'N/A',
+            'customer' => $shipment->customer_name ?? 'N/A',
             'driver' => $shipment->driver ?? 'N/A',
             'vehicle' => $shipment->registration_number ?? 'N/A',
             'vehicle_type' => $shipment->vehicle_type ?? 'N/A',
@@ -143,6 +160,12 @@ class ShipmentController extends Controller
 
     public function createFromOrder(Request $request, int $orderId)
     {
+        $userId = request()->header('X-User-Id');
+        if (!$userId) {
+            return response()->json(['message' => 'Unauthorized - User ID required'], 401);
+        }
+
+        $orgUserId = UserHelper::getOrganizationUserId($userId);
         $data = $request->all();
         $validator = Validator::make($data, [
             'transport_id' => 'required|integer|exists:transport,transport_id',
@@ -162,7 +185,10 @@ class ShipmentController extends Controller
                 ->header('Access-Control-Allow-Origin', '*');
         }
 
-        $order = DB::table('orders')->where('order_id', $orderId)->first();
+        $order = DB::table('orders')
+            ->where('order_id', $orderId)
+            ->where('organization_id', $orgUserId)
+            ->first();
         if (!$order) {
             return response()->json(['message' => 'Order not found'], 404)
                 ->header('Access-Control-Allow-Origin', '*');
@@ -213,6 +239,12 @@ class ShipmentController extends Controller
 
     public function updateStatus(Request $request, int $id)
     {
+        $userId = request()->header('X-User-Id');
+        if (!$userId) {
+            return response()->json(['message' => 'Unauthorized - User ID required'], 401);
+        }
+
+        $orgUserId = UserHelper::getOrganizationUserId($userId);
         $data = $request->all();
         $validator = Validator::make($data, [
             'status' => 'required|string|in:pending,in_transit,out_for_delivery,delivered,cancelled',
@@ -225,7 +257,13 @@ class ShipmentController extends Controller
                 ->header('Access-Control-Allow-Origin', '*');
         }
 
-        $shipment = DB::table('shipments')->where('shipment_id', $id)->first();
+        // Verify shipment belongs to user via order
+        $shipment = DB::table('shipments as s')
+            ->join('orders as o', 's.order_id', '=', 'o.order_id')
+            ->where('s.shipment_id', $id)
+            ->where('o.organization_id', $orgUserId)
+            ->select('s.*')
+            ->first();
         if (!$shipment) {
             return response()->json(['message' => 'Shipment not found'], 404)
                 ->header('Access-Control-Allow-Origin', '*');
@@ -366,6 +404,12 @@ class ShipmentController extends Controller
     // GPS Tracking Methods
     public function updateLocation(Request $request, int $id)
     {
+        $userId = request()->header('X-User-Id');
+        if (!$userId) {
+            return response()->json(['message' => 'Unauthorized - User ID required'], 401);
+        }
+
+        $orgUserId = UserHelper::getOrganizationUserId($userId);
         $validator = Validator::make($request->all(), [
             'latitude' => 'required|numeric|between:-90,90',
             'longitude' => 'required|numeric|between:-180,180',
@@ -379,8 +423,13 @@ class ShipmentController extends Controller
                 ->header('Access-Control-Allow-Origin', '*');
         }
 
-        // Verify shipment exists
-        $shipment = DB::table('shipments')->where('shipment_id', $id)->first();
+        // Verify shipment belongs to user via order
+        $shipment = DB::table('shipments as s')
+            ->join('orders as o', 's.order_id', '=', 'o.order_id')
+            ->where('s.shipment_id', $id)
+            ->where('o.organization_id', $orgUserId)
+            ->select('s.*')
+            ->first();
         if (!$shipment) {
             return response()->json(['message' => 'Shipment not found'], 404)
                 ->header('Access-Control-Allow-Origin', '*');
@@ -410,6 +459,23 @@ class ShipmentController extends Controller
 
     public function getLocation(int $id)
     {
+        $userId = request()->header('X-User-Id');
+        if (!$userId) {
+            return response()->json(['message' => 'Unauthorized - User ID required'], 401);
+        }
+
+        $orgUserId = UserHelper::getOrganizationUserId($userId);
+        // Verify shipment belongs to user via order
+        $shipmentExists = DB::table('shipments as s')
+            ->join('orders as o', 's.order_id', '=', 'o.order_id')
+            ->where('s.shipment_id', $id)
+            ->where('o.organization_id', $orgUserId)
+            ->exists();
+        if (!$shipmentExists) {
+            return response()->json(['message' => 'Shipment not found'], 404)
+                ->header('Access-Control-Allow-Origin', '*');
+        }
+
         // Get latest GPS location for shipment
         $location = DB::table('gps_locations')
             ->where('shipment_id', $id)
@@ -436,6 +502,23 @@ class ShipmentController extends Controller
 
     public function getLocationHistory(int $id)
     {
+        $userId = request()->header('X-User-Id');
+        if (!$userId) {
+            return response()->json(['message' => 'Unauthorized - User ID required'], 401);
+        }
+
+        $orgUserId = UserHelper::getOrganizationUserId($userId);
+        // Verify shipment belongs to user via order
+        $shipmentExists = DB::table('shipments as s')
+            ->join('orders as o', 's.order_id', '=', 'o.order_id')
+            ->where('s.shipment_id', $id)
+            ->where('o.organization_id', $orgUserId)
+            ->exists();
+        if (!$shipmentExists) {
+            return response()->json(['message' => 'Shipment not found'], 404)
+                ->header('Access-Control-Allow-Origin', '*');
+        }
+
         // Get GPS tracking history for shipment
         $locations = DB::table('gps_locations')
             ->where('shipment_id', $id)

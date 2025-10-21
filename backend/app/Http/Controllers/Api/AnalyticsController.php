@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Helpers\UserHelper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
@@ -11,32 +12,46 @@ class AnalyticsController extends Controller
 {
     public function getOverviewMetrics(Request $request)
     {
+        $userId = request()->header('X-User-Id');
+        if (!$userId) {
+            return response()->json(['message' => 'Unauthorized - User ID required'], 401);
+        }
+
+        $orgUserId = UserHelper::getOrganizationUserId($userId);
         $dateFrom = $request->query('date_from', Carbon::now()->subDays(30)->format('Y-m-d'));
         $dateTo = $request->query('date_to', Carbon::now()->format('Y-m-d'));
 
         try {
-            // Overall business metrics
-            $totalRevenue = DB::table('invoices')
-                ->where('status', 'paid')
-                ->whereBetween('invoice_date', [$dateFrom, $dateTo])
-                ->sum('amount');
+            // Overall business metrics (filtered by organization)
+            $totalRevenue = DB::table('invoices as i')
+                ->join('orders as o', 'i.order_id', '=', 'o.order_id')
+                ->where('i.status', 'paid')
+                ->where('o.organization_id', $orgUserId)
+                ->whereBetween('i.invoice_date', [$dateFrom, $dateTo])
+                ->sum('i.amount');
 
             $totalOrders = DB::table('orders')
+                ->where('organization_id', $orgUserId)
                 ->whereBetween('order_date', [$dateFrom, $dateTo])
                 ->count();
 
             $completedOrders = DB::table('orders')
+                ->where('organization_id', $orgUserId)
                 ->where('order_status', 'fulfilled')
                 ->whereBetween('order_date', [$dateFrom, $dateTo])
                 ->count();
 
-            $totalShipments = DB::table('shipments')
-                ->whereBetween('creation_date', [$dateFrom, $dateTo])
+            $totalShipments = DB::table('shipments as s')
+                ->join('orders as o', 's.order_id', '=', 'o.order_id')
+                ->where('o.organization_id', $orgUserId)
+                ->whereBetween('s.creation_date', [$dateFrom, $dateTo])
                 ->count();
 
-            $deliveredShipments = DB::table('shipments')
-                ->where('status', 'delivered')
-                ->whereBetween('creation_date', [$dateFrom, $dateTo])
+            $deliveredShipments = DB::table('shipments as s')
+                ->join('orders as o', 's.order_id', '=', 'o.order_id')
+                ->where('o.organization_id', $orgUserId)
+                ->where('s.status', 'delivered')
+                ->whereBetween('s.creation_date', [$dateFrom, $dateTo])
                 ->count();
 
             // Calculate fulfillment rate
@@ -44,10 +59,12 @@ class AnalyticsController extends Controller
             $deliveryRate = $totalShipments > 0 ? round(($deliveredShipments / $totalShipments) * 100, 1) : 0;
 
             // Average delivery time
-            $avgDeliveryTime = DB::table('shipments')
-                ->selectRaw('AVG(DATEDIFF(DATE(NOW()), creation_date)) as avg_days')
-                ->where('status', 'delivered')
-                ->whereBetween('creation_date', [$dateFrom, $dateTo])
+            $avgDeliveryTime = DB::table('shipments as s')
+                ->join('orders as o', 's.order_id', '=', 'o.order_id')
+                ->selectRaw('AVG(DATEDIFF(DATE(NOW()), s.creation_date)) as avg_days')
+                ->where('o.organization_id', $orgUserId)
+                ->where('s.status', 'delivered')
+                ->whereBetween('s.creation_date', [$dateFrom, $dateTo])
                 ->first();
 
             $data = [
@@ -77,23 +94,31 @@ class AnalyticsController extends Controller
 
     public function getRevenueAnalytics(Request $request)
     {
+        $userId = request()->header('X-User-Id');
+        if (!$userId) {
+            return response()->json(['message' => 'Unauthorized - User ID required'], 401);
+        }
+
+        $orgUserId = UserHelper::getOrganizationUserId($userId);
         $period = $request->query('period', 'month'); // day, week, month, year
         $dateFrom = $request->query('date_from', Carbon::now()->subDays(30)->format('Y-m-d'));
         $dateTo = $request->query('date_to', Carbon::now()->format('Y-m-d'));
 
         try {
             $groupBy = match($period) {
-                'day' => "DATE(invoice_date)",
-                'week' => "YEARWEEK(invoice_date, 1)",
-                'month' => "DATE_FORMAT(invoice_date, '%Y-%m')",
-                'year' => "YEAR(invoice_date)",
-                default => "DATE_FORMAT(invoice_date, '%Y-%m')"
+                'day' => "DATE(i.invoice_date)",
+                'week' => "YEARWEEK(i.invoice_date, 1)",
+                'month' => "DATE_FORMAT(i.invoice_date, '%Y-%m')",
+                'year' => "YEAR(i.invoice_date)",
+                default => "DATE_FORMAT(i.invoice_date, '%Y-%m')"
             };
 
-            $revenueData = DB::table('invoices')
-                ->selectRaw("$groupBy as period, SUM(amount) as revenue, COUNT(*) as invoice_count")
-                ->where('status', 'paid')
-                ->whereBetween('invoice_date', [$dateFrom, $dateTo])
+            $revenueData = DB::table('invoices as i')
+                ->join('orders as o', 'i.order_id', '=', 'o.order_id')
+                ->selectRaw("$groupBy as period, SUM(i.amount) as revenue, COUNT(*) as invoice_count")
+                ->where('i.status', 'paid')
+                ->where('o.organization_id', $orgUserId)
+                ->whereBetween('i.invoice_date', [$dateFrom, $dateTo])
                 ->groupBy(DB::raw($groupBy))
                 ->orderBy(DB::raw($groupBy))
                 ->get();
@@ -118,22 +143,32 @@ class AnalyticsController extends Controller
 
     public function getOperationalMetrics(Request $request)
     {
+        $userId = request()->header('X-User-Id');
+        if (!$userId) {
+            return response()->json(['message' => 'Unauthorized - User ID required'], 401);
+        }
+
+        $orgUserId = UserHelper::getOrganizationUserId($userId);
         $dateFrom = $request->query('date_from', Carbon::now()->subDays(30)->format('Y-m-d'));
         $dateTo = $request->query('date_to', Carbon::now()->format('Y-m-d'));
 
         try {
             // Delivery performance by status
-            $deliveryMetrics = DB::table('shipments')
-                ->selectRaw('status, COUNT(*) as count')
-                ->whereBetween('creation_date', [$dateFrom, $dateTo])
-                ->groupBy('status')
+            $deliveryMetrics = DB::table('shipments as s')
+                ->join('orders as o', 's.order_id', '=', 'o.order_id')
+                ->selectRaw('s.status, COUNT(*) as count')
+                ->where('o.organization_id', $orgUserId)
+                ->whereBetween('s.creation_date', [$dateFrom, $dateTo])
+                ->groupBy('s.status')
                 ->get();
 
             // Top performing routes (origin to destination)
-            $topRoutes = DB::table('shipments')
-                ->selectRaw('origin_name, destination_name, COUNT(*) as shipment_count, AVG(charges) as avg_cost')
-                ->whereBetween('creation_date', [$dateFrom, $dateTo])
-                ->groupBy('origin_name', 'destination_name')
+            $topRoutes = DB::table('shipments as s')
+                ->join('orders as o', 's.order_id', '=', 'o.order_id')
+                ->selectRaw('s.origin_name, s.destination_name, COUNT(*) as shipment_count, AVG(s.charges) as avg_cost')
+                ->where('o.organization_id', $orgUserId)
+                ->whereBetween('s.creation_date', [$dateFrom, $dateTo])
+                ->groupBy('s.origin_name', 's.destination_name')
                 ->orderByDesc('shipment_count')
                 ->limit(10)
                 ->get()
@@ -147,10 +182,12 @@ class AnalyticsController extends Controller
 
             // Driver performance (if drivers are assigned)
             $driverPerformance = DB::table('shipments as s')
+                ->join('orders as o', 's.order_id', '=', 'o.order_id')
                 ->leftJoin('transport as t', 's.transport_id', '=', 't.transport_id')
                 ->leftJoin('users as u', 't.driver_id', '=', 'u.user_id')
                 ->selectRaw('u.username as driver_name, COUNT(*) as total_deliveries,
                            SUM(CASE WHEN s.status = "delivered" THEN 1 ELSE 0 END) as completed_deliveries')
+                ->where('o.organization_id', $orgUserId)
                 ->whereBetween('s.creation_date', [$dateFrom, $dateTo])
                 ->whereNotNull('u.username')
                 ->groupBy('u.user_id', 'u.username')
@@ -191,6 +228,12 @@ class AnalyticsController extends Controller
 
     public function getCustomerAnalytics(Request $request)
     {
+        $userId = request()->header('X-User-Id');
+        if (!$userId) {
+            return response()->json(['message' => 'Unauthorized - User ID required'], 401);
+        }
+
+        $orgUserId = UserHelper::getOrganizationUserId($userId);
         $dateFrom = $request->query('date_from', Carbon::now()->subDays(30)->format('Y-m-d'));
         $dateTo = $request->query('date_to', Carbon::now()->format('Y-m-d'));
 
@@ -198,10 +241,11 @@ class AnalyticsController extends Controller
             // Top customers by revenue
             $topCustomers = DB::table('invoices as i')
                 ->leftJoin('orders as o', 'i.order_id', '=', 'o.order_id')
-                ->leftJoin('users as u', 'o.user_id', '=', 'u.user_id')
+                ->leftJoin('users as u', 'o.organization_id', '=', 'u.user_id')
                 ->selectRaw('u.username as customer_name, COUNT(i.invoice_id) as total_invoices,
                            SUM(i.amount) as total_revenue, AVG(i.amount) as avg_order_value')
                 ->where('i.status', 'paid')
+                ->where('o.organization_id', $orgUserId)
                 ->whereBetween('i.invoice_date', [$dateFrom, $dateTo])
                 ->whereNotNull('u.username')
                 ->groupBy('u.user_id', 'u.username')
@@ -220,8 +264,9 @@ class AnalyticsController extends Controller
 
             // Customer activity trends
             $customerTrends = DB::table('orders as o')
-                ->leftJoin('users as u', 'o.user_id', '=', 'u.user_id')
+                ->leftJoin('users as u', 'o.organization_id', '=', 'u.user_id')
                 ->selectRaw("DATE_FORMAT(o.order_date, '%Y-%m') as month, COUNT(DISTINCT u.user_id) as unique_customers")
+                ->where('o.organization_id', $orgUserId)
                 ->whereBetween('o.order_date', [$dateFrom, $dateTo])
                 ->groupBy(DB::raw("DATE_FORMAT(o.order_date, '%Y-%m')"))
                 ->orderBy(DB::raw("DATE_FORMAT(o.order_date, '%Y-%m')"))
@@ -248,11 +293,19 @@ class AnalyticsController extends Controller
 
     public function getInventoryAnalytics(Request $request)
     {
+        $userId = request()->header('X-User-Id');
+        if (!$userId) {
+            return response()->json(['message' => 'Unauthorized - User ID required'], 401);
+        }
+
+        $orgUserId = UserHelper::getOrganizationUserId($userId);
+
         try {
             // Warehouse utilization
             $warehouseUtilization = DB::table('warehouse as w')
                 ->leftJoin('inventory as i', 'w.warehouse_id', '=', 'i.warehouse_id')
                 ->selectRaw('w.warehouse_name, w.location, COUNT(i.inventory_id) as item_count')
+                ->where('w.organization_id', $orgUserId)
                 ->groupBy('w.warehouse_id', 'w.warehouse_name', 'w.location')
                 ->orderByDesc('item_count')
                 ->get()
@@ -288,13 +341,24 @@ class AnalyticsController extends Controller
 
             // Storage efficiency metrics
             $storageMetrics = [
-                'total_warehouses' => DB::table('warehouse')->count(),
-                'total_inventory_items' => DB::table('inventory')->count(),
+                'total_warehouses' => DB::table('warehouse')->where('organization_id', $orgUserId)->count(),
+                'total_inventory_items' => DB::table('inventory as i')
+                    ->join('warehouse as w', 'i.warehouse_id', '=', 'w.warehouse_id')
+                    ->where('w.organization_id', $orgUserId)
+                    ->count(),
                 'unassigned_items' => DB::table('order_details as od')
+                    ->join('orders as o', 'od.order_id', '=', 'o.order_id')
                     ->leftJoin('inventory as i', 'od.order_details_id', '=', 'i.order_details_id')
+                    ->where('o.organization_id', $orgUserId)
                     ->whereNull('i.inventory_id')
                     ->count(),
-                'avg_items_per_warehouse' => round(DB::table('inventory')->count() / max(1, DB::table('warehouse')->count()), 1),
+                'avg_items_per_warehouse' => round(
+                    DB::table('inventory as i')
+                        ->join('warehouse as w', 'i.warehouse_id', '=', 'w.warehouse_id')
+                        ->where('w.organization_id', $orgUserId)
+                        ->count() / max(1, DB::table('warehouse')->where('organization_id', $orgUserId)->count()),
+                    1
+                ),
             ];
 
             $data = [
@@ -404,7 +468,7 @@ class AnalyticsController extends Controller
         return [
             'top_customers' => DB::table('invoices as i')
                 ->leftJoin('orders as o', 'i.order_id', '=', 'o.order_id')
-                ->leftJoin('users as u', 'o.user_id', '=', 'u.user_id')
+                ->leftJoin('users as u', 'o.organization_id', '=', 'u.user_id')
                 ->selectRaw('u.username, SUM(i.amount) as total_spent, COUNT(*) as order_count')
                 ->where('i.status', 'paid')
                 ->whereBetween('i.invoice_date', [$dateFrom, $dateTo])

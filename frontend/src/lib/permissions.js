@@ -50,17 +50,17 @@ export const can = {
   // Dashboard - All staff
   viewDashboard: () => hasAnyRole('admin', 'booking_manager', 'warehouse_manager'),
 
-  // Quotes & Orders
-  viewQuotes: () => hasAnyRole('admin', 'booking_manager'), // Booking managers can view quotes for reference
-  manageQuotes: () => isAdmin(), // Only admin can create and approve quotes
-  viewOrders: () => hasAnyRole('admin', 'booking_manager'), // Booking managers can view orders
-  manageOrders: () => isAdmin(), // Only admin can create orders
+  // Quotes & Orders - Booking Manager and Admin only
+  viewQuotes: () => hasAnyRole('admin', 'booking_manager'), // Booking managers and admin can view quotes
+  manageQuotes: () => hasAnyRole('admin', 'booking_manager'), // Booking managers can create and manage quotes
+  viewOrders: () => hasAnyRole('admin', 'booking_manager'), // Booking managers and admin can view orders
+  manageOrders: () => hasAnyRole('admin', 'booking_manager'), // Booking managers can create and manage orders
 
-  // Shipments - All staff
-  viewShipments: () => hasAnyRole('admin', 'booking_manager', 'warehouse_manager'),
-  manageShipments: () => hasAnyRole('admin', 'booking_manager', 'warehouse_manager'),
+  // Shipments - Warehouse Manager and Admin only
+  viewShipments: () => hasAnyRole('admin', 'warehouse_manager'),
+  manageShipments: () => hasAnyRole('admin', 'warehouse_manager'),
 
-  // Invoices - Admin and Booking Manager
+  // Invoices - Booking Manager and Admin only
   viewInvoices: () => hasAnyRole('admin', 'booking_manager'),
   manageInvoices: () => hasAnyRole('admin', 'booking_manager'),
 
@@ -74,8 +74,8 @@ export const can = {
   viewTransportation: () => hasAnyRole('admin', 'booking_manager', 'warehouse_manager'),
   manageTransportation: () => hasAnyRole('admin', 'booking_manager', 'warehouse_manager'),
 
-  // Reports - All staff
-  viewReports: () => hasAnyRole('admin', 'booking_manager', 'warehouse_manager'),
+  // Reports - Admin only
+  viewReports: () => isAdmin(),
 
   // Team Management - Admin only
   viewTeam: () => isAdmin(),

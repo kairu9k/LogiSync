@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Helpers\UserHelper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
@@ -70,26 +71,32 @@ class QuoteController extends Controller
 
     public function index(Request $request)
     {
+        $userId = request()->header('X-User-Id');
+        if (!$userId) {
+            return response()->json(['message' => 'Unauthorized - User ID required'], 401);
+        }
+
+        $orgUserId = UserHelper::getOrganizationUserId($userId);
         $status = $request->query('status');
         $query = DB::table('quotes as q')
-            ->leftJoin('users as u', 'q.user_id', '=', 'u.user_id')
             ->leftJoin('users as creator', 'q.created_by_user_id', '=', 'creator.user_id')
             ->leftJoin('orders as o', 'o.quote_id', '=', 'q.quote_id')
+            ->where('q.organization_id', $orgUserId)
             ->select(
-                'q.quote_id','q.creation_date','q.user_id','q.weight','q.dimensions','q.distance','q.estimated_cost','q.expiry_date','q.status',
+                'q.quote_id','q.quote_number','q.creation_date','q.organization_id','q.weight','q.dimensions','q.distance','q.estimated_cost','q.expiry_date','q.status',
                 'q.customer_name',
-                'u.username',
                 'creator.username as created_by_username',
                 DB::raw('MIN(o.order_id) as order_id')
             )
-            ->groupBy('q.quote_id','q.creation_date','q.user_id','q.weight','q.dimensions','q.distance','q.estimated_cost','q.expiry_date','q.status','q.customer_name','u.username','creator.username')
+            ->groupBy('q.quote_id','q.quote_number','q.creation_date','q.organization_id','q.weight','q.dimensions','q.distance','q.estimated_cost','q.expiry_date','q.status','q.customer_name','creator.username')
             ->orderByDesc('q.creation_date');
         if ($status && $status !== 'any') $query->where('q.status', $status);
         $rows = $query->limit(100)->get();
         $data = $rows->map(function ($r) {
             return [
                 'id' => (int) $r->quote_id,
-                'customer' => $r->customer_name ?? $r->username ?? 'N/A',
+                'quote_number' => $r->quote_number,
+                'customer' => $r->customer_name ?? 'N/A',
                 'created_by' => $r->created_by_username ?? 'System',
                 'weight' => (int) $r->weight,
                 'dimensions' => $r->dimensions,
@@ -134,9 +141,14 @@ class QuoteController extends Controller
 
     public function store(Request $request)
     {
+        $userId = request()->header('X-User-Id');
+        if (!$userId) {
+            return response()->json(['message' => 'Unauthorized - User ID required'], 401);
+        }
+
+        $orgUserId = UserHelper::getOrganizationUserId($userId);
         $data = $request->all();
         $validator = Validator::make($data, [
-            'user_id' => 'nullable|integer',
             'customer' => 'required|string|max:255',
             'destination' => 'nullable|string',
             'weight' => 'required|integer|min:0',
@@ -144,25 +156,25 @@ class QuoteController extends Controller
             'W' => 'required|numeric|min:0',
             'H' => 'required|numeric|min:0',
             'distance' => 'required|integer|min:0',
-            'created_by_user_id' => 'nullable|integer',
         ]);
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 422)
                 ->header('Access-Control-Allow-Origin', '*');
         }
 
-        // Get a default user_id (for backward compatibility)
-        $userId = $data['user_id'] ?? (DB::table('users')->min('user_id') ?? 1);
-
         // Get the creator (logged-in user who created the quote)
-        $createdByUserId = $data['created_by_user_id'] ?? null;
+        $createdByUserId = $userId;
 
         $dims = [ 'L' => (float)$data['L'], 'W' => (float)$data['W'], 'H' => (float)$data['H'] ];
         $cost = $this->calculateCost((int)$data['weight'], $dims, (int)$data['distance'], $data['destination'] ?? 'standard');
         $expiry = Carbon::now()->addDays(14)->toDateString();
 
+        // Generate unique quote number
+        $quoteNumber = UserHelper::generateQuoteNumber();
+
         $id = DB::table('quotes')->insertGetId([
-            'user_id' => $userId,
+            'user_id' => $orgUserId,
+            'quote_number' => $quoteNumber,
             'customer_name' => $data['customer'],
             'created_by_user_id' => $createdByUserId,
             'weight' => (int)$data['weight'],
@@ -176,6 +188,7 @@ class QuoteController extends Controller
         return response()->json([
             'message' => 'Quote created',
             'quote_id' => $id,
+            'quote_number' => $quoteNumber,
             'estimated_cost' => $cost,
             'expiry_date' => $expiry,
         ], 201)->header('Access-Control-Allow-Origin', '*');
@@ -183,6 +196,12 @@ class QuoteController extends Controller
 
     public function updateStatus(Request $request, int $id)
     {
+        $userId = request()->header('X-User-Id');
+        if (!$userId) {
+            return response()->json(['message' => 'Unauthorized - User ID required'], 401);
+        }
+
+        $orgUserId = UserHelper::getOrganizationUserId($userId);
         $data = $request->all();
         $validator = Validator::make($data, [
             'status' => 'required|string|in:pending,approved,rejected,expired',
@@ -191,22 +210,37 @@ class QuoteController extends Controller
             return response()->json(['errors' => $validator->errors()], 422)
                 ->header('Access-Control-Allow-Origin', '*');
         }
-        $exists = DB::table('quotes')->where('quote_id', $id)->exists();
+        $exists = DB::table('quotes')
+            ->where('quote_id', $id)
+            ->where('organization_id', $orgUserId)
+            ->exists();
         if (!$exists) return response()->json(['message' => 'Quote not found'], 404)->header('Access-Control-Allow-Origin','*');
-        DB::table('quotes')->where('quote_id', $id)->update(['status' => $data['status']]);
+        DB::table('quotes')
+            ->where('quote_id', $id)
+            ->where('organization_id', $orgUserId)
+            ->update(['status' => $data['status']]);
         return response()->json(['message' => 'Quote status updated'])->header('Access-Control-Allow-Origin','*');
     }
 
     public function convertToOrder(int $id)
     {
-        $q = DB::table('quotes')->where('quote_id', $id)->first();
+        $userId = request()->header('X-User-Id');
+        if (!$userId) {
+            return response()->json(['message' => 'Unauthorized - User ID required'], 401);
+        }
+
+        $orgUserId = UserHelper::getOrganizationUserId($userId);
+        $q = DB::table('quotes')
+            ->where('quote_id', $id)
+            ->where('organization_id', $orgUserId)
+            ->first();
         if (!$q) return response()->json(['message' => 'Quote not found'], 404)->header('Access-Control-Allow-Origin','*');
         // If expired, block conversion
         if ($q->expiry_date && Carbon::parse($q->expiry_date)->isPast()) {
             return response()->json(['message' => 'Quote expired'], 400)->header('Access-Control-Allow-Origin','*');
         }
-        // Ensure there is a user
-        $userId = $q->user_id ?? (DB::table('users')->min('user_id') ?? 1);
+        // Use the authenticated user_id
+        $userId = $q->user_id;
         $orderPayload = [
             'user_id' => $userId,
             'order_status' => 'pending',

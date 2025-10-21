@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Helpers\UserHelper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -11,6 +12,12 @@ class OrderController extends Controller
 {
     public function index(Request $request)
     {
+        $userId = request()->header('X-User-Id');
+        if (!$userId) {
+            return response()->json(['message' => 'Unauthorized - User ID required'], 401);
+        }
+
+        $orgUserId = UserHelper::getOrganizationUserId($userId);
         // Basic listing with optional status filter and search by PO (order_id) or username
         $status = $request->query('status');
         $search = $request->query('q');
@@ -18,19 +25,19 @@ class OrderController extends Controller
         $limit = max(1, min($limit, 100));
 
         $query = DB::table('orders as o')
-            ->leftJoin('users as u', 'o.user_id', '=', 'u.user_id')
             ->leftJoin('order_details as od', 'o.order_id', '=', 'od.order_id')
             ->leftJoin('shipments as s', 'o.order_id', '=', 's.order_id')
+            ->where('o.organization_id', $orgUserId)
             ->select(
                 'o.order_id',
+                'o.order_number',
                 'o.order_status',
                 'o.order_date',
                 'o.customer_name',
-                'u.username',
                 DB::raw('COUNT(DISTINCT od.order_details_id) as items'),
                 DB::raw('COUNT(DISTINCT s.shipment_id) as shipment_count')
             )
-            ->groupBy('o.order_id', 'o.order_status', 'o.order_date', 'o.customer_name', 'u.username')
+            ->groupBy('o.order_id', 'o.order_number', 'o.order_status', 'o.order_date', 'o.customer_name')
             ->orderByDesc('o.order_date');
 
         if ($status && $status !== 'any') {
@@ -40,7 +47,7 @@ class OrderController extends Controller
         if ($search) {
             $query->where(function ($q) use ($search) {
                 $numeric = (int) preg_replace('/[^0-9]/', '', $search);
-                $q->where('u.username', 'like', "%$search%")
+                $q->where('o.customer_name', 'like', "%$search%")
                   ->orWhere('o.order_id', $numeric);
             });
         }
@@ -48,13 +55,11 @@ class OrderController extends Controller
         $rows = $query->limit($limit)->get();
 
         $data = $rows->map(function ($row) {
-            // Use customer_name if available, fallback to username
-            $customerDisplay = $row->customer_name ?? $row->username ?? 'N/A';
-
             return [
                 'id' => (int) $row->order_id,
-                'po' => 'PO-' . str_pad((string) $row->order_id, 5, '0', STR_PAD_LEFT),
-                'customer' => $customerDisplay,
+                'order_number' => $row->order_number,
+                'po' => $row->order_number ?? ('PO-' . str_pad((string) $row->order_id, 5, '0', STR_PAD_LEFT)),
+                'customer' => $row->customer_name ?? 'N/A',
                 'items' => (int) $row->items,
                 'status' => $row->order_status,
                 'order_date' => $row->order_date,
@@ -69,22 +74,28 @@ class OrderController extends Controller
 
     public function show(int $id)
     {
+        $userId = request()->header('X-User-Id');
+        if (!$userId) {
+            return response()->json(['message' => 'Unauthorized - User ID required'], 401);
+        }
+
+        $orgUserId = UserHelper::getOrganizationUserId($userId);
         $row = DB::table('orders as o')
-            ->leftJoin('users as u', 'o.user_id', '=', 'u.user_id')
             ->leftJoin('quotes as q', 'o.quote_id', '=', 'q.quote_id')
             ->select(
                 'o.order_id',
+                'o.order_number',
                 'o.order_status',
                 'o.order_date',
                 'o.customer_name',
                 'o.quote_id',
-                'u.username',
                 'q.weight',
                 'q.dimensions',
                 'q.distance',
                 'q.estimated_cost'
             )
             ->where('o.order_id', $id)
+            ->where('o.organization_id', $orgUserId)
             ->first();
 
         if (!$row) {
@@ -92,13 +103,11 @@ class OrderController extends Controller
                 ->header('Access-Control-Allow-Origin', '*');
         }
 
-        // Use customer_name if available, fallback to username
-        $customerDisplay = $row->customer_name ?? $row->username ?? 'N/A';
-
         $data = [
             'id' => (int) $row->order_id,
-            'po' => 'PO-' . str_pad((string) $row->order_id, 5, '0', STR_PAD_LEFT),
-            'customer' => $customerDisplay,
+            'order_number' => $row->order_number,
+            'po' => $row->order_number ?? ('PO-' . str_pad((string) $row->order_id, 5, '0', STR_PAD_LEFT)),
+            'customer' => $row->customer_name ?? 'N/A',
             'status' => $row->order_status,
             'order_date' => $row->order_date,
             'quote_id' => $row->quote_id,
@@ -114,10 +123,15 @@ class OrderController extends Controller
 
     public function store(Request $request)
     {
+        $userId = request()->header('X-User-Id');
+        if (!$userId) {
+            return response()->json(['message' => 'Unauthorized - User ID required'], 401);
+        }
+
+        $orgUserId = UserHelper::getOrganizationUserId($userId);
         $data = $request->all();
         $validator = Validator::make($data, [
             'customer' => 'nullable|string|max:255',
-            'user_id' => 'nullable|integer',
             'status' => 'nullable|string|in:pending,processing,fulfilled,canceled',
             'items' => 'sometimes|array',
             'items.*.product_id' => 'required_with:items|integer',
@@ -128,25 +142,21 @@ class OrderController extends Controller
                 ->header('Access-Control-Allow-Origin', '*');
         }
 
-        // Resolve or create a user
-        $userId = $data['user_id'] ?? (DB::table('users')->min('user_id') ?? null);
-        if (!$userId) {
-            $userId = DB::table('users')->insertGetId([
-                'username' => $data['customer'] ?? 'demo',
-                'password' => bcrypt('password'),
-                'role' => 'admin',
-                'email' => ($data['customer'] ?? 'demo') . '@example.com',
-            ], 'user_id');
-        }
-
         $status = $data['status'] ?? 'pending';
 
+        // Generate unique order number
+        $orderNumber = UserHelper::generateOrderNumber();
+
         $payload = [
-            'user_id' => $userId,
+            'organization_id' => $orgUserId,
+            'order_number' => $orderNumber,
             'order_status' => $status,
         ];
         if (!empty($data['quote_id'])) {
             $payload['quote_id'] = (int)$data['quote_id'];
+        }
+        if (!empty($data['customer'])) {
+            $payload['customer_name'] = $data['customer'];
         }
         $id = DB::table('orders')->insertGetId($payload, 'order_id');
 
@@ -169,11 +179,18 @@ class OrderController extends Controller
         return response()->json([
             'message' => 'Order created',
             'order_id' => $id,
+            'order_number' => $orderNumber,
         ], 201)->header('Access-Control-Allow-Origin', '*');
     }
 
     public function updateStatus(Request $request, int $id)
     {
+        $userId = request()->header('X-User-Id');
+        if (!$userId) {
+            return response()->json(['message' => 'Unauthorized - User ID required'], 401);
+        }
+
+        $orgUserId = UserHelper::getOrganizationUserId($userId);
         $data = $request->all();
         $validator = Validator::make($data, [
             'status' => 'required|string|in:pending,processing,fulfilled,canceled',
@@ -183,15 +200,21 @@ class OrderController extends Controller
                 ->header('Access-Control-Allow-Origin', '*');
         }
 
-        $exists = DB::table('orders')->where('order_id', $id)->exists();
+        $exists = DB::table('orders')
+            ->where('order_id', $id)
+            ->where('organization_id', $orgUserId)
+            ->exists();
         if (!$exists) {
             return response()->json(['message' => 'Order not found'], 404)
                 ->header('Access-Control-Allow-Origin', '*');
         }
 
-        DB::table('orders')->where('order_id', $id)->update([
-            'order_status' => $data['status'],
-        ]);
+        DB::table('orders')
+            ->where('order_id', $id)
+            ->where('organization_id', $orgUserId)
+            ->update([
+                'order_status' => $data['status'],
+            ]);
 
         return response()->json(['message' => 'Status updated'])
             ->header('Access-Control-Allow-Origin', '*');
@@ -199,6 +222,12 @@ class OrderController extends Controller
 
     public function update(Request $request, int $id)
     {
+        $userId = request()->header('X-User-Id');
+        if (!$userId) {
+            return response()->json(['message' => 'Unauthorized - User ID required'], 401);
+        }
+
+        $orgUserId = UserHelper::getOrganizationUserId($userId);
         // Currently supports updating status (same validation as updateStatus)
         $data = $request->all();
         $validator = Validator::make($data, [
@@ -209,7 +238,10 @@ class OrderController extends Controller
                 ->header('Access-Control-Allow-Origin', '*');
         }
 
-        $exists = DB::table('orders')->where('order_id', $id)->exists();
+        $exists = DB::table('orders')
+            ->where('order_id', $id)
+            ->where('organization_id', $orgUserId)
+            ->exists();
         if (!$exists) {
             return response()->json(['message' => 'Order not found'], 404)
                 ->header('Access-Control-Allow-Origin', '*');
@@ -224,7 +256,10 @@ class OrderController extends Controller
                 ->header('Access-Control-Allow-Origin', '*');
         }
 
-        DB::table('orders')->where('order_id', $id)->update($updates);
+        DB::table('orders')
+            ->where('order_id', $id)
+            ->where('organization_id', $orgUserId)
+            ->update($updates);
 
         return response()->json(['message' => 'Order updated'])
             ->header('Access-Control-Allow-Origin', '*');
@@ -232,10 +267,19 @@ class OrderController extends Controller
 
     public function addItems(Request $request, int $id)
     {
+        $userId = request()->header('X-User-Id');
+        if (!$userId) {
+            return response()->json(['message' => 'Unauthorized - User ID required'], 401);
+        }
+
+        $orgUserId = UserHelper::getOrganizationUserId($userId);
         // Accept either items[] or a single product_id + quantity
         $data = $request->all();
 
-        $exists = DB::table('orders')->where('order_id', $id)->exists();
+        $exists = DB::table('orders')
+            ->where('order_id', $id)
+            ->where('organization_id', $orgUserId)
+            ->exists();
         if (!$exists) {
             return response()->json(['message' => 'Order not found'], 404)
                 ->header('Access-Control-Allow-Origin', '*');
@@ -285,9 +329,20 @@ class OrderController extends Controller
 
     public function updateItem(Request $request, int $id, int $itemId)
     {
-        // Ensure item belongs to order
-        $item = DB::table('order_details')->where('order_details_id', $itemId)->first();
-        if (!$item || (int)$item->order_id !== (int)$id) {
+        $userId = request()->header('X-User-Id');
+        if (!$userId) {
+            return response()->json(['message' => 'Unauthorized - User ID required'], 401);
+        }
+
+        $orgUserId = UserHelper::getOrganizationUserId($userId);
+        // Ensure item belongs to order and user owns the order
+        $item = DB::table('order_details as od')
+            ->join('orders as o', 'od.order_id', '=', 'o.order_id')
+            ->where('od.order_details_id', $itemId)
+            ->where('od.order_id', $id)
+            ->where('o.organization_id', $orgUserId)
+            ->first();
+        if (!$item) {
             return response()->json(['message' => 'Order item not found'], 404)
                 ->header('Access-Control-Allow-Origin', '*');
         }
@@ -318,9 +373,20 @@ class OrderController extends Controller
 
     public function deleteItem(int $id, int $itemId)
     {
-        // Ensure item belongs to order
-        $item = DB::table('order_details')->where('order_details_id', $itemId)->first();
-        if (!$item || (int)$item->order_id !== (int)$id) {
+        $userId = request()->header('X-User-Id');
+        if (!$userId) {
+            return response()->json(['message' => 'Unauthorized - User ID required'], 401);
+        }
+
+        $orgUserId = UserHelper::getOrganizationUserId($userId);
+        // Ensure item belongs to order and user owns the order
+        $item = DB::table('order_details as od')
+            ->join('orders as o', 'od.order_id', '=', 'o.order_id')
+            ->where('od.order_details_id', $itemId)
+            ->where('od.order_id', $id)
+            ->where('o.organization_id', $orgUserId)
+            ->first();
+        if (!$item) {
             return response()->json(['message' => 'Order item not found'], 404)
                 ->header('Access-Control-Allow-Origin', '*');
         }

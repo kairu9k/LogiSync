@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Helpers\UserHelper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -11,10 +12,17 @@ class TransportController extends Controller
 {
     public function index(Request $request)
     {
+        $userId = request()->header('X-User-Id');
+        if (!$userId) {
+            return response()->json(['message' => 'Unauthorized - User ID required'], 401);
+        }
+
+        $orgUserId = UserHelper::getOrganizationUserId($userId);
         $query = DB::table('transport as t')
             ->join('users as d', 't.driver_id', '=', 'd.user_id')
             ->leftJoin('budgets as b', 't.budget_id', '=', 'b.budget_id')
             ->leftJoin('schedules as s', 't.schedule_id', '=', 's.schedule_id')
+            ->where('t.organization_id', $orgUserId)
             ->select(
                 't.transport_id',
                 't.vehicle_id',
@@ -80,11 +88,18 @@ class TransportController extends Controller
 
     public function show($id)
     {
+        $userId = request()->header('X-User-Id');
+        if (!$userId) {
+            return response()->json(['message' => 'Unauthorized - User ID required'], 401);
+        }
+
+        $orgUserId = UserHelper::getOrganizationUserId($userId);
         $transport = DB::table('transport as t')
             ->join('users as d', 't.driver_id', '=', 'd.user_id')
             ->leftJoin('budgets as b', 't.budget_id', '=', 'b.budget_id')
             ->leftJoin('schedules as s', 't.schedule_id', '=', 's.schedule_id')
             ->where('t.transport_id', $id)
+            ->where('t.organization_id', $orgUserId)
             ->select(
                 't.transport_id',
                 't.vehicle_id',
@@ -124,6 +139,12 @@ class TransportController extends Controller
 
     public function store(Request $request)
     {
+        $userId = request()->header('X-User-Id');
+        if (!$userId) {
+            return response()->json(['message' => 'Unauthorized - User ID required'], 401);
+        }
+
+        $orgUserId = UserHelper::getOrganizationUserId($userId);
         $validator = Validator::make($request->all(), [
             'vehicle_id' => 'required|string|max:255',
             'vehicle_type' => 'required|string|max:255',
@@ -152,6 +173,7 @@ class TransportController extends Controller
             'driver_id' => $request->driver_id,
             'budget_id' => $request->budget_id,
             'schedule_id' => $request->schedule_id,
+            'organization_id' => $orgUserId,
         ]);
 
         return response()->json([
@@ -162,6 +184,12 @@ class TransportController extends Controller
 
     public function update(Request $request, $id)
     {
+        $userId = request()->header('X-User-Id');
+        if (!$userId) {
+            return response()->json(['message' => 'Unauthorized - User ID required'], 401);
+        }
+
+        $orgUserId = UserHelper::getOrganizationUserId($userId);
         $validator = Validator::make($request->all(), [
             'vehicle_id' => 'required|string|max:255',
             'vehicle_type' => 'required|string|max:255',
@@ -181,7 +209,10 @@ class TransportController extends Controller
         // Convert boolean to text
         $safetyCompliance = $request->safety_compliance ? 'Verified' : null;
 
-        $updated = DB::table('transport')->where('transport_id', $id)->update([
+        $updated = DB::table('transport')
+            ->where('transport_id', $id)
+            ->where('organization_id', $orgUserId)
+            ->update([
             'vehicle_id' => $request->vehicle_id,
             'vehicle_type' => $request->vehicle_type,
             'registration_number' => $request->registration_number,
@@ -203,7 +234,16 @@ class TransportController extends Controller
 
     public function destroy($id)
     {
-        $deleted = DB::table('transport')->where('transport_id', $id)->delete();
+        $userId = request()->header('X-User-Id');
+        if (!$userId) {
+            return response()->json(['message' => 'Unauthorized - User ID required'], 401);
+        }
+
+        $orgUserId = UserHelper::getOrganizationUserId($userId);
+        $deleted = DB::table('transport')
+            ->where('transport_id', $id)
+            ->where('organization_id', $orgUserId)
+            ->delete();
 
         if (!$deleted) {
             return response()->json(['message' => 'Transport not found'], 404)
@@ -217,8 +257,15 @@ class TransportController extends Controller
     // Helper endpoints for dropdowns
     public function getDrivers()
     {
+        $userId = request()->header('X-User-Id');
+        if (!$userId) {
+            return response()->json(['message' => 'Unauthorized - User ID required'], 401);
+        }
+
+        $orgUserId = UserHelper::getOrganizationUserId($userId);
         $drivers = DB::table('users')
             ->where('role', 'driver')
+            ->where('created_by', $orgUserId)
             ->select('user_id as id', 'username', 'email')
             ->get();
 
@@ -228,7 +275,14 @@ class TransportController extends Controller
 
     public function getBudgets()
     {
+        $userId = request()->header('X-User-Id');
+        if (!$userId) {
+            return response()->json(['message' => 'Unauthorized - User ID required'], 401);
+        }
+
+        $orgUserId = UserHelper::getOrganizationUserId($userId);
         $budgets = DB::table('budgets')
+            ->where('organization_id', $orgUserId)
             ->select('budget_id as id', 'budget_name', 'total_budget')
             ->get();
 
@@ -238,7 +292,14 @@ class TransportController extends Controller
 
     public function getSchedules()
     {
+        $userId = request()->header('X-User-Id');
+        if (!$userId) {
+            return response()->json(['message' => 'Unauthorized - User ID required'], 401);
+        }
+
+        $orgUserId = UserHelper::getOrganizationUserId($userId);
         $schedules = DB::table('schedules')
+            ->where('organization_id', $orgUserId)
             ->select('schedule_id as id', 'schedule_name', 'start_time', 'end_time')
             ->get();
 

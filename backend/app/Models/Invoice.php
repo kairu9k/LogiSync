@@ -15,6 +15,7 @@ class Invoice extends Model
 
     protected $fillable = [
         'order_id',
+        'invoice_number',
         'shipment_id',
         'quote_id',
         'invoice_type',
@@ -71,9 +72,10 @@ class Invoice extends Model
         return '₱' . number_format($this->amount / 100.0, 2);
     }
 
-    public function getInvoiceNumberAttribute(): string
+    public function getInvoiceNumberAttribute($value): string
     {
-        return 'INV-' . str_pad((string) $this->invoice_id, 6, '0', STR_PAD_LEFT);
+        // Return database value if available, otherwise generate from ID for backwards compatibility
+        return $value ?? ('INV-' . str_pad((string) $this->invoice_id, 6, '0', STR_PAD_LEFT));
     }
 
     public function getDaysOverdueAttribute(): int
@@ -148,8 +150,12 @@ class Invoice extends Model
             ]);
         }
 
+        // Generate unique invoice number
+        $invoiceNumber = \App\Helpers\UserHelper::generateInvoiceNumber();
+
         $invoiceData = array_merge([
             'order_id' => $shipment->order_id,
+            'invoice_number' => $invoiceNumber,
             'shipment_id' => $shipment->shipment_id,
             'quote_id' => $shipment->order->quote_id ?? null,
             'invoice_type' => self::TYPE_SHIPMENT,

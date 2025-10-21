@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Helpers\UserHelper;
 use App\Models\Invoice;
 use App\Models\Shipment;
 use Illuminate\Http\Request;
@@ -14,6 +15,12 @@ class InvoiceController extends Controller
 {
     public function index(Request $request)
     {
+        $userId = request()->header('X-User-Id');
+        if (!$userId) {
+            return response()->json(['message' => 'Unauthorized - User ID required'], 401);
+        }
+
+        $orgUserId = UserHelper::getOrganizationUserId($userId);
         $status = $request->query('status');
         $search = $request->query('q');
         $limit = (int) ($request->query('limit', 20));
@@ -21,10 +28,11 @@ class InvoiceController extends Controller
 
         $query = DB::table('invoices as i')
             ->leftJoin('orders as o', 'i.order_id', '=', 'o.order_id')
-            ->leftJoin('users as u', 'o.user_id', '=', 'u.user_id')
             ->leftJoin('shipments as s', 'i.shipment_id', '=', 's.shipment_id')
+            ->where('o.organization_id', $orgUserId)
             ->select(
                 'i.invoice_id',
+                'i.invoice_number',
                 'i.invoice_type',
                 'i.invoice_date',
                 'i.due_date',
@@ -32,8 +40,7 @@ class InvoiceController extends Controller
                 'i.status',
                 'i.payment_date',
                 'i.payment_method',
-                'u.username as customer',
-                'u.email as customer_email',
+                'o.customer_name',
                 's.tracking_number'
             )
             ->orderByDesc('i.invoice_date');
@@ -45,7 +52,7 @@ class InvoiceController extends Controller
         if ($search) {
             $query->where(function ($q) use ($search) {
                 $numeric = (int) preg_replace('/[^0-9]/', '', $search);
-                $q->where('u.username', 'like', "%$search%")
+                $q->where('o.customer_name', 'like', "%$search%")
                   ->orWhere('i.invoice_id', $numeric)
                   ->orWhere('s.tracking_number', 'like', "%$search%");
             });
@@ -56,9 +63,8 @@ class InvoiceController extends Controller
         $data = $rows->map(function ($row) {
             return [
                 'id' => (int) $row->invoice_id,
-                'invoice_number' => 'INV-' . str_pad((string) $row->invoice_id, 6, '0', STR_PAD_LEFT),
-                'customer' => $row->customer ?? 'N/A',
-                'customer_email' => $row->customer_email,
+                'invoice_number' => $row->invoice_number ?? ('INV-' . str_pad((string) $row->invoice_id, 6, '0', STR_PAD_LEFT)),
+                'customer' => $row->customer_name ?? 'N/A',
                 'amount' => (int) $row->amount,
                 'formatted_amount' => '₱' . number_format($row->amount / 100.0, 2),
                 'status' => $row->status,
@@ -88,21 +94,26 @@ class InvoiceController extends Controller
 
     public function show(int $id)
     {
+        $userId = request()->header('X-User-Id');
+        if (!$userId) {
+            return response()->json(['message' => 'Unauthorized - User ID required'], 401);
+        }
+
+        $orgUserId = UserHelper::getOrganizationUserId($userId);
         $invoice = DB::table('invoices as i')
             ->leftJoin('orders as o', 'i.order_id', '=', 'o.order_id')
-            ->leftJoin('users as u', 'o.user_id', '=', 'u.user_id')
             ->leftJoin('shipments as s', 'i.shipment_id', '=', 's.shipment_id')
             ->leftJoin('quotes as q', 'i.quote_id', '=', 'q.quote_id')
+            ->where('i.invoice_id', $id)
+            ->where('o.organization_id', $orgUserId)
             ->select(
                 'i.*',
-                'u.username as customer',
-                'u.email as customer_email',
+                'o.customer_name',
                 's.tracking_number',
                 's.receiver_name',
                 's.receiver_address',
                 'q.total_amount as quote_amount'
             )
-            ->where('i.invoice_id', $id)
             ->first();
 
         if (!$invoice) {
@@ -120,7 +131,7 @@ class InvoiceController extends Controller
 
         $data = [
             'id' => (int) $invoice->invoice_id,
-            'invoice_number' => 'INV-' . str_pad((string) $invoice->invoice_id, 6, '0', STR_PAD_LEFT),
+            'invoice_number' => $invoice->invoice_number ?? ('INV-' . str_pad((string) $invoice->invoice_id, 6, '0', STR_PAD_LEFT)),
             'invoice_type' => $invoice->invoice_type,
             'invoice_date' => $invoice->invoice_date,
             'due_date' => $invoice->due_date,
@@ -130,8 +141,7 @@ class InvoiceController extends Controller
             'payment_date' => $invoice->payment_date,
             'payment_method' => $invoice->payment_method,
             'notes' => $invoice->notes,
-            'customer' => $invoice->customer ?? 'N/A',
-            'customer_email' => $invoice->customer_email,
+            'customer' => $invoice->customer_name ?? 'N/A',
             'tracking_number' => $invoice->tracking_number,
             'receiver_name' => $invoice->receiver_name,
             'receiver_address' => $invoice->receiver_address,
@@ -148,6 +158,12 @@ class InvoiceController extends Controller
 
     public function store(Request $request)
     {
+        $userId = request()->header('X-User-Id');
+        if (!$userId) {
+            return response()->json(['message' => 'Unauthorized - User ID required'], 401);
+        }
+
+        $orgUserId = UserHelper::getOrganizationUserId($userId);
         $data = $request->all();
         $validator = Validator::make($data, [
             'order_id' => 'required|integer|exists:orders,order_id',
@@ -164,8 +180,22 @@ class InvoiceController extends Controller
                 ->header('Access-Control-Allow-Origin', '*');
         }
 
+        // Verify order belongs to user
+        $orderExists = DB::table('orders')
+            ->where('order_id', $data['order_id'])
+            ->where('organization_id', $orgUserId)
+            ->exists();
+        if (!$orderExists) {
+            return response()->json(['message' => 'Order not found'], 404)
+                ->header('Access-Control-Allow-Origin', '*');
+        }
+
+        // Generate unique invoice number
+        $invoiceNumber = UserHelper::generateInvoiceNumber();
+
         $invoiceData = [
             'order_id' => $data['order_id'],
+            'invoice_number' => $invoiceNumber,
             'shipment_id' => $data['shipment_id'] ?? null,
             'quote_id' => $data['quote_id'] ?? null,
             'invoice_type' => $data['invoice_type'] ?? 'standard',
@@ -187,6 +217,12 @@ class InvoiceController extends Controller
 
     public function updateStatus(Request $request, int $id)
     {
+        $userId = request()->header('X-User-Id');
+        if (!$userId) {
+            return response()->json(['message' => 'Unauthorized - User ID required'], 401);
+        }
+
+        $orgUserId = UserHelper::getOrganizationUserId($userId);
         $data = $request->all();
         $validator = Validator::make($data, [
             'status' => 'required|string|in:pending,paid,overdue,cancelled',
@@ -200,7 +236,10 @@ class InvoiceController extends Controller
                 ->header('Access-Control-Allow-Origin', '*');
         }
 
-        $invoice = Invoice::find($id);
+        // Verify invoice belongs to user via order
+        $invoice = Invoice::whereHas('order', function($q) use ($orgUserId) {
+            $q->where('organization_id', $orgUserId);
+        })->find($id);
         if (!$invoice) {
             return response()->json(['message' => 'Invoice not found'], 404)
                 ->header('Access-Control-Allow-Origin', '*');
@@ -227,6 +266,12 @@ class InvoiceController extends Controller
 
     public function markAsPaid(Request $request, int $id)
     {
+        $userId = request()->header('X-User-Id');
+        if (!$userId) {
+            return response()->json(['message' => 'Unauthorized - User ID required'], 401);
+        }
+
+        $orgUserId = UserHelper::getOrganizationUserId($userId);
         $data = $request->all();
         $validator = Validator::make($data, [
             'payment_method' => 'required|string|max:50',
@@ -239,7 +284,10 @@ class InvoiceController extends Controller
                 ->header('Access-Control-Allow-Origin', '*');
         }
 
-        $invoice = Invoice::find($id);
+        // Verify invoice belongs to user via order
+        $invoice = Invoice::whereHas('order', function($q) use ($orgUserId) {
+            $q->where('organization_id', $orgUserId);
+        })->find($id);
         if (!$invoice) {
             return response()->json(['message' => 'Invoice not found'], 404)
                 ->header('Access-Control-Allow-Origin', '*');
@@ -261,7 +309,16 @@ class InvoiceController extends Controller
 
     public function createFromShipment(Request $request, int $shipmentId)
     {
-        $shipment = Shipment::with('order')->find($shipmentId);
+        $userId = request()->header('X-User-Id');
+        if (!$userId) {
+            return response()->json(['message' => 'Unauthorized - User ID required'], 401);
+        }
+
+        $orgUserId = UserHelper::getOrganizationUserId($userId);
+        // Verify shipment belongs to user via order
+        $shipment = Shipment::with('order')->whereHas('order', function($q) use ($orgUserId) {
+            $q->where('organization_id', $orgUserId);
+        })->find($shipmentId);
         if (!$shipment) {
             return response()->json(['message' => 'Shipment not found'], 404)
                 ->header('Access-Control-Allow-Origin', '*');

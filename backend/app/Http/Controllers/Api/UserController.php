@@ -12,11 +12,18 @@ class UserController extends Controller
 {
     public function index(Request $request)
     {
+        $userId = request()->header('X-User-Id');
+        if (!$userId) {
+            return response()->json(['message' => 'Unauthorized - User ID required'], 401);
+        }
+
         $role = $request->query('role');
         $search = $request->query('q');
 
+        // Show only team members created by this admin
         $query = DB::table('users')
-            ->select('user_id', 'username', 'email', 'role')
+            ->select('user_id', 'username', 'email', 'role', 'created_by')
+            ->where('created_by', $userId)
             ->orderBy('user_id', 'desc');
 
         if ($role && $role !== 'all') {
@@ -48,9 +55,15 @@ class UserController extends Controller
 
     public function show(int $id)
     {
+        $userId = request()->header('X-User-Id');
+        if (!$userId) {
+            return response()->json(['message' => 'Unauthorized - User ID required'], 401);
+        }
+
         $user = DB::table('users')
             ->select('user_id', 'username', 'email', 'role')
             ->where('user_id', $id)
+            ->where('created_by', $userId)
             ->first();
 
         if (!$user) {
@@ -72,6 +85,11 @@ class UserController extends Controller
 
     public function store(Request $request)
     {
+        $createdBy = request()->header('X-User-Id');
+        if (!$createdBy) {
+            return response()->json(['message' => 'Unauthorized - User ID required'], 401);
+        }
+
         $data = $request->all();
         $validator = Validator::make($data, [
             'username' => 'required|string|max:255|unique:users,username',
@@ -91,6 +109,7 @@ class UserController extends Controller
             'password' => Hash::make($data['password']),
             'role' => $data['role'],
             'email_verified' => true, // Admin-created accounts are automatically verified
+            'created_by' => $createdBy, // Track who created this team member
         ], 'user_id');
 
         return response()->json([
@@ -101,7 +120,15 @@ class UserController extends Controller
 
     public function update(Request $request, int $id)
     {
-        $user = DB::table('users')->where('user_id', $id)->first();
+        $userId = request()->header('X-User-Id');
+        if (!$userId) {
+            return response()->json(['message' => 'Unauthorized - User ID required'], 401);
+        }
+
+        $user = DB::table('users')
+            ->where('user_id', $id)
+            ->where('created_by', $userId)
+            ->first();
 
         if (!$user) {
             return response()->json(['message' => 'User not found'], 404)
@@ -145,14 +172,25 @@ class UserController extends Controller
 
     public function destroy(int $id)
     {
-        $user = DB::table('users')->where('user_id', $id)->first();
+        $userId = request()->header('X-User-Id');
+        if (!$userId) {
+            return response()->json(['message' => 'Unauthorized - User ID required'], 401);
+        }
+
+        $user = DB::table('users')
+            ->where('user_id', $id)
+            ->where('created_by', $userId)
+            ->first();
 
         if (!$user) {
             return response()->json(['message' => 'User not found'], 404)
                 ->header('Access-Control-Allow-Origin', '*');
         }
 
-        DB::table('users')->where('user_id', $id)->delete();
+        DB::table('users')
+            ->where('user_id', $id)
+            ->where('created_by', $userId)
+            ->delete();
 
         return response()->json(['message' => 'User deleted successfully'])
             ->header('Access-Control-Allow-Origin', '*');

@@ -136,6 +136,23 @@ export default function Shipments() {
               <div>
                 Status: <span className={getStatusBadgeClass(s.status)}>{s.status}</span>
               </div>
+              {s.status === 'pending' && s.origin_name && (
+                <div style={{
+                  marginTop: 8,
+                  padding: '8px 12px',
+                  backgroundColor: 'var(--surface-100)',
+                  borderRadius: '6px',
+                  borderLeft: '3px solid var(--warn-500)'
+                }}>
+                  <div style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--warn-700)', marginBottom: '4px' }}>
+                    📍 Current Location (Warehouse Origin)
+                  </div>
+                  <div style={{ fontSize: '0.875rem', fontWeight: '500' }}>{s.origin_name}</div>
+                  {s.origin_address && (
+                    <div className="muted" style={{ fontSize: '0.75rem', marginTop: '2px' }}>{s.origin_address}</div>
+                  )}
+                </div>
+              )}
               <div className="muted" style={{ fontSize: '0.875rem' }}>
                 Created: {new Date(s.creation_date).toLocaleDateString()}
                 {s.departure_date && ` • Departure: ${new Date(s.departure_date).toLocaleDateString()}`}
@@ -179,8 +196,15 @@ export default function Shipments() {
 
 function StatusUpdateForm({ shipment, onUpdate, updating }) {
   const [newStatus, setNewStatus] = useState('')
-  const [location, setLocation] = useState('')
+  // Pre-fill location with origin for pending shipments
+  const [location, setLocation] = useState(
+    shipment.status === 'pending' && shipment.origin_name
+      ? shipment.origin_name
+      : ''
+  )
   const [details, setDetails] = useState('')
+  const [showSignatureInput, setShowSignatureInput] = useState(false)
+  const [signatureName, setSignatureName] = useState('')
 
   const handleSubmit = (e) => {
     e.preventDefault()
@@ -190,6 +214,60 @@ function StatusUpdateForm({ shipment, onUpdate, updating }) {
     setNewStatus('')
     setLocation('')
     setDetails('')
+    setShowSignatureInput(false)
+    setSignatureName('')
+  }
+
+  // Get smart suggestions based on selected next status
+  const getSmartSuggestions = (statusValue) => {
+    switch (statusValue) {
+      case 'in_transit':
+        return [
+          { label: '✓ On schedule', value: 'On schedule' },
+          { label: '⏱️ Minor delay', value: 'Minor delay (10-30 mins)' },
+          { label: '🚗 Traffic delay', value: 'Traffic delay' },
+          { label: '🌧️ Weather delay', value: 'Weather delay' }
+        ]
+      case 'out_for_delivery':
+        return [
+          { label: '📍 First attempt', value: 'First delivery attempt' },
+          { label: '📞 Customer called ahead', value: 'Customer notified, delivering now' },
+          { label: '🚚 Delivering now', value: 'Out for delivery' }
+        ]
+      case 'delivered':
+        return [
+          { label: '🚪 Left at door', value: 'Left at door' },
+          { label: '🤝 Handed to customer', value: 'Handed to customer' },
+          { label: '🏢 Left with security', value: 'Left with security/reception' },
+          { label: '✍️ Signed by...', value: 'signature', special: true }
+        ]
+      case 'cancelled':
+        return [
+          { label: '👤 Customer request', value: 'Cancelled by customer request' },
+          { label: '📍 Address invalid', value: 'Invalid or incomplete address' },
+          { label: '💳 Payment issue', value: 'Payment issue' },
+          { label: '📦 Item unavailable', value: 'Item unavailable' }
+        ]
+      default:
+        return []
+    }
+  }
+
+  const handleSuggestionClick = (suggestion) => {
+    if (suggestion.special && suggestion.value === 'signature') {
+      setShowSignatureInput(true)
+      setDetails('')
+    } else {
+      setDetails(suggestion.value)
+      setShowSignatureInput(false)
+    }
+  }
+
+  const handleSignatureSubmit = () => {
+    if (signatureName.trim()) {
+      setDetails(`Signed by: ${signatureName.trim()}`)
+      setShowSignatureInput(false)
+    }
   }
 
   // Define logical status progressions
@@ -230,6 +308,7 @@ function StatusUpdateForm({ shipment, onUpdate, updating }) {
   }
 
   const availableStatuses = getAvailableStatuses(shipment.status)
+  const smartSuggestions = newStatus ? getSmartSuggestions(newStatus) : []
 
   return (
     <form onSubmit={handleSubmit} style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--gray-200)' }}>
@@ -268,12 +347,79 @@ function StatusUpdateForm({ shipment, onUpdate, updating }) {
             required
           />
         </div>
+
+        {/* Smart Suggestions */}
+        {smartSuggestions.length > 0 && (
+          <div style={{ marginTop: 8 }}>
+            <label className="label" style={{ fontSize: '0.875rem', marginBottom: 6, display: 'block' }}>
+              Quick details:
+            </label>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {smartSuggestions.map((suggestion, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => handleSuggestionClick(suggestion)}
+                  className="btn btn-outline"
+                  style={{
+                    padding: '6px 12px',
+                    fontSize: '0.813rem',
+                    backgroundColor: details === suggestion.value ? 'var(--primary-100)' : 'transparent',
+                    borderColor: details === suggestion.value ? 'var(--primary-500)' : 'var(--border)',
+                    color: details === suggestion.value ? 'var(--primary-700)' : 'inherit'
+                  }}
+                >
+                  {suggestion.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Signature Input */}
+        {showSignatureInput && (
+          <div style={{ marginTop: 8, padding: 12, backgroundColor: 'var(--surface-100)', borderRadius: 8 }}>
+            <label className="label" style={{ fontSize: '0.875rem', marginBottom: 6 }}>
+              Enter recipient name:
+            </label>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input
+                className="input"
+                placeholder="Full name"
+                value={signatureName}
+                onChange={(e) => setSignatureName(e.target.value)}
+                autoFocus
+              />
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={handleSignatureSubmit}
+                disabled={!signatureName.trim()}
+              >
+                Set
+              </button>
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={() => {
+                  setShowSignatureInput(false)
+                  setSignatureName('')
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Manual Details Input */}
         <input
           className="input"
-          placeholder="Additional details (optional)"
+          placeholder="Additional details (optional, or use quick buttons above)"
           value={details}
           onChange={(e) => setDetails(e.target.value)}
         />
+
         <button
           className="btn btn-primary"
           type="submit"

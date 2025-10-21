@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Helpers\UserHelper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -11,7 +12,13 @@ class ScheduleController extends Controller
 {
     public function index(Request $request)
     {
-        $query = DB::table('schedules');
+        $userId = request()->header('X-User-Id');
+        if (!$userId) {
+            return response()->json(['message' => 'Unauthorized - User ID required'], 401);
+        }
+
+        $orgUserId = UserHelper::getOrganizationUserId($userId);
+        $query = DB::table('schedules')->where('organization_id', $orgUserId);
 
         // Search functionality
         if ($search = $request->query('q')) {
@@ -36,8 +43,15 @@ class ScheduleController extends Controller
 
     public function show($id)
     {
+        $userId = request()->header('X-User-Id');
+        if (!$userId) {
+            return response()->json(['message' => 'Unauthorized - User ID required'], 401);
+        }
+
+        $orgUserId = UserHelper::getOrganizationUserId($userId);
         $schedule = DB::table('schedules')
             ->where('schedule_id', $id)
+            ->where('organization_id', $orgUserId)
             ->first();
 
         if (!$schedule) {
@@ -56,6 +70,12 @@ class ScheduleController extends Controller
 
     public function store(Request $request)
     {
+        $userId = request()->header('X-User-Id');
+        if (!$userId) {
+            return response()->json(['message' => 'Unauthorized - User ID required'], 401);
+        }
+
+        $orgUserId = UserHelper::getOrganizationUserId($userId);
         $validator = Validator::make($request->all(), [
             'schedule_name' => 'required|string|max:255',
             'start_time' => 'required|date',
@@ -73,6 +93,7 @@ class ScheduleController extends Controller
             'start_time' => $request->start_time,
             'end_time' => $request->end_time,
             'route_details' => $request->route_details,
+            'user_id' => $orgUserId,
         ]);
 
         return response()->json([
@@ -83,6 +104,12 @@ class ScheduleController extends Controller
 
     public function update(Request $request, $id)
     {
+        $userId = request()->header('X-User-Id');
+        if (!$userId) {
+            return response()->json(['message' => 'Unauthorized - User ID required'], 401);
+        }
+
+        $orgUserId = UserHelper::getOrganizationUserId($userId);
         $validator = Validator::make($request->all(), [
             'schedule_name' => 'required|string|max:255',
             'start_time' => 'required|date',
@@ -95,7 +122,10 @@ class ScheduleController extends Controller
                 ->header('Access-Control-Allow-Origin', '*');
         }
 
-        $updated = DB::table('schedules')->where('schedule_id', $id)->update([
+        $updated = DB::table('schedules')
+            ->where('schedule_id', $id)
+            ->where('organization_id', $orgUserId)
+            ->update([
             'schedule_name' => $request->schedule_name,
             'start_time' => $request->start_time,
             'end_time' => $request->end_time,
@@ -113,8 +143,17 @@ class ScheduleController extends Controller
 
     public function destroy($id)
     {
+        $userId = request()->header('X-User-Id');
+        if (!$userId) {
+            return response()->json(['message' => 'Unauthorized - User ID required'], 401);
+        }
+
+        $orgUserId = UserHelper::getOrganizationUserId($userId);
         // Check if schedule is in use by any vehicles
-        $inUse = DB::table('transport')->where('schedule_id', $id)->exists();
+        $inUse = DB::table('transport')
+            ->where('schedule_id', $id)
+            ->where('organization_id', $orgUserId)
+            ->exists();
 
         if ($inUse) {
             return response()->json([
@@ -122,7 +161,10 @@ class ScheduleController extends Controller
             ], 400)->header('Access-Control-Allow-Origin', '*');
         }
 
-        $deleted = DB::table('schedules')->where('schedule_id', $id)->delete();
+        $deleted = DB::table('schedules')
+            ->where('schedule_id', $id)
+            ->where('organization_id', $orgUserId)
+            ->delete();
 
         if (!$deleted) {
             return response()->json(['message' => 'Schedule not found'], 404)
