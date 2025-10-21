@@ -90,6 +90,12 @@ class UserController extends Controller
             return response()->json(['message' => 'Unauthorized - User ID required'], 401);
         }
 
+        // Get creator's organization
+        $creator = DB::table('users')->where('user_id', $createdBy)->first();
+        if (!$creator || !$creator->organization_id) {
+            return response()->json(['message' => 'Creator organization not found'], 400);
+        }
+
         $data = $request->all();
         $validator = Validator::make($data, [
             'username' => 'required|string|max:255|unique:users,username',
@@ -108,6 +114,7 @@ class UserController extends Controller
             'email' => $data['email'],
             'password' => Hash::make($data['password']),
             'role' => $data['role'],
+            'organization_id' => $creator->organization_id, // Inherit organization from creator
             'email_verified' => true, // Admin-created accounts are automatically verified
             'created_by' => $createdBy, // Track who created this team member
         ], 'user_id');

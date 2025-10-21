@@ -26,7 +26,7 @@ class OrderDetail extends Model
     public static function getUnassignedItems()
     {
         // Get orders that are processing or fulfilled but not yet assigned to warehouse
-        return Order::with('user', 'quote')
+        return Order::with('organization', 'quote')
             ->whereDoesntHave('inventory') // Orders not in inventory yet
             ->whereIn('order_status', ['processing', 'fulfilled'])
             ->get();

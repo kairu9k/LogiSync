@@ -93,7 +93,7 @@ class BudgetController extends Controller
             'start_date' => $request->start_date,
             'end_date' => $request->end_date,
             'total_budget' => $request->total_budget,
-            'user_id' => $orgUserId,
+            'organization_id' => $orgUserId,
         ]);
 
         return response()->json([

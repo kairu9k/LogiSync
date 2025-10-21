@@ -13,7 +13,7 @@ class Quote extends Model
     public $timestamps = false;
 
     protected $fillable = [
-        'user_id',
+        'organization_id',
         'customer_name',
         'customer_email',
         'pickup_location',
@@ -24,6 +24,10 @@ class Quote extends Model
         'estimated_cost',
         'quote_status',
         'quote_date',
+        'quote_number',
+        'created_by_user_id',
+        'expiry_date',
+        'status',
     ];
 
     protected $casts = [
@@ -33,9 +37,9 @@ class Quote extends Model
         'distance' => 'float',
     ];
 
-    public function user(): BelongsTo
+    public function organization(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'user_id', 'user_id');
+        return $this->belongsTo(User::class, 'organization_id', 'user_id');
     }
 
     public function order(): HasOne

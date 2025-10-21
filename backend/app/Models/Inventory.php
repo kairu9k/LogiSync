@@ -56,7 +56,7 @@ class Inventory extends Model
 
     public static function getItemsByStatus(string $status = null): \Illuminate\Database\Eloquent\Collection
     {
-        $query = self::with(['warehouse', 'order.user']);
+        $query = self::with(['warehouse', 'order.organization']);
 
         if ($status) {
             $query->whereHas('order', function ($q) use ($status) {
@@ -75,7 +75,7 @@ class Inventory extends Model
             $orderIdFromPO = (int) $matches[1];
         }
 
-        return self::with(['warehouse', 'order.user'])
+        return self::with(['warehouse', 'order.organization'])
             ->where(function ($query) use ($search, $orderIdFromPO) {
                 $query->where('location_in_warehouse', 'like', "%{$search}%")
                     ->orWhereHas('warehouse', function ($q) use ($search) {
@@ -88,7 +88,7 @@ class Inventory extends Model
                             $q->orWhere('order_id', $orderIdFromPO);
                         }
                     })
-                    ->orWhereHas('order.user', function ($q) use ($search) {
+                    ->orWhereHas('order.organization', function ($q) use ($search) {
                         $q->where('username', 'like', "%{$search}%");
                     });
             })

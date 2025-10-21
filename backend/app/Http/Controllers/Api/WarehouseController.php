@@ -27,7 +27,7 @@ class WarehouseController extends Controller
         $limit = (int) ($request->query('limit', 20));
         $limit = max(1, min($limit, 100));
 
-        $query = Warehouse::with(['inventory.order.user'])->where('organization_id', $orgUserId);
+        $query = Warehouse::with(['inventory.order.organization'])->where('organization_id', $orgUserId);
 
         if ($search) {
             $query->where(function ($q) use ($search) {
@@ -62,7 +62,7 @@ class WarehouseController extends Controller
 
     public function show(int $id)
     {
-        $warehouse = Warehouse::with(['inventory.order.user', 'inventory.order.quote'])->find($id);
+        $warehouse = Warehouse::with(['inventory.order.organization', 'inventory.order.quote'])->find($id);
 
         if (!$warehouse) {
             return response()->json(['message' => 'Warehouse not found'], 404)
@@ -127,7 +127,7 @@ class WarehouseController extends Controller
                 ->header('Access-Control-Allow-Origin', '*');
         }
 
-        $data['user_id'] = $orgUserId;
+        $data['organization_id'] = $orgUserId;
         $warehouse = Warehouse::create($data);
 
         return response()->json([
@@ -188,7 +188,7 @@ class WarehouseController extends Controller
         $limit = (int) ($request->query('limit', 50));
         $limit = max(1, min($limit, 200));
 
-        $query = Inventory::with(['warehouse', 'order.user', 'order.quote']);
+        $query = Inventory::with(['warehouse', 'order.organization', 'order.quote']);
 
         if ($search) {
             $items = Inventory::searchItems($search);
@@ -318,7 +318,7 @@ class WarehouseController extends Controller
         $unassignedCount = OrderDetail::getUnassignedItems()->count();
 
         // Get recent activity
-        $recentAssignments = Inventory::with(['warehouse', 'order.user'])
+        $recentAssignments = Inventory::with(['warehouse', 'order.organization'])
             ->orderBy('inventory_id', 'desc')
             ->limit(5)
             ->get()

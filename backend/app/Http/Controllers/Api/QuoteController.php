@@ -173,7 +173,7 @@ class QuoteController extends Controller
         $quoteNumber = UserHelper::generateQuoteNumber();
 
         $id = DB::table('quotes')->insertGetId([
-            'user_id' => $orgUserId,
+            'organization_id' => $orgUserId,
             'quote_number' => $quoteNumber,
             'customer_name' => $data['customer'],
             'created_by_user_id' => $createdByUserId,
@@ -239,10 +239,10 @@ class QuoteController extends Controller
         if ($q->expiry_date && Carbon::parse($q->expiry_date)->isPast()) {
             return response()->json(['message' => 'Quote expired'], 400)->header('Access-Control-Allow-Origin','*');
         }
-        // Use the authenticated user_id
-        $userId = $q->user_id;
+        // Use the authenticated organization_id
+        $organizationId = $q->organization_id;
         $orderPayload = [
-            'user_id' => $userId,
+            'organization_id' => $organizationId,
             'order_status' => 'pending',
         ];
         // Copy customer name from quote

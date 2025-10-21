@@ -14,18 +14,20 @@ class Order extends Model
     public $timestamps = false;
 
     protected $fillable = [
-        'user_id',
+        'organization_id',
         'order_status',
         'order_date',
+        'customer_name',
+        'quote_id',
     ];
 
     protected $casts = [
         'order_date' => 'date',
     ];
 
-    public function user(): BelongsTo
+    public function organization(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'user_id', 'user_id');
+        return $this->belongsTo(User::class, 'organization_id', 'user_id');
     }
 
     public function shipment(): HasOne

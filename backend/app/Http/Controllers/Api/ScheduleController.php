@@ -93,7 +93,7 @@ class ScheduleController extends Controller
             'start_time' => $request->start_time,
             'end_time' => $request->end_time,
             'route_details' => $request->route_details,
-            'user_id' => $orgUserId,
+            'organization_id' => $orgUserId,
         ]);
 
         return response()->json([
