@@ -171,6 +171,7 @@ class ShipmentController extends Controller
             'transport_id' => 'required|integer|exists:transport,transport_id',
             'receiver_name' => 'required|string|max:255',
             'receiver_contact' => 'required|string|max:50',
+            'receiver_email' => 'nullable|email|max:255',
             'receiver_address' => 'required|string',
             'origin_name' => 'required|string|max:255',
             'origin_address' => 'required|string',
@@ -211,6 +212,7 @@ class ShipmentController extends Controller
             'tracking_number' => $trackingNumber,
             'receiver_name' => $data['receiver_name'],
             'receiver_contact' => $data['receiver_contact'],
+            'receiver_email' => $data['receiver_email'] ?? null,
             'receiver_address' => $data['receiver_address'],
             'origin_name' => $data['origin_name'],
             'origin_address' => $data['origin_address'],
@@ -229,6 +231,31 @@ class ShipmentController extends Controller
             'status' => 'pending',
             'details' => 'Shipment created',
         ]);
+
+        // Send tracking email if receiver email is provided
+        if (!empty($data['receiver_email'])) {
+            try {
+                // Note: charges come from frontend in pesos (e.g., 336), not centavos
+                $chargesInPesos = $data['charges'];
+
+                $emailBody = "Hello {$data['receiver_name']},\n\n";
+                $emailBody .= "Your shipment has been created and is ready for dispatch!\n\n";
+                $emailBody .= "Tracking Number: {$trackingNumber}\n";
+                $emailBody .= "Destination: {$data['destination_name']}\n";
+                $emailBody .= "Estimated Charges: ₱" . number_format($chargesInPesos, 2) . "\n\n";
+                $emailBody .= "You can track your shipment status using the tracking number above.\n\n";
+                $emailBody .= "If you have any questions, please contact us.\n\n";
+                $emailBody .= "Best regards,\nLogiSync Team\nDavao City, Philippines";
+
+                \Mail::raw($emailBody, function ($message) use ($data, $trackingNumber) {
+                    $message->to($data['receiver_email'])
+                        ->subject("LogiSync - Shipment Created - Tracking #{$trackingNumber}");
+                });
+            } catch (\Exception $e) {
+                // Log error but don't fail the shipment creation
+                \Log::error('Failed to send tracking email: ' . $e->getMessage());
+            }
+        }
 
         return response()->json([
             'message' => 'Shipment created successfully',

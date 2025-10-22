@@ -30,11 +30,22 @@ class AuthController extends Controller
         $verificationCode = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
         $expiresAt = Carbon::now()->addMinutes(15);
 
+        // Create organization for the new admin user
+        $organizationId = DB::table('organizations')->insertGetId([
+            'name' => $data['company'] ?? ($data['name'] ?? $data['email']) . "'s Organization",
+            'email' => $data['email'],
+            'phone' => null,
+            'address' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
         $id = DB::table('users')->insertGetId([
             'username' => $data['name'] ?? ($data['email'] ?? ''),
             'password' => Hash::make($data['password']),
             'role' => 'admin',
             'email' => $data['email'],
+            'organization_id' => $organizationId,
             'email_verification_code' => $verificationCode,
             'email_verification_code_expires_at' => $expiresAt,
             'email_verified' => false,

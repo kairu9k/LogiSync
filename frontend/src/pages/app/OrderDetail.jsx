@@ -388,6 +388,7 @@ function CreateShipmentForm({ order, onSubmit, onCancel, creating }) {
     transport_id: '',
     receiver_name: order.customer || '',
     receiver_contact: '',
+    receiver_email: '',
     receiver_address: '', // Will be same as destination_address
     origin_name: '',
     origin_address: '',
@@ -634,6 +635,20 @@ function CreateShipmentForm({ order, onSubmit, onCancel, creating }) {
             />
             <div style={{ fontSize: '0.75rem', color: 'var(--gray-600)', marginTop: 4 }}>
               📞 Driver will use this to contact receiver for delivery
+            </div>
+          </label>
+
+          <label style={{ marginTop: 12 }}>
+            <div className="label">Email Address (Optional)</div>
+            <input
+              className="input"
+              type="email"
+              placeholder="e.g. customer@email.com"
+              value={formData.receiver_email}
+              onChange={(e) => handleInputChange('receiver_email', e.target.value)}
+            />
+            <div style={{ fontSize: '0.75rem', color: 'var(--gray-600)', marginTop: 4 }}>
+              📧 Customer will receive tracking number via email
             </div>
           </label>
 

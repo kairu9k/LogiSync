@@ -9,24 +9,29 @@ class OrdersTableSeeder extends Seeder
 {
     public function run(): void
     {
-        $userAdmin = DB::table('users')->where('username', 'admin01')->value('user_id');
-        $userWarehouse = DB::table('users')->where('username', 'warehouse_mgr')->value('user_id');
-        $userDriver = DB::table('users')->where('username', 'driver01')->value('user_id');
+        // Get the first organization
+        $orgId = DB::table('organizations')->first()->organization_id ?? null;
 
-        // Seed three orders linked to the users with specific statuses
+        if (!$orgId) {
+            echo "No organization found. Skipping orders seeder.\n";
+            return;
+        }
+
+        // Seed three orders with different statuses
         $orders = [
-            ['user_id' => $userAdmin, 'order_status' => 'processing'],
-            ['user_id' => $userWarehouse, 'order_status' => 'shipped'],
-            ['user_id' => $userDriver, 'order_status' => 'delivered'],
+            ['organization_id' => $orgId, 'order_status' => 'pending', 'customer_name' => 'Juan Dela Cruz'],
+            ['organization_id' => $orgId, 'order_status' => 'processing', 'customer_name' => 'Maria Santos'],
+            ['organization_id' => $orgId, 'order_status' => 'fulfilled', 'customer_name' => 'Pedro Garcia'],
         ];
 
         foreach ($orders as $o) {
             DB::table('orders')->updateOrInsert(
                 [
-                    'user_id' => $o['user_id'],
+                    'organization_id' => $o['organization_id'],
                     'order_status' => $o['order_status'],
+                    'customer_name' => $o['customer_name'],
                 ],
-                [] // order_date defaults to CURRENT_TIMESTAMP
+                ['order_date' => now()]
             );
         }
     }

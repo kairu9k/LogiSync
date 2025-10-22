@@ -41,7 +41,8 @@ class InvoiceController extends Controller
                 'i.payment_date',
                 'i.payment_method',
                 'o.customer_name',
-                's.tracking_number'
+                's.tracking_number',
+                's.receiver_email'
             )
             ->orderByDesc('i.invoice_date');
 
@@ -65,6 +66,7 @@ class InvoiceController extends Controller
                 'id' => (int) $row->invoice_id,
                 'invoice_number' => $row->invoice_number ?? ('INV-' . str_pad((string) $row->invoice_id, 6, '0', STR_PAD_LEFT)),
                 'customer' => $row->customer_name ?? 'N/A',
+                'customer_email' => $row->receiver_email,
                 'amount' => (int) $row->amount,
                 'formatted_amount' => '₱' . number_format($row->amount / 100.0, 2),
                 'status' => $row->status,

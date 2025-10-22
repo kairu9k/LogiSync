@@ -3,12 +3,10 @@
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('pricing_config', function (Blueprint $table) {
@@ -33,14 +31,11 @@ return new class extends Migration
             'fuel_surcharge_percent' => 10.00,
             'insurance_percent' => 2.00,
             'minimum_charge' => 200.00,
-            'priority_multiplier' => 1.00,  // Standard multiplier (no markup)
-            'express_multiplier' => 1.50,   // Remote areas multiplier
+            'priority_multiplier' => 1.00,
+            'express_multiplier' => 1.50,
         ]);
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('pricing_config');

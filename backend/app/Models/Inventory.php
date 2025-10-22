@@ -31,16 +31,15 @@ class Inventory extends Model
     public function getFullDetailsAttribute(): array
     {
         $order = $this->order;
-        $customer = $order ? $order->user : null;
 
         return [
             'inventory_id' => $this->inventory_id,
             'location' => $this->location_in_warehouse,
             'warehouse' => $this->warehouse ? $this->warehouse->warehouse_name : 'Unknown',
             'order_id' => $order ? $order->order_id : null,
-            'po' => $order ? ('PO-' . str_pad($order->order_id, 5, '0', STR_PAD_LEFT)) : 'N/A',
+            'po' => $order ? ($order->order_number ?? 'PO-' . str_pad($order->order_id, 5, '0', STR_PAD_LEFT)) : 'N/A',
             'order_status' => $order ? $order->order_status : 'unknown',
-            'customer' => $customer ? $customer->username : 'Unknown',
+            'customer' => $order && $order->customer_name ? $order->customer_name : 'Unknown',
             'order_date' => $order ? $order->order_date : null,
         ];
     }

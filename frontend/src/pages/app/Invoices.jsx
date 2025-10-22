@@ -83,44 +83,195 @@ export default function Invoices() {
 <head>
     <title>Invoice ${invoice.invoice_number}</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 40px; color: #333; }
-        .header { text-align: center; margin-bottom: 40px; border-bottom: 2px solid #333; padding-bottom: 20px; }
-        .company-name { font-size: 24px; font-weight: bold; color: #2563eb; }
-        .invoice-title { font-size: 20px; margin-top: 10px; }
-        .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin: 30px 0; }
-        .info-section h3 { margin: 0 0 10px 0; color: #1f2937; border-bottom: 1px solid #e5e7eb; padding-bottom: 5px; }
-        .info-row { margin: 8px 0; }
-        .label { font-weight: bold; color: #6b7280; }
-        .amount-section { text-align: center; margin: 40px 0; padding: 20px; background: #f9fafb; border: 1px solid #e5e7eb; }
-        .amount { font-size: 32px; font-weight: bold; color: #059669; }
-        .status { display: inline-block; padding: 4px 12px; border-radius: 16px; font-size: 14px; font-weight: bold; }
+        @media print {
+            body { margin: 20px; }
+            .no-print { display: none; }
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 60px;
+            color: #1f2937;
+            line-height: 1.6;
+            font-size: 16px;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 50px;
+            border-bottom: 3px solid #2563eb;
+            padding-bottom: 30px;
+        }
+        .logo-section {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .logo {
+            width: 80px;
+            height: 80px;
+            object-fit: contain;
+        }
+        .company-info {
+            text-align: left;
+        }
+        .company-name {
+            font-size: 32px;
+            font-weight: bold;
+            color: #2563eb;
+            margin: 0;
+        }
+        .company-tagline {
+            font-size: 14px;
+            color: #6b7280;
+            margin: 5px 0 0 0;
+        }
+        .invoice-header-right {
+            text-align: right;
+        }
+        .invoice-title {
+            font-size: 36px;
+            font-weight: bold;
+            color: #1f2937;
+            margin: 0;
+        }
+        .invoice-number-display {
+            font-size: 18px;
+            color: #6b7280;
+            margin-top: 5px;
+        }
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 50px;
+            margin: 40px 0;
+        }
+        .info-section h3 {
+            margin: 0 0 20px 0;
+            color: #1f2937;
+            border-bottom: 2px solid #e5e7eb;
+            padding-bottom: 10px;
+            font-size: 20px;
+        }
+        .info-row {
+            margin: 12px 0;
+            font-size: 16px;
+            display: flex;
+            justify-content: space-between;
+        }
+        .label {
+            font-weight: 600;
+            color: #6b7280;
+            min-width: 120px;
+        }
+        .value {
+            color: #1f2937;
+            font-weight: 500;
+            text-align: right;
+        }
+        .amount-section {
+            text-align: center;
+            margin: 50px 0;
+            padding: 40px;
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+            border: 2px solid #2563eb;
+            border-radius: 12px;
+        }
+        .amount-label {
+            font-size: 18px;
+            color: #6b7280;
+            margin-bottom: 10px;
+        }
+        .amount {
+            font-size: 48px;
+            font-weight: bold;
+            color: #2563eb;
+            margin: 10px 0;
+        }
+        .status {
+            display: inline-block;
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-size: 16px;
+            font-weight: bold;
+            margin-top: 10px;
+        }
         .status.paid { background: #d1fae5; color: #065f46; }
         .status.pending { background: #fef3c7; color: #92400e; }
         .status.overdue { background: #fee2e2; color: #991b1b; }
-        .footer { margin-top: 60px; text-align: center; color: #6b7280; font-size: 12px; }
-        .overdue-warning { background: #fee2e2; color: #991b1b; padding: 15px; border-radius: 8px; margin: 20px 0; text-align: center; font-weight: bold; }
+        .footer {
+            margin-top: 80px;
+            padding-top: 30px;
+            text-align: center;
+            color: #6b7280;
+            font-size: 14px;
+            border-top: 2px solid #e5e7eb;
+        }
+        .overdue-warning {
+            background: #fee2e2;
+            color: #991b1b;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 30px 0;
+            text-align: center;
+            font-weight: bold;
+            font-size: 18px;
+            border: 2px solid #dc2626;
+        }
     </style>
 </head>
 <body>
     <div class="header">
-        <div class="company-name">LogiSync</div>
-        <div class="invoice-title">INVOICE</div>
+        <div class="logo-section">
+            <img src="/logo_for_logisync.png" alt="LogiSync Logo" class="logo">
+            <div class="company-info">
+                <div class="company-name">LogiSync</div>
+                <div class="company-tagline">Logistics Management System</div>
+            </div>
+        </div>
+        <div class="invoice-header-right">
+            <div class="invoice-title">INVOICE</div>
+            <div class="invoice-number-display">${invoice.invoice_number}</div>
+        </div>
     </div>
 
     <div class="info-grid">
         <div class="info-section">
             <h3>Invoice Details</h3>
-            <div class="info-row"><span class="label">Invoice #:</span> ${invoice.invoice_number}</div>
-            <div class="info-row"><span class="label">Date:</span> ${new Date(invoice.invoice_date).toLocaleDateString()}</div>
-            <div class="info-row"><span class="label">Due Date:</span> ${new Date(invoice.due_date).toLocaleDateString()}</div>
-            <div class="info-row"><span class="label">Type:</span> ${invoice.invoice_type}</div>
-            ${invoice.tracking_number ? `<div class="info-row"><span class="label">Tracking #:</span> ${invoice.tracking_number}</div>` : ''}
+            <div class="info-row">
+                <span class="label">Invoice Date:</span>
+                <span class="value">${new Date(invoice.invoice_date).toLocaleDateString()}</span>
+            </div>
+            <div class="info-row">
+                <span class="label">Due Date:</span>
+                <span class="value">${new Date(invoice.due_date).toLocaleDateString()}</span>
+            </div>
+            <div class="info-row">
+                <span class="label">Invoice Type:</span>
+                <span class="value">${invoice.invoice_type}</span>
+            </div>
+            ${invoice.tracking_number ? `
+            <div class="info-row">
+                <span class="label">Tracking #:</span>
+                <span class="value">${invoice.tracking_number}</span>
+            </div>` : ''}
         </div>
 
         <div class="info-section">
             <h3>Customer Information</h3>
-            <div class="info-row"><span class="label">Customer:</span> ${invoice.customer}</div>
-            ${invoice.customer_email ? `<div class="info-row"><span class="label">Email:</span> ${invoice.customer_email}</div>` : ''}
+            <div class="info-row">
+                <span class="label">Name:</span>
+                <span class="value">${invoice.customer}</span>
+            </div>
+            ${invoice.customer_email ? `
+            <div class="info-row">
+                <span class="label">Email:</span>
+                <span class="value">${invoice.customer_email}</span>
+            </div>` : `
+            <div class="info-row">
+                <span class="label">Email:</span>
+                <span class="value" style="color: #9ca3af; font-style: italic;">Not provided</span>
+            </div>`}
         </div>
     </div>
 
@@ -131,7 +282,7 @@ export default function Invoices() {
     ` : ''}
 
     <div class="amount-section">
-        <div class="label">Total Amount</div>
+        <div class="amount-label">TOTAL AMOUNT DUE</div>
         <div class="amount">${invoice.formatted_amount}</div>
         <div style="margin-top: 15px;">
             <span class="status ${invoice.status}">${invoice.status.toUpperCase()}</span>
@@ -142,8 +293,14 @@ export default function Invoices() {
     <div class="info-grid">
         <div class="info-section">
             <h3>Payment Information</h3>
-            <div class="info-row"><span class="label">Payment Date:</span> ${new Date(invoice.payment_date).toLocaleDateString()}</div>
-            <div class="info-row"><span class="label">Payment Method:</span> ${invoice.payment_method || 'Not specified'}</div>
+            <div class="info-row">
+                <span class="label">Payment Date:</span>
+                <span class="value">${new Date(invoice.payment_date).toLocaleDateString()}</span>
+            </div>
+            <div class="info-row">
+                <span class="label">Payment Method:</span>
+                <span class="value">${invoice.payment_method || 'Not specified'}</span>
+            </div>
         </div>
     </div>
     ` : ''}

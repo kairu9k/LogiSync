@@ -93,11 +93,12 @@ class Invoice extends Model
     }
 
     // Mutators
-    public function setAmountAttribute($value): void
-    {
-        // Convert dollars to cents for storage
-        $this->attributes['amount'] = (int) round($value * 100);
-    }
+    // Note: Amounts should already be stored in centavos (e.g., 33600 for ₱336.00)
+    // The mutator has been removed to prevent double conversion
+    // public function setAmountAttribute($value): void
+    // {
+    //     $this->attributes['amount'] = (int) round($value * 100);
+    // }
 
     // Methods
     public function markAsPaid(string $paymentMethod = null, Carbon $paymentDate = null): bool

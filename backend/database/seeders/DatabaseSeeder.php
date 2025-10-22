@@ -9,6 +9,10 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call([
+            // Important base data - must run first
+            SubscriptionPlansSeeder::class,
+
+            // Demo/test data
             UsersTableSeeder::class,
             SchedulesTableSeeder::class,
             BudgetsTableSeeder::class,
