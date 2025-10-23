@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Invoice;
+use App\Models\Shipment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -184,6 +186,11 @@ class DriverController extends Controller
             'details' => $data['notes'] ?? $this->getDefaultStatusMessage($data['status']),
         ]);
 
+        // Auto-generate invoice when driver marks shipment as delivered
+        if ($systemStatus === 'delivered') {
+            $this->createInvoiceForDeliveredShipment($shipmentId);
+        }
+
         return response()->json([
             'message' => 'Status updated successfully',
             'new_status' => $systemStatus
@@ -282,5 +289,54 @@ class DriverController extends Controller
 
         return response()->json(['data' => $data])
             ->header('Access-Control-Allow-Origin', '*');
+    }
+
+    private function createInvoiceForDeliveredShipment(int $shipmentId): void
+    {
+        try {
+            // Check if invoice already exists for this shipment
+            $existingInvoice = Invoice::where('shipment_id', $shipmentId)->first();
+            if ($existingInvoice) {
+                \Log::info('Invoice already exists for shipment', ['shipment_id' => $shipmentId, 'invoice_id' => $existingInvoice->invoice_id]);
+                return; // Invoice already exists
+            }
+
+            // Get shipment with order relationship
+            $shipment = Shipment::with('order')->find($shipmentId);
+            if (!$shipment) {
+                \Log::error('Shipment not found for invoice creation', ['shipment_id' => $shipmentId]);
+                return;
+            }
+
+            if (!$shipment->order) {
+                \Log::error('No order found for shipment during invoice creation', ['shipment_id' => $shipmentId]);
+                return;
+            }
+
+            \Log::info('Creating invoice for delivered shipment (driver)', [
+                'shipment_id' => $shipmentId,
+                'order_id' => $shipment->order_id,
+                'charges' => $shipment->charges
+            ]);
+
+            // Create invoice automatically with Net 30 terms
+            $invoice = Invoice::createFromShipment($shipment, [
+                'notes' => 'Auto-generated invoice upon delivery completion (driver)'
+            ]);
+
+            \Log::info('Invoice created successfully for delivered shipment (driver)', [
+                'shipment_id' => $shipmentId,
+                'invoice_id' => $invoice->invoice_id,
+                'invoice_number' => $invoice->invoice_number
+            ]);
+
+        } catch (\Exception $e) {
+            // Log error but don't fail the shipment update
+            \Log::error('Failed to create invoice for delivered shipment (driver): ' . $e->getMessage(), [
+                'shipment_id' => $shipmentId,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+        }
     }
 }
