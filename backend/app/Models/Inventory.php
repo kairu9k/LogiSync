@@ -53,9 +53,16 @@ class Inventory extends Model
         ]);
     }
 
-    public static function getItemsByStatus(string $status = null): \Illuminate\Database\Eloquent\Collection
+    public static function getItemsByStatus(string $status = null, $organizationId = null): \Illuminate\Database\Eloquent\Collection
     {
         $query = self::with(['warehouse', 'order.organization']);
+
+        // Filter by organization through order relationship
+        if ($organizationId) {
+            $query->whereHas('order', function ($q) use ($organizationId) {
+                $q->where('organization_id', $organizationId);
+            });
+        }
 
         if ($status) {
             $query->whereHas('order', function ($q) use ($status) {
@@ -66,7 +73,7 @@ class Inventory extends Model
         return $query->get();
     }
 
-    public static function searchItems(string $search): \Illuminate\Database\Eloquent\Collection
+    public static function searchItems(string $search, $organizationId = null): \Illuminate\Database\Eloquent\Collection
     {
         // Check if search is a PO number format (PO-00001)
         $orderIdFromPO = null;
@@ -74,8 +81,16 @@ class Inventory extends Model
             $orderIdFromPO = (int) $matches[1];
         }
 
-        return self::with(['warehouse', 'order.organization'])
-            ->where(function ($query) use ($search, $orderIdFromPO) {
+        $query = self::with(['warehouse', 'order.organization']);
+
+        // Filter by organization through order relationship
+        if ($organizationId) {
+            $query->whereHas('order', function ($q) use ($organizationId) {
+                $q->where('organization_id', $organizationId);
+            });
+        }
+
+        return $query->where(function ($query) use ($search, $orderIdFromPO) {
                 $query->where('location_in_warehouse', 'like', "%{$search}%")
                     ->orWhereHas('warehouse', function ($q) use ($search) {
                         $q->where('warehouse_name', 'like', "%{$search}%");

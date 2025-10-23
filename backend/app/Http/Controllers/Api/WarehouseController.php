@@ -52,7 +52,8 @@ class WarehouseController extends Controller
             ];
         });
 
-        $stats = Warehouse::getWarehouseStats();
+        // Get stats filtered by organization
+        $stats = Warehouse::getWarehouseStats($orgUserId);
 
         return response()->json([
             'data' => $data,
@@ -182,21 +183,33 @@ class WarehouseController extends Controller
 
     public function getInventory(Request $request)
     {
+        $userId = request()->header('X-User-Id');
+        if (!$userId) {
+            return response()->json(['message' => 'Unauthorized - User ID required'], 401);
+        }
+
+        // Get organization user ID (admin's ID for team members, own ID for admins)
+        $orgUserId = UserHelper::getOrganizationUserId($userId);
+
         $search = $request->query('search');
         $status = $request->query('status');
         $warehouseId = $request->query('warehouse_id');
         $limit = (int) ($request->query('limit', 50));
         $limit = max(1, min($limit, 200));
 
-        $query = Inventory::with(['warehouse', 'order.organization', 'order.quote']);
-
+        // Get items filtered by organization
         if ($search) {
-            $items = Inventory::searchItems($search);
+            $items = Inventory::searchItems($search, $orgUserId);
         } else {
             if ($status) {
-                $items = Inventory::getItemsByStatus($status);
+                $items = Inventory::getItemsByStatus($status, $orgUserId);
             } else {
-                $items = $query->get();
+                // Get all items for this organization
+                $items = Inventory::with(['warehouse', 'order.organization', 'order.quote'])
+                    ->whereHas('order', function ($q) use ($orgUserId) {
+                        $q->where('organization_id', $orgUserId);
+                    })
+                    ->get();
             }
         }
 
@@ -314,11 +327,23 @@ class WarehouseController extends Controller
 
     public function getDashboardMetrics()
     {
-        $stats = Warehouse::getWarehouseStats();
+        $userId = request()->header('X-User-Id');
+        if (!$userId) {
+            return response()->json(['message' => 'Unauthorized - User ID required'], 401);
+        }
+
+        // Get organization user ID (admin's ID for team members, own ID for admins)
+        $orgUserId = UserHelper::getOrganizationUserId($userId);
+
+        // Get stats filtered by organization
+        $stats = Warehouse::getWarehouseStats($orgUserId);
         $unassignedCount = OrderDetail::getUnassignedItems()->count();
 
-        // Get recent activity
+        // Get recent activity filtered by organization
         $recentAssignments = Inventory::with(['warehouse', 'order.organization'])
+            ->whereHas('order', function ($q) use ($orgUserId) {
+                $q->where('organization_id', $orgUserId);
+            })
             ->orderBy('inventory_id', 'desc')
             ->limit(5)
             ->get()

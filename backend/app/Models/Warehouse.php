@@ -35,9 +35,16 @@ class Warehouse extends Model
         return $this->inventory()->count();
     }
 
-    public static function getWarehouseStats()
+    public static function getWarehouseStats($organizationId = null)
     {
-        $warehouses = self::with('inventory')->get();
+        $query = self::with('inventory');
+
+        // Filter by organization if provided
+        if ($organizationId) {
+            $query->where('organization_id', $organizationId);
+        }
+
+        $warehouses = $query->get();
 
         return [
             'total_warehouses' => $warehouses->count(),
