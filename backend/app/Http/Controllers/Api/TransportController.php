@@ -263,9 +263,20 @@ class TransportController extends Controller
         }
 
         $orgUserId = UserHelper::getOrganizationUserId($userId);
+
+        // Get the organization_id from the user
+        $user = DB::table('users')->where('user_id', $userId)->first();
+        $organizationId = $user ? $user->organization_id : null;
+
+        if (!$organizationId) {
+            return response()->json(['message' => 'User organization not found'], 404)
+                ->header('Access-Control-Allow-Origin', '*');
+        }
+
+        // Get all drivers from the same organization
         $drivers = DB::table('users')
             ->where('role', 'driver')
-            ->where('created_by', $orgUserId)
+            ->where('organization_id', $organizationId)
             ->select('user_id as id', 'username', 'email')
             ->get();
 
