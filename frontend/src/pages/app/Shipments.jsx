@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getShipments, updateShipmentStatus } from '../../lib/api'
+import * as Ably from 'ably'
 
 export default function Shipments() {
   const [shipments, setShipments] = useState([])
@@ -34,6 +35,81 @@ export default function Shipments() {
     fetchShipments({ q, status })
   }, [q, status])
 
+  // Real-time updates via Ably
+  useEffect(() => {
+    // Get organization_id from auth data
+    let organizationId = null
+    try {
+      const authData = localStorage.getItem('auth')
+      if (authData) {
+        const parsed = JSON.parse(authData)
+        organizationId = parsed.user?.organization_id
+      }
+    } catch (e) {
+      console.error('Failed to parse auth data:', e)
+    }
+
+    console.log('Setting up Ably subscription for organization:', organizationId)
+
+    if (!organizationId) {
+      console.warn('No organization_id found, skipping Ably subscription')
+      return
+    }
+
+    // Connect to Ably
+    const ably = new Ably.Realtime({
+      key: import.meta.env.VITE_ABLY_KEY,
+    })
+
+    ably.connection.on('connected', () => {
+      console.log('✅ Ably connected successfully')
+    })
+
+    ably.connection.on('failed', () => {
+      console.error('❌ Ably connection failed')
+    })
+
+    // Subscribe to organization channel for shipment updates
+    // Using public channel for now (TODO: implement auth for private channels)
+    const channelName = `public:organization.${organizationId}`
+    console.log('📡 Subscribing to channel:', channelName)
+    const channel = ably.channels.get(channelName)
+
+    channel.subscribe('shipment.status.updated', (message) => {
+      console.log('Shipment status updated in real-time:', message.data)
+
+      // Update the shipment in the list
+      setShipments((prevShipments) => {
+        const updated = prevShipments.map((shipment) => {
+          if (shipment.id === message.data.shipment_id) {
+            console.log(`✅ Updating shipment ${shipment.id} from ${shipment.status} to ${message.data.new_status}`)
+            return {
+              ...shipment,
+              status: message.data.new_status,
+            }
+          }
+          return shipment
+        })
+
+        // Re-sort: delivered shipments go last
+        return updated.sort((a, b) => {
+          if (a.status === 'delivered' && b.status !== 'delivered') return 1
+          if (a.status !== 'delivered' && b.status === 'delivered') return -1
+          return 0
+        })
+      })
+
+      // Show a toast notification (optional)
+      console.log(`📦 Shipment ${message.data.tracking_number} is now ${message.data.new_status}`)
+    })
+
+    // Cleanup on unmount
+    return () => {
+      channel.unsubscribe()
+      ably.close()
+    }
+  }, [])
+
   async function handleStatusUpdate(shipmentId, newStatus, location, details = '') {
     try {
       setUpdating(shipmentId)
@@ -53,6 +129,7 @@ export default function Shipments() {
   function getStatusBadgeClass(status) {
     switch (status) {
       case 'delivered': return 'badge success'
+      case 'picked_up': return 'badge success'
       case 'in_transit': case 'out_for_delivery': return 'badge info'
       case 'pending': return 'badge warn'
       case 'cancelled': return 'badge danger'
@@ -297,6 +374,7 @@ function StatusUpdateForm({ shipment, onUpdate, updating }) {
         // For any other status, allow all transitions
         statusOptions.push(
           { value: 'pending', label: 'Pending' },
+          { value: 'picked_up', label: 'Picked Up' },
           { value: 'in_transit', label: 'In Transit' },
           { value: 'out_for_delivery', label: 'Out for Delivery' },
           { value: 'delivered', label: 'Delivered' },
@@ -317,6 +395,7 @@ function StatusUpdateForm({ shipment, onUpdate, updating }) {
           <div className="label">Current Status:
             <span className={`badge ${
               shipment.status === 'delivered' ? 'success' :
+              shipment.status === 'picked_up' ? 'success' :
               shipment.status === 'out_for_delivery' ? 'warn' :
               shipment.status === 'in_transit' ? 'info' : ''
             }`} style={{ marginLeft: 4 }}>

@@ -36,7 +36,7 @@ class DashboardController extends Controller
         $shipmentsInTransit = DB::table('shipments as s')
             ->join('orders as o', 's.order_id', '=', 'o.order_id')
             ->where('o.organization_id', $userId)
-            ->whereIn('s.status', ['in_transit', 'out_for_delivery'])
+            ->whereIn('s.status', ['picked_up', 'in_transit', 'out_for_delivery'])
             ->count();
         $shipmentsDelivered = DB::table('shipments as s')
             ->join('orders as o', 's.order_id', '=', 'o.order_id')

@@ -4,6 +4,7 @@ import { apiGet } from '../../lib/api'
 import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
+import * as Ably from 'ably'
 
 // Fix default marker icon issue with Leaflet
 delete L.Icon.Default.prototype._getIconUrl
@@ -30,7 +31,7 @@ export default function Dashboard() {
   const navigate = useNavigate()
   const [dashboardData, setDashboardData] = useState({
     orders: { total: 0, fulfilled: 0, processing: 0, pending: 0 },
-    shipments: { total: 0, delivered: 0, active: 0, pending: 0 },
+    shipments: { total: 0, delivered: 0, outForDelivery: 0, inTransit: 0, pending: 0, failed: 0, active: 0 },
     quotes: { total: 0, converted: 0, approved: 0, pending: 0 },
     invoices: { total: 0, paid: 0, pending: 0, overdue: 0, total_unpaid: 0, formatted_total_unpaid: '₱0.00' },
     warehouse: { total_warehouses: 0, total_items: 0, unassigned_items: 0, warehouses_at_capacity: 0 },
@@ -90,8 +91,11 @@ export default function Dashboard() {
         const shipmentsMetrics = {
           total: shipments.length,
           delivered: shipments.filter(s => s.status === 'delivered').length,
-          active: shipments.filter(s => ['in_transit', 'out_for_delivery'].includes(s.status)).length,
-          pending: shipments.filter(s => s.status === 'pending').length
+          outForDelivery: shipments.filter(s => s.status === 'out_for_delivery').length,
+          inTransit: shipments.filter(s => s.status === 'in_transit').length,
+          pending: shipments.filter(s => s.status === 'pending').length,
+          failed: shipments.filter(s => ['failed', 'returned', 'cancelled'].includes(s.status)).length,
+          active: shipments.filter(s => ['in_transit', 'out_for_delivery'].includes(s.status)).length
         }
 
         const quotesMetrics = {
@@ -129,25 +133,61 @@ export default function Dashboard() {
           tracking_number: i.tracking_number
         }))
 
-        // Generate notifications
+        // Generate notifications with metadata
         const notifications = []
         if (shipmentsMetrics.pending > 0) {
-          notifications.push(`${shipmentsMetrics.pending} shipment${shipmentsMetrics.pending > 1 ? 's' : ''} pending dispatch.`)
+          notifications.push({
+            icon: '📦',
+            type: 'warning',
+            message: `${shipmentsMetrics.pending} shipment${shipmentsMetrics.pending > 1 ? 's' : ''} pending dispatch`,
+            link: '/app/shipments?status=pending',
+            priority: 'medium'
+          })
         }
         if (invoicesMetrics.overdue > 0) {
-          notifications.push(`${invoicesMetrics.overdue} invoice${invoicesMetrics.overdue > 1 ? 's' : ''} overdue - follow up required.`)
+          notifications.push({
+            icon: '🚨',
+            type: 'critical',
+            message: `${invoicesMetrics.overdue} invoice${invoicesMetrics.overdue > 1 ? 's' : ''} overdue - follow up required`,
+            link: '/app/invoices?status=overdue',
+            priority: 'high'
+          })
         }
         if (quotesMetrics.pending > 0) {
-          notifications.push(`${quotesMetrics.pending} quote request${quotesMetrics.pending > 1 ? 's' : ''} awaiting approval.`)
+          notifications.push({
+            icon: '📋',
+            type: 'info',
+            message: `${quotesMetrics.pending} quote request${quotesMetrics.pending > 1 ? 's' : ''} awaiting approval`,
+            link: '/app/quotes?status=pending',
+            priority: 'medium'
+          })
         }
         if (warehouseMetrics.unassigned_items > 0) {
-          notifications.push(`${warehouseMetrics.unassigned_items} item${warehouseMetrics.unassigned_items > 1 ? 's' : ''} awaiting warehouse assignment.`)
+          notifications.push({
+            icon: '⚠️',
+            type: 'warning',
+            message: `${warehouseMetrics.unassigned_items} item${warehouseMetrics.unassigned_items > 1 ? 's' : ''} awaiting warehouse assignment`,
+            link: '/app/warehouse',
+            priority: 'medium'
+          })
         }
         if (warehouseMetrics.warehouses_at_capacity > 0) {
-          notifications.push(`${warehouseMetrics.warehouses_at_capacity} warehouse${warehouseMetrics.warehouses_at_capacity > 1 ? 's' : ''} near capacity.`)
+          notifications.push({
+            icon: '📊',
+            type: 'warning',
+            message: `${warehouseMetrics.warehouses_at_capacity} warehouse${warehouseMetrics.warehouses_at_capacity > 1 ? 's' : ''} near capacity`,
+            link: '/app/warehouse',
+            priority: 'low'
+          })
         }
         if (notifications.length === 0) {
-          notifications.push('All systems running smoothly.')
+          notifications.push({
+            icon: '✅',
+            type: 'success',
+            message: 'All systems running smoothly',
+            link: null,
+            priority: 'low'
+          })
         }
 
         setDashboardData({
@@ -167,6 +207,233 @@ export default function Dashboard() {
       }
     }
     loadDashboardData()
+  }, [])
+
+  // Real-time updates via Ably for order status changes
+  useEffect(() => {
+    // Get organization_id from auth data
+    let organizationId = null
+    try {
+      const authData = localStorage.getItem('auth')
+      if (authData) {
+        const parsed = JSON.parse(authData)
+        organizationId = parsed.user?.organization_id
+      }
+    } catch (e) {
+      console.error('Failed to parse auth data:', e)
+    }
+
+    console.log('[Dashboard] Setting up Ably subscription for organization:', organizationId)
+
+    if (!organizationId) {
+      console.warn('[Dashboard] No organization_id found, skipping Ably subscription')
+      return
+    }
+
+    // Connect to Ably
+    const ably = new Ably.Realtime({
+      key: import.meta.env.VITE_ABLY_KEY,
+    })
+
+    ably.connection.on('connected', () => {
+      console.log('[Dashboard] ✅ Ably connected successfully')
+    })
+
+    ably.connection.on('failed', () => {
+      console.error('[Dashboard] ❌ Ably connection failed')
+    })
+
+    // Subscribe to organization channel for order updates
+    const channelName = `public:organization.${organizationId}`
+    console.log('[Dashboard] 📡 Subscribing to channel:', channelName)
+    const channel = ably.channels.get(channelName)
+
+    channel.subscribe('order.status.updated', (message) => {
+      console.log('[Dashboard] Order status updated in real-time:', message.data)
+
+      // Update the recent orders list and recalculate metrics
+      setDashboardData((prevData) => {
+        const updatedRecentOrders = prevData.recent_orders.map((order) => {
+          if (order.id === message.data.order_id) {
+            console.log(`[Dashboard] ✅ Updating order ${order.id} from ${order.status} to ${message.data.new_status}`)
+            return {
+              ...order,
+              status: message.data.new_status,
+            }
+          }
+          return order
+        })
+
+        // Recalculate order metrics
+        const updatedOrderMetrics = {
+          ...prevData.orders,
+          fulfilled: updatedRecentOrders.filter(o => o.status === 'fulfilled').length,
+          processing: updatedRecentOrders.filter(o => o.status === 'processing').length,
+          pending: updatedRecentOrders.filter(o => o.status === 'pending').length
+        }
+
+        // Regenerate notifications with updated data
+        const notifications = []
+        if (prevData.shipments.pending > 0) {
+          notifications.push({
+            icon: '📦',
+            type: 'warning',
+            message: `${prevData.shipments.pending} shipment${prevData.shipments.pending > 1 ? 's' : ''} pending dispatch`,
+            link: '/app/shipments?status=pending',
+            priority: 'medium'
+          })
+        }
+        if (prevData.invoices.overdue > 0) {
+          notifications.push({
+            icon: '🚨',
+            type: 'critical',
+            message: `${prevData.invoices.overdue} invoice${prevData.invoices.overdue > 1 ? 's' : ''} overdue - follow up required`,
+            link: '/app/invoices?status=overdue',
+            priority: 'high'
+          })
+        }
+        if (prevData.quotes.pending > 0) {
+          notifications.push({
+            icon: '📋',
+            type: 'info',
+            message: `${prevData.quotes.pending} quote request${prevData.quotes.pending > 1 ? 's' : ''} awaiting approval`,
+            link: '/app/quotes?status=pending',
+            priority: 'medium'
+          })
+        }
+        if (prevData.warehouse.unassigned_items > 0) {
+          notifications.push({
+            icon: '⚠️',
+            type: 'warning',
+            message: `${prevData.warehouse.unassigned_items} item${prevData.warehouse.unassigned_items > 1 ? 's' : ''} awaiting warehouse assignment`,
+            link: '/app/warehouse',
+            priority: 'medium'
+          })
+        }
+        if (prevData.warehouse.warehouses_at_capacity > 0) {
+          notifications.push({
+            icon: '📊',
+            type: 'warning',
+            message: `${prevData.warehouse.warehouses_at_capacity} warehouse${prevData.warehouse.warehouses_at_capacity > 1 ? 's' : ''} near capacity`,
+            link: '/app/warehouse',
+            priority: 'low'
+          })
+        }
+        if (notifications.length === 0) {
+          notifications.push({
+            icon: '✅',
+            type: 'success',
+            message: 'All systems running smoothly',
+            link: null,
+            priority: 'low'
+          })
+        }
+
+        return {
+          ...prevData,
+          orders: updatedOrderMetrics,
+          recent_orders: updatedRecentOrders,
+          notifications
+        }
+      })
+
+      console.log(`[Dashboard] 📦 Order ${message.data.po} is now ${message.data.new_status}`)
+    })
+
+    // Subscribe to shipment status updates
+    channel.subscribe('shipment.status.updated', (message) => {
+      console.log('[Dashboard] Shipment status updated in real-time:', message.data)
+
+      // Update shipment metrics and regenerate notifications
+      setDashboardData((prevData) => {
+        const oldStatus = message.data.old_status
+        const newStatus = message.data.new_status
+
+        // Update shipment metrics
+        const updatedShipmentMetrics = { ...prevData.shipments }
+
+        // Decrement old status count
+        if (oldStatus === 'delivered') updatedShipmentMetrics.delivered--
+        else if (['in_transit', 'out_for_delivery'].includes(oldStatus)) updatedShipmentMetrics.active--
+        else if (oldStatus === 'pending') updatedShipmentMetrics.pending--
+
+        // Increment new status count
+        if (newStatus === 'delivered') updatedShipmentMetrics.delivered++
+        else if (['in_transit', 'out_for_delivery'].includes(newStatus)) updatedShipmentMetrics.active++
+        else if (newStatus === 'pending') updatedShipmentMetrics.pending++
+
+        // Regenerate notifications
+        const notifications = []
+        if (updatedShipmentMetrics.pending > 0) {
+          notifications.push({
+            icon: '📦',
+            type: 'warning',
+            message: `${updatedShipmentMetrics.pending} shipment${updatedShipmentMetrics.pending > 1 ? 's' : ''} pending dispatch`,
+            link: '/app/shipments?status=pending',
+            priority: 'medium'
+          })
+        }
+        if (prevData.invoices.overdue > 0) {
+          notifications.push({
+            icon: '🚨',
+            type: 'critical',
+            message: `${prevData.invoices.overdue} invoice${prevData.invoices.overdue > 1 ? 's' : ''} overdue - follow up required`,
+            link: '/app/invoices?status=overdue',
+            priority: 'high'
+          })
+        }
+        if (prevData.quotes.pending > 0) {
+          notifications.push({
+            icon: '📋',
+            type: 'info',
+            message: `${prevData.quotes.pending} quote request${prevData.quotes.pending > 1 ? 's' : ''} awaiting approval`,
+            link: '/app/quotes?status=pending',
+            priority: 'medium'
+          })
+        }
+        if (prevData.warehouse.unassigned_items > 0) {
+          notifications.push({
+            icon: '⚠️',
+            type: 'warning',
+            message: `${prevData.warehouse.unassigned_items} item${prevData.warehouse.unassigned_items > 1 ? 's' : ''} awaiting warehouse assignment`,
+            link: '/app/warehouse',
+            priority: 'medium'
+          })
+        }
+        if (prevData.warehouse.warehouses_at_capacity > 0) {
+          notifications.push({
+            icon: '📊',
+            type: 'warning',
+            message: `${prevData.warehouse.warehouses_at_capacity} warehouse${prevData.warehouse.warehouses_at_capacity > 1 ? 's' : ''} near capacity`,
+            link: '/app/warehouse',
+            priority: 'low'
+          })
+        }
+        if (notifications.length === 0) {
+          notifications.push({
+            icon: '✅',
+            type: 'success',
+            message: 'All systems running smoothly',
+            link: null,
+            priority: 'low'
+          })
+        }
+
+        return {
+          ...prevData,
+          shipments: updatedShipmentMetrics,
+          notifications
+        }
+      })
+
+      console.log(`[Dashboard] 🚚 Shipment ${message.data.tracking_number} is now ${message.data.new_status}`)
+    })
+
+    // Cleanup on unmount
+    return () => {
+      channel.unsubscribe()
+      ably.close()
+    }
   }, [])
 
   // Load active shipments with GPS tracking
@@ -428,171 +695,183 @@ export default function Dashboard() {
         )}
       </div>
 
-      <div className="card" style={{ padding: 20 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-          <h3 style={{ margin: 0 }}>Fulfillment Performance</h3>
-          <div style={{ fontSize: '14px', color: '#6b7280' }}>
-            Total: <strong>{dashboardData.shipments.total}</strong> shipments
+      <div className="card" style={{ padding: 24 }}>
+        <div style={{ marginBottom: 28 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700' }}>Shipment Status Overview</h3>
+            <div style={{
+              fontSize: '12px',
+              color: 'var(--text-muted)',
+              fontWeight: '500'
+            }}>
+              Total: {dashboardData.shipments.total} shipments
+            </div>
           </div>
+          <p style={{ margin: 0, fontSize: '14px', color: 'var(--text-muted)' }}>Track your delivery performance across all statuses</p>
         </div>
 
         {loading ? (
-          <div className="skeleton" style={{ height: 180 }} />
+          <div className="skeleton" style={{ height: 280 }} />
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-            {/* Delivered Progress Bar */}
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: '20px' }}>✅</span>
-                  <span style={{ fontWeight: '600', fontSize: '15px' }}>Delivered</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <span style={{ fontSize: '24px', fontWeight: 'bold', color: '#059669' }}>
-                    {dashboardData.shipments.delivered}
-                  </span>
-                  <span style={{ fontSize: '14px', color: '#6b7280' }}>
-                    {dashboardData.shipments.total > 0
-                      ? Math.round((dashboardData.shipments.delivered / dashboardData.shipments.total) * 100)
-                      : 0}%
-                  </span>
-                </div>
-              </div>
-              <div style={{
-                height: '12px',
-                background: '#f3f4f6',
-                borderRadius: '6px',
-                overflow: 'hidden'
-              }}>
-                <div style={{
-                  height: '100%',
-                  background: 'linear-gradient(90deg, #059669 0%, #10b981 100%)',
-                  width: `${dashboardData.shipments.total > 0
-                    ? Math.round((dashboardData.shipments.delivered / dashboardData.shipments.total) * 100)
-                    : 0}%`,
-                  transition: 'width 0.3s ease'
-                }} />
-              </div>
-            </div>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(5, 1fr)',
+            gap: '20px'
+          }}>
+            {[
+              {
+                label: 'Delivered',
+                value: dashboardData.shipments.delivered,
+                icon: '✅',
+                color: '#10b981',
+                lightColor: '#d1fae5'
+              },
+              {
+                label: 'Out for Delivery',
+                value: dashboardData.shipments.outForDelivery,
+                icon: '🚛',
+                color: '#8b5cf6',
+                lightColor: '#ede9fe'
+              },
+              {
+                label: 'In Transit',
+                value: dashboardData.shipments.inTransit,
+                icon: '🚚',
+                color: '#3b82f6',
+                lightColor: '#dbeafe'
+              },
+              {
+                label: 'Pending',
+                value: dashboardData.shipments.pending,
+                icon: '⏳',
+                color: '#f59e0b',
+                lightColor: '#fef3c7'
+              },
+              {
+                label: 'Issues',
+                value: dashboardData.shipments.failed,
+                icon: '❌',
+                color: '#ef4444',
+                lightColor: '#fee2e2'
+              }
+            ].map((item, idx) => {
+              const maxValue = Math.max(
+                dashboardData.shipments.delivered,
+                dashboardData.shipments.outForDelivery,
+                dashboardData.shipments.inTransit,
+                dashboardData.shipments.pending,
+                dashboardData.shipments.failed,
+                1
+              )
+              const heightPercent = (item.value / maxValue) * 100
+              const percentage = dashboardData.shipments.total > 0
+                ? Math.round((item.value / dashboardData.shipments.total) * 100)
+                : 0
 
-            {/* In Transit Progress Bar */}
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: '20px' }}>🚚</span>
-                  <span style={{ fontWeight: '600', fontSize: '15px' }}>In Transit</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <span style={{ fontSize: '24px', fontWeight: 'bold', color: '#2563eb' }}>
-                    {dashboardData.shipments.active}
-                  </span>
-                  <span style={{ fontSize: '14px', color: '#6b7280' }}>
-                    {dashboardData.shipments.total > 0
-                      ? Math.round((dashboardData.shipments.active / dashboardData.shipments.total) * 100)
-                      : 0}%
-                  </span>
-                </div>
-              </div>
-              <div style={{
-                height: '12px',
-                background: '#f3f4f6',
-                borderRadius: '6px',
-                overflow: 'hidden'
-              }}>
-                <div style={{
-                  height: '100%',
-                  background: 'linear-gradient(90deg, #2563eb 0%, #3b82f6 100%)',
-                  width: `${dashboardData.shipments.total > 0
-                    ? Math.round((dashboardData.shipments.active / dashboardData.shipments.total) * 100)
-                    : 0}%`,
-                  transition: 'width 0.3s ease'
-                }} />
-              </div>
-            </div>
+              return (
+                <div
+                  key={idx}
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '12px',
+                    padding: '16px',
+                    background: 'var(--surface)',
+                    borderRadius: '12px',
+                    border: '1px solid var(--border)',
+                    transition: 'all 0.3s ease',
+                    cursor: 'pointer'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-4px)'
+                    e.currentTarget.style.boxShadow = `0 12px 24px -8px ${item.color}40`
+                    e.currentTarget.style.borderColor = item.color
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)'
+                    e.currentTarget.style.boxShadow = 'none'
+                    e.currentTarget.style.borderColor = 'var(--border)'
+                  }}
+                >
+                  {/* Icon */}
+                  <div style={{
+                    width: '48px',
+                    height: '48px',
+                    borderRadius: '12px',
+                    background: item.lightColor,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '24px'
+                  }}>
+                    {item.icon}
+                  </div>
 
-            {/* Pending Progress Bar */}
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: '20px' }}>⏳</span>
-                  <span style={{ fontWeight: '600', fontSize: '15px' }}>Pending Dispatch</span>
+                  {/* Label */}
+                  <div style={{
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    color: 'var(--text-muted)',
+                    lineHeight: 1.2
+                  }}>
+                    {item.label}
+                  </div>
+
+                  {/* Value */}
+                  <div style={{
+                    fontSize: '32px',
+                    fontWeight: '800',
+                    color: 'var(--text)',
+                    lineHeight: 1,
+                    marginTop: 'auto'
+                  }}>
+                    {item.value}
+                  </div>
+
+                  {/* Bar and Percentage */}
+                  <div style={{ marginTop: '8px' }}>
+                    <div style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      marginBottom: '6px'
+                    }}>
+                      <span style={{
+                        fontSize: '12px',
+                        fontWeight: '600',
+                        color: item.color
+                      }}>
+                        {percentage}%
+                      </span>
+                      <span style={{
+                        fontSize: '11px',
+                        color: 'var(--text-muted)'
+                      }}>
+                        of total
+                      </span>
+                    </div>
+                    <div style={{
+                      height: '6px',
+                      background: item.lightColor,
+                      borderRadius: '3px',
+                      overflow: 'hidden'
+                    }}>
+                      <div style={{
+                        height: '100%',
+                        width: `${heightPercent}%`,
+                        background: item.color,
+                        borderRadius: '3px',
+                        transition: 'width 0.5s ease'
+                      }} />
+                    </div>
+                  </div>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <span style={{ fontSize: '24px', fontWeight: 'bold', color: '#d97706' }}>
-                    {dashboardData.shipments.pending}
-                  </span>
-                  <span style={{ fontSize: '14px', color: '#6b7280' }}>
-                    {dashboardData.shipments.total > 0
-                      ? Math.round((dashboardData.shipments.pending / dashboardData.shipments.total) * 100)
-                      : 0}%
-                  </span>
-                </div>
-              </div>
-              <div style={{
-                height: '12px',
-                background: '#f3f4f6',
-                borderRadius: '6px',
-                overflow: 'hidden'
-              }}>
-                <div style={{
-                  height: '100%',
-                  background: 'linear-gradient(90deg, #d97706 0%, #f59e0b 100%)',
-                  width: `${dashboardData.shipments.total > 0
-                    ? Math.round((dashboardData.shipments.pending / dashboardData.shipments.total) * 100)
-                    : 0}%`,
-                  transition: 'width 0.3s ease'
-                }} />
-              </div>
-            </div>
+              )
+            })}
           </div>
         )}
       </div>
 
-      <div className="grid" style={{ gridTemplateColumns: '1.2fr 0.8fr', gap: 16 }}>
-        <div className="card">
-          <h3 style={{ marginTop: 0 }}>Recent Orders</h3>
-          {loading ? (
-            <div>Loading...</div>
-          ) : (
-            <ul style={{ margin: 0, paddingLeft: 18 }}>
-              {dashboardData.recent_orders.length > 0 ? (
-                dashboardData.recent_orders.map((order) => (
-                  <li key={order.id} style={{ marginBottom: 8 }}>
-                    {order.po} • {order.customer} •
-                    <span className={`badge ${
-                      order.status === 'fulfilled' ? 'success' :
-                      order.status === 'processing' ? 'info' :
-                      order.status === 'pending' ? 'warn' : ''
-                    }`} style={{ marginLeft: 4 }}>
-                      {order.status}
-                    </span>
-                  </li>
-                ))
-              ) : (
-                <li>No recent orders</li>
-              )}
-            </ul>
-          )}
-        </div>
-        <div className="card">
-          <h3 style={{ marginTop: 0 }}>Notifications</h3>
-          <ul style={{ margin: 0, paddingLeft: 18 }}>
-            {loading ? (
-              <li>Loading...</li>
-            ) : (
-              dashboardData.notifications.map((notification, index) => (
-                <li key={index} style={{
-                  color: notification.includes('overdue') ? 'var(--danger-600)' :
-                         notification.includes('pending') ? 'var(--warning-600)' : 'inherit',
-                  marginBottom: 4
-                }}>
-                  {notification}
-                </li>
-              ))
-            )}
-          </ul>
-        </div>
-      </div>
 
       {/* Fullscreen Map Modal */}
       {showFullMap && (

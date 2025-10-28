@@ -25,6 +25,7 @@ import Budgets from './pages/app/Budgets.jsx'
 import DriverLogin from './pages/DriverLogin.jsx'
 import DriverDashboard from './pages/DriverDashboard.jsx'
 import DriverShipment from './pages/DriverShipment.jsx'
+import TestAbly from './pages/TestAbly.jsx'
 
 function App() {
   return (
@@ -57,6 +58,9 @@ function App() {
       <Route path="/driver/login" element={<DriverLogin />} />
       <Route path="/driver/dashboard" element={<DriverDashboard />} />
       <Route path="/driver/shipment/:id" element={<DriverShipment />} />
+
+      {/* Test Routes (Development only) */}
+      <Route path="/test-ably" element={<TestAbly />} />
     </Routes>
   )
 }

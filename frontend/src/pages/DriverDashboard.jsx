@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { apiGet, apiPost } from '../lib/api'
+import { apiGet, apiPost, apiPatch } from '../lib/api'
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
@@ -30,6 +30,599 @@ function MapUpdater({ center }) {
     }
   }, [center, map])
   return null
+}
+
+// Swipeable Card Component with gesture detection
+function SwipeableCard({ shipment, quickAction, onSwipe, onTap, onStatusUpdate, getStatusIcon, currentLocation }) {
+  const [touchStart, setTouchStart] = useState(0)
+  const [touchEnd, setTouchEnd] = useState(0)
+  const [swipeOffset, setSwipeOffset] = useState(0)
+  const [isSwiping, setIsSwiping] = useState(false)
+  const [isLongPressing, setIsLongPressing] = useState(false)
+  const [showStatusModal, setShowStatusModal] = useState(false)
+  const touchStartTime = useRef(0)
+  const longPressTimer = useRef(null)
+
+  const minSwipeDistance = 100 // minimum distance for swipe to trigger
+
+  const handleTouchStart = (e) => {
+    setTouchEnd(0)
+    setTouchStart(e.targetTouches[0].clientX)
+    setIsSwiping(false)
+    setIsLongPressing(false)
+    touchStartTime.current = Date.now()
+
+    // Start long press timer
+    longPressTimer.current = setTimeout(() => {
+      setIsLongPressing(true)
+      if (navigator.vibrate) {
+        navigator.vibrate(50)
+      }
+      setShowStatusModal(true)
+    }, 500) // 500ms for long press
+  }
+
+  const handleTouchMove = (e) => {
+    setTouchEnd(e.targetTouches[0].clientX)
+    const distance = e.targetTouches[0].clientX - touchStart
+
+    // Cancel long press if moving
+    if (Math.abs(distance) > 10 && longPressTimer.current) {
+      clearTimeout(longPressTimer.current)
+      setIsLongPressing(false)
+    }
+
+    // Only allow right swipe (positive distance) and only if quickAction exists
+    if (distance > 0 && quickAction) {
+      setSwipeOffset(Math.min(distance, 150)) // Cap at 150px
+      setIsSwiping(true)
+    }
+  }
+
+  const handleTouchEnd = () => {
+    // Clear long press timer
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current)
+    }
+    setTimeout(() => setIsLongPressing(false), 100)
+
+    if (!touchStart || !touchEnd) return
+
+    const distance = touchEnd - touchStart
+    const isRightSwipe = distance > minSwipeDistance
+    const touchDuration = Date.now() - touchStartTime.current
+
+    if (isRightSwipe && quickAction) {
+      // Trigger pickup action
+      onSwipe()
+    } else if (!isSwiping && Math.abs(distance) < 10 && touchDuration < 200) {
+      // Quick tap - navigate to detail
+      onTap()
+    }
+
+    // Reset
+    setSwipeOffset(0)
+    setIsSwiping(false)
+    setTouchStart(0)
+    setTouchEnd(0)
+  }
+
+  const swipeProgress = Math.min(swipeOffset / minSwipeDistance, 1)
+
+  return (
+    <div
+      style={{
+        position: 'relative',
+        overflow: 'hidden',
+        borderRadius: '12px',
+      }}
+    >
+      {/* Background swipe indicator (shows when swiping) */}
+      {quickAction && swipeOffset > 0 && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: `linear-gradient(90deg, ${quickAction.color} 0%, ${quickAction.color}dd ${swipeOffset}px, transparent ${swipeOffset}px)`,
+            display: 'flex',
+            alignItems: 'center',
+            padding: '0 20px',
+            zIndex: 0,
+          }}
+        >
+          <div
+            style={{
+              fontSize: '24px',
+              opacity: swipeProgress,
+              transform: `scale(${0.8 + swipeProgress * 0.2})`,
+              transition: 'transform 0.1s ease',
+            }}
+          >
+            {swipeProgress >= 1 ? '✅' : '➡️'}
+          </div>
+          <div
+            style={{
+              marginLeft: '10px',
+              color: 'white',
+              fontWeight: 600,
+              opacity: swipeProgress,
+            }}
+          >
+            {swipeProgress >= 1 ? 'Release to confirm!' : quickAction.label}
+          </div>
+        </div>
+      )}
+
+      {/* Card content */}
+      <div
+        className="card"
+        style={{
+          padding: '14px',
+          transition: isSwiping ? 'none' : 'transform 0.3s ease, box-shadow 0.1s ease',
+          transform: isLongPressing ? `translateX(${swipeOffset}px) scale(0.98)` : `translateX(${swipeOffset}px)`,
+          border: '1px solid var(--gray-200)',
+          cursor: 'pointer',
+          position: 'relative',
+          zIndex: 1,
+          backgroundColor: 'var(--surface)',
+          boxShadow: isLongPressing ? '0 0 0 3px rgba(59, 130, 246, 0.4)' : 'none',
+        }}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onClick={() => !isSwiping && !showStatusModal && onTap()}
+      >
+        {/* Header: Tracking Number + Status */}
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: '12px',
+          }}
+        >
+          <div
+            style={{
+              fontFamily: 'monospace',
+              fontSize: '15px',
+              fontWeight: 700,
+              color: 'var(--text)',
+            }}
+          >
+            {shipment.tracking_number}
+          </div>
+          <span
+            className={`badge ${
+              shipment.status === 'delivered'
+                ? 'success'
+                : shipment.status === 'out_for_delivery'
+                ? 'warn'
+                : shipment.status === 'in_transit'
+                ? 'info'
+                : ''
+            }`}
+            style={{
+              fontSize: '11px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              padding: '4px 8px',
+            }}
+          >
+            <span>{getStatusIcon(shipment.status)}</span>
+            <span>{shipment.status.replace('_', ' ')}</span>
+          </span>
+        </div>
+
+        {/* Delivery Location */}
+        <div style={{ marginBottom: '10px' }}>
+          <div
+            style={{
+              fontSize: '10px',
+              color: '#9ca3af',
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px',
+              fontWeight: 600,
+              marginBottom: '4px',
+            }}
+          >
+            📍 DELIVERY TO
+          </div>
+          <div
+            style={{
+              fontSize: '14px',
+              color: 'var(--text)',
+              lineHeight: '1.4',
+              fontWeight: 500,
+            }}
+          >
+            {shipment.destination_address}
+          </div>
+        </div>
+
+        {/* Customer & Contact in Row */}
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            gap: '12px',
+          }}
+        >
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div
+              style={{
+                fontSize: '10px',
+                color: '#9ca3af',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                fontWeight: 600,
+                marginBottom: '3px',
+              }}
+            >
+              👤 CUSTOMER
+            </div>
+            <div
+              style={{
+                fontSize: '13px',
+                color: 'var(--text)',
+                fontWeight: 600,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {shipment.customer}
+            </div>
+          </div>
+
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div
+              style={{
+                fontSize: '10px',
+                color: '#9ca3af',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                fontWeight: 600,
+                marginBottom: '3px',
+              }}
+            >
+              📞 CONTACT
+            </div>
+            <div
+              style={{
+                fontSize: '13px',
+                color:
+                  shipment.receiver_phone !== 'N/A'
+                    ? 'var(--primary-600)'
+                    : '#9ca3af',
+                fontWeight: 600,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {shipment.receiver_phone !== 'N/A' ? shipment.receiver_phone : 'No phone'}
+            </div>
+          </div>
+        </div>
+
+        {/* Interaction hints */}
+        {!showStatusModal && shipment.status !== 'delivered' && (
+          <div
+            style={{
+              marginTop: '12px',
+              padding: '8px',
+              background: 'rgba(59, 130, 246, 0.1)',
+              borderRadius: '6px',
+              textAlign: 'center',
+              fontSize: '11px',
+              color: '#3b82f6',
+              fontWeight: 600,
+            }}
+          >
+            {quickAction && shipment.status === 'pending'
+              ? '➡️ Swipe right to pickup | 📝 Long press to update'
+              : '📝 Long press to update status'}
+          </div>
+        )}
+      </div>
+
+      {/* Status Update Modal */}
+      {showStatusModal && (
+        <StatusUpdateModal
+          shipment={shipment}
+          onUpdate={onStatusUpdate}
+          onClose={() => setShowStatusModal(false)}
+          currentLocation={currentLocation}
+        />
+      )}
+    </div>
+  )
+}
+
+// Status Update Modal Component
+function StatusUpdateModal({ shipment, onUpdate, onClose, currentLocation }) {
+  const [selectedStatus, setSelectedStatus] = useState('')
+  const [location, setLocation] = useState('')
+  const [notes, setNotes] = useState('')
+  const [updating, setUpdating] = useState(false)
+  const [gettingLocation, setGettingLocation] = useState(false)
+
+  // Auto-fill location with GPS coordinates when modal opens
+  useEffect(() => {
+    if (currentLocation && !location) {
+      const coords = `${currentLocation.latitude.toFixed(6)}, ${currentLocation.longitude.toFixed(6)}`
+      setLocation(coords)
+    }
+  }, [currentLocation])
+
+  const statusOptions = [
+    { value: 'picked_up', label: '📦 Picked Up', icon: '📦', color: '#10b981' },
+    { value: 'in_transit', label: '🚛 In Transit', icon: '🚛', color: '#3b82f6' },
+    { value: 'out_for_delivery', label: '🚚 Out for Delivery', icon: '🚚', color: '#8b5cf6' },
+    { value: 'delivered', label: '✅ Delivered', icon: '✅', color: '#10b981' },
+    { value: 'delivery_attempted', label: '🔄 Delivery Attempted', icon: '🔄', color: '#f59e0b' },
+    { value: 'exception', label: '⚠️ Exception/Problem', icon: '⚠️', color: '#ef4444' }
+  ]
+
+  const useCurrentLocation = () => {
+    if (currentLocation) {
+      const coords = `${currentLocation.latitude.toFixed(6)}, ${currentLocation.longitude.toFixed(6)}`
+      setLocation(coords)
+    } else {
+      // Try to get location if not already available
+      setGettingLocation(true)
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const coords = `${position.coords.latitude.toFixed(6)}, ${position.coords.longitude.toFixed(6)}`
+            setLocation(coords)
+            setGettingLocation(false)
+          },
+          (error) => {
+            alert('Unable to get your location. Please enter manually.')
+            setGettingLocation(false)
+          }
+        )
+      } else {
+        alert('Geolocation is not supported by your device')
+        setGettingLocation(false)
+      }
+    }
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    if (!selectedStatus || !location.trim()) {
+      alert('Please select a status and enter location')
+      return
+    }
+
+    setUpdating(true)
+    try {
+      await onUpdate(shipment.id, selectedStatus, location.trim(), notes.trim())
+      onClose()
+    } catch (error) {
+      alert('Failed to update status')
+    } finally {
+      setUpdating(false)
+    }
+  }
+
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 9999,
+        padding: '20px',
+      }}
+      onClick={onClose}
+    >
+      <div
+        style={{
+          backgroundColor: 'var(--surface)',
+          borderRadius: '12px',
+          padding: '20px',
+          maxWidth: '500px',
+          width: '100%',
+          maxHeight: '90vh',
+          overflow: 'auto',
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+          <h2 style={{ margin: 0, color: 'var(--text)' }}>📝 Update Status</h2>
+          <button
+            onClick={onClose}
+            disabled={updating}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              fontSize: '24px',
+              cursor: 'pointer',
+              color: 'var(--text-muted)',
+            }}
+          >
+            ✖️
+          </button>
+        </div>
+
+        {/* Shipment Info */}
+        <div style={{ marginBottom: '20px', padding: '12px', background: 'var(--bg-2)', borderRadius: '8px' }}>
+          <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '4px' }}>Shipment</div>
+          <div style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text)', fontFamily: 'monospace' }}>
+            {shipment.tracking_number}
+          </div>
+        </div>
+
+        <form onSubmit={handleSubmit}>
+          {/* Status Options */}
+          <div style={{ marginBottom: '20px' }}>
+            <label style={{ display: 'block', marginBottom: '10px', fontSize: '13px', fontWeight: 600, color: 'var(--text)' }}>
+              Select Status
+            </label>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
+              {statusOptions.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setSelectedStatus(option.value)}
+                  disabled={updating}
+                  style={{
+                    padding: '12px',
+                    border: selectedStatus === option.value ? `2px solid ${option.color}` : '1px solid var(--border)',
+                    borderRadius: '8px',
+                    background: selectedStatus === option.value ? `${option.color}15` : 'var(--surface)',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    color: selectedStatus === option.value ? option.color : 'var(--text)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    transition: 'all 0.2s ease',
+                  }}
+                >
+                  <span style={{ fontSize: '16px' }}>{option.icon}</span>
+                  <span>{option.label.replace(/^[^\s]+\s/, '')}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Location */}
+          <div style={{ marginBottom: '15px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+              <label style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)' }}>
+                📍 Current Location *
+              </label>
+              <button
+                type="button"
+                onClick={useCurrentLocation}
+                disabled={updating || gettingLocation}
+                style={{
+                  padding: '4px 10px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  color: 'white',
+                  background: currentLocation ? '#10b981' : '#3b82f6',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: updating || gettingLocation ? 'not-allowed' : 'pointer',
+                  opacity: updating || gettingLocation ? 0.6 : 1,
+                }}
+              >
+                {gettingLocation ? '⏳ Getting...' : currentLocation ? '🔄 Refresh GPS' : '🔍 Get Location'}
+              </button>
+            </div>
+            <input
+              type="text"
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              placeholder="e.g. Manila Hub, Customer Location or GPS coords"
+              disabled={updating}
+              required
+              style={{
+                width: '100%',
+                padding: '10px',
+                border: '1px solid var(--border)',
+                borderRadius: '6px',
+                fontSize: '14px',
+                background: 'var(--surface)',
+                color: 'var(--text)',
+              }}
+            />
+            {currentLocation && (
+              <div style={{ marginTop: '4px', fontSize: '11px', color: '#10b981' }}>
+                ✓ GPS coordinates auto-filled from live tracking
+              </div>
+            )}
+            {!currentLocation && (
+              <div style={{ marginTop: '4px', fontSize: '11px', color: '#f59e0b' }}>
+                ⚠️ GPS tracking not active - Click "Get Location" or enter manually
+              </div>
+            )}
+          </div>
+
+          {/* Notes */}
+          <div style={{ marginBottom: '20px' }}>
+            <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 600, color: 'var(--text)' }}>
+              📝 Additional Notes
+            </label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Optional notes or details..."
+              disabled={updating}
+              rows={3}
+              style={{
+                width: '100%',
+                padding: '10px',
+                border: '1px solid var(--border)',
+                borderRadius: '6px',
+                fontSize: '14px',
+                background: 'var(--surface)',
+                color: 'var(--text)',
+                resize: 'vertical',
+              }}
+            />
+          </div>
+
+          {/* Actions */}
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={updating}
+              style={{
+                flex: 1,
+                padding: '12px',
+                border: '1px solid var(--border)',
+                borderRadius: '8px',
+                background: 'var(--surface)',
+                color: 'var(--text)',
+                fontSize: '14px',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={updating || !selectedStatus || !location.trim()}
+              style={{
+                flex: 1,
+                padding: '12px',
+                border: 'none',
+                borderRadius: '8px',
+                background: updating || !selectedStatus || !location.trim() ? '#9ca3af' : '#3b82f6',
+                color: 'white',
+                fontSize: '14px',
+                fontWeight: 600,
+                cursor: updating || !selectedStatus || !location.trim() ? 'not-allowed' : 'pointer',
+              }}
+            >
+              {updating ? '🔄 Updating...' : '✅ Update Status'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
 }
 
 export default function DriverDashboard() {
@@ -81,6 +674,81 @@ export default function DriverDashboard() {
       setError(e.message || 'Failed to load shipments')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleQuickStatusUpdate = async (shipmentId, newStatus) => {
+    try {
+      // Find the shipment to get origin info
+      const shipment = shipments.find(s => s.id === shipmentId)
+      const locationText = newStatus === 'picked_up' && shipment?.customer
+        ? `Picked up from warehouse`
+        : 'In transit'
+
+      await apiPatch(`/api/driver/shipments/${shipmentId}/status`, {
+        status: newStatus,
+        location: locationText,
+        notes: 'Quick status update via swipe gesture',
+        driver_id: driver.id
+      })
+
+      // Reload shipments to show updated status
+      await loadShipments(driver.id)
+    } catch (e) {
+      alert('Failed to update status: ' + (e.message || 'Unknown error'))
+    }
+  }
+
+  const handleFullStatusUpdate = async (shipmentId, newStatus, location, notes) => {
+    try {
+      await apiPatch(`/api/driver/shipments/${shipmentId}/status`, {
+        status: newStatus,
+        location: location,
+        notes: notes || 'Status updated via driver dashboard',
+        driver_id: driver.id
+      })
+
+      // Reload shipments to show updated status
+      await loadShipments(driver.id)
+    } catch (e) {
+      throw new Error(e.message || 'Failed to update status')
+    }
+  }
+
+  const getQuickActionButton = (shipment) => {
+    switch (shipment.status) {
+      case 'pending':
+        return {
+          label: '📦 Confirm Pickup',
+          nextStatus: 'picked_up',
+          color: '#10b981',
+          confirmMessage: '✅ Confirm that the package has been loaded onto your vehicle?'
+        }
+      case 'picked_up':
+        return {
+          label: '🚛 Start Journey',
+          nextStatus: 'in_transit',
+          color: '#3b82f6',
+          confirmMessage: '🚛 Start the journey to the customer?'
+        }
+      case 'in_transit':
+        return {
+          label: '🚚 Out for Delivery',
+          nextStatus: 'out_for_delivery',
+          color: '#f59e0b',
+          confirmMessage: '🚚 Mark as out for delivery? (You should be near the destination)'
+        }
+      case 'out_for_delivery':
+        return {
+          label: '✅ Mark Delivered',
+          nextStatus: 'delivered',
+          color: '#059669',
+          confirmMessage: '✅ Confirm that the package has been successfully delivered to the customer?'
+        }
+      case 'delivered':
+        return null // No action needed for delivered shipments
+      default:
+        return null
     }
   }
 
@@ -246,6 +914,7 @@ export default function DriverDashboard() {
   const getStatusColor = (status) => {
     switch (status) {
       case 'pending': return 'status-pending'
+      case 'picked_up': return 'status-info'
       case 'in_transit': return 'status-transit'
       case 'out_for_delivery': return 'status-delivery'
       case 'delivered': return 'status-delivered'
@@ -256,6 +925,7 @@ export default function DriverDashboard() {
   const getStatusIcon = (status) => {
     switch (status) {
       case 'pending': return '📦'
+      case 'picked_up': return '✅'
       case 'in_transit': return '🚛'
       case 'out_for_delivery': return '🚚'
       case 'delivered': return '✅'
@@ -504,7 +1174,7 @@ export default function DriverDashboard() {
       </div>
 
       {summary && (
-        <div className="grid" style={{ gridTemplateColumns: 'repeat(4, minmax(0,1fr))', gap: '16px', marginBottom: '16px' }}>
+        <div className="grid" style={{ gridTemplateColumns: 'repeat(5, minmax(0,1fr))', gap: '16px', marginBottom: '16px' }}>
           <div className="card" style={{ padding: '16px', textAlign: 'center' }}>
             <div style={{ fontSize: '32px', fontWeight: 'bold', color: 'var(--primary-600)', marginBottom: '8px' }}>
               {summary.total || 0}
@@ -516,6 +1186,12 @@ export default function DriverDashboard() {
               {summary.pending || 0}
             </div>
             <div className="muted" style={{ fontSize: '14px' }}>Pending</div>
+          </div>
+          <div className="card" style={{ padding: '16px', textAlign: 'center' }}>
+            <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#10b981', marginBottom: '8px' }}>
+              {summary.picked_up || 0}
+            </div>
+            <div className="muted" style={{ fontSize: '14px' }}>Picked Up</div>
           </div>
           <div className="card" style={{ padding: '16px', textAlign: 'center' }}>
             <div style={{ fontSize: '32px', fontWeight: 'bold', color: 'var(--info-600)', marginBottom: '8px' }}>
@@ -668,62 +1344,23 @@ export default function DriverDashboard() {
       )}
 
       {!loading && !error && shipments.length > 0 && (
-        <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '16px' }}>
-          {shipments.map((shipment) => (
-            <div
-              key={shipment.id}
-              className="card"
-              style={{
-                padding: '16px',
-                cursor: 'pointer',
-                transition: 'all 0.2s ease',
-                border: '1px solid var(--gray-200)',
-                ':hover': {
-                  borderColor: 'var(--primary-300)',
-                  transform: 'translateY(-2px)',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
-                }
-              }}
-              onClick={() => navigate(`/driver/shipment/${shipment.id}`)}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                <div className="muted" style={{ fontFamily: 'monospace', fontSize: '14px' }}>
-                  {shipment.tracking_number}
-                </div>
-                <span className={`badge ${
-                  shipment.status === 'delivered' ? 'success' :
-                  shipment.status === 'out_for_delivery' ? 'warn' :
-                  shipment.status === 'in_transit' ? 'info' : ''
-                }`} style={{ fontSize: '12px' }}>
-                  {getStatusIcon(shipment.status)} {shipment.status.replace('_', ' ')}
-                </span>
-              </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          {shipments.map((shipment) => {
+            const quickAction = getQuickActionButton(shipment)
 
-              <div style={{ marginBottom: '8px' }}>
-                <div style={{ fontWeight: 'bold', fontSize: '16px', marginBottom: '4px' }}>
-                  📍 {shipment.receiver_name}
-                </div>
-                <div className="muted" style={{ fontSize: '14px' }}>
-                  {shipment.destination_address}
-                </div>
-              </div>
-
-              <div style={{ marginBottom: '12px' }}>
-                <div className="muted" style={{ fontSize: '14px' }}>
-                  👤 Customer: {shipment.customer}
-                </div>
-                <div className="muted" style={{ fontSize: '14px', marginTop: '4px' }}>
-                  🚛 Vehicle: {shipment.vehicle}
-                </div>
-              </div>
-
-              <div style={{ textAlign: 'center', paddingTop: '8px', borderTop: '1px solid var(--gray-200)' }}>
-                <span className="muted" style={{ fontSize: '12px' }}>
-                  👆 Tap to update status
-                </span>
-              </div>
-            </div>
-          ))}
+            return (
+              <SwipeableCard
+                key={shipment.id}
+                shipment={shipment}
+                quickAction={quickAction}
+                onSwipe={() => handleQuickStatusUpdate(shipment.id, quickAction?.nextStatus)}
+                onTap={() => navigate(`/driver/shipment/${shipment.id}`)}
+                onStatusUpdate={handleFullStatusUpdate}
+                getStatusIcon={getStatusIcon}
+                currentLocation={currentLocation}
+              />
+            )
+          })}
         </div>
       )}
 

@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Helpers\UserHelper;
+use App\Models\Order;
+use App\Events\OrderStatusUpdated;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -200,21 +202,39 @@ class OrderController extends Controller
                 ->header('Access-Control-Allow-Origin', '*');
         }
 
-        $exists = DB::table('orders')
+        // Get old status before updating
+        $order = DB::table('orders')
             ->where('order_id', $id)
             ->where('organization_id', $orgUserId)
-            ->exists();
-        if (!$exists) {
+            ->first();
+
+        if (!$order) {
             return response()->json(['message' => 'Order not found'], 404)
                 ->header('Access-Control-Allow-Origin', '*');
         }
+
+        $oldStatus = $order->order_status;
+        $newStatus = $data['status'];
 
         DB::table('orders')
             ->where('order_id', $id)
             ->where('organization_id', $orgUserId)
             ->update([
-                'order_status' => $data['status'],
+                'order_status' => $newStatus,
             ]);
+
+        // Broadcast real-time status update
+        $orderModel = Order::find($id);
+        if ($orderModel) {
+            \Log::info('Broadcasting order status update', [
+                'order_id' => $id,
+                'old_status' => $oldStatus,
+                'new_status' => $newStatus,
+                'organization_id' => $orderModel->organization_id ?? null
+            ]);
+            event(new OrderStatusUpdated($orderModel, $oldStatus, $newStatus, 'admin'));
+            \Log::info('Order broadcast event fired');
+        }
 
         return response()->json(['message' => 'Status updated'])
             ->header('Access-Control-Allow-Origin', '*');
@@ -238,11 +258,13 @@ class OrderController extends Controller
                 ->header('Access-Control-Allow-Origin', '*');
         }
 
-        $exists = DB::table('orders')
+        // Get old status before updating
+        $order = DB::table('orders')
             ->where('order_id', $id)
             ->where('organization_id', $orgUserId)
-            ->exists();
-        if (!$exists) {
+            ->first();
+
+        if (!$order) {
             return response()->json(['message' => 'Order not found'], 404)
                 ->header('Access-Control-Allow-Origin', '*');
         }
@@ -256,10 +278,27 @@ class OrderController extends Controller
                 ->header('Access-Control-Allow-Origin', '*');
         }
 
+        $oldStatus = $order->order_status;
+
         DB::table('orders')
             ->where('order_id', $id)
             ->where('organization_id', $orgUserId)
             ->update($updates);
+
+        // Broadcast real-time status update if status was changed
+        if (array_key_exists('order_status', $updates)) {
+            $orderModel = Order::find($id);
+            if ($orderModel) {
+                \Log::info('Broadcasting order status update', [
+                    'order_id' => $id,
+                    'old_status' => $oldStatus,
+                    'new_status' => $updates['order_status'],
+                    'organization_id' => $orderModel->organization_id ?? null
+                ]);
+                event(new OrderStatusUpdated($orderModel, $oldStatus, $updates['order_status'], 'admin'));
+                \Log::info('Order broadcast event fired');
+            }
+        }
 
         return response()->json(['message' => 'Order updated'])
             ->header('Access-Control-Allow-Origin', '*');

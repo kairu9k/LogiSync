@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Helpers\UserHelper;
+use App\Models\Notification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
@@ -185,6 +186,19 @@ class QuoteController extends Controller
             'distance' => (int)$data['distance'],
         ], 'quote_id');
 
+        // Create notification for new quote request
+        Notification::create([
+            'organization_id' => $orgUserId,
+            'user_id' => null,
+            'type' => 'info',
+            'category' => 'quote',
+            'icon' => '📋',
+            'message' => "New quote request from {$data['customer']} - {$quoteNumber}",
+            'link' => "/app/quotes",
+            'priority' => 'medium',
+            'related_id' => $id,
+        ]);
+
         return response()->json([
             'message' => 'Quote created',
             'quote_id' => $id,
@@ -210,15 +224,33 @@ class QuoteController extends Controller
             return response()->json(['errors' => $validator->errors()], 422)
                 ->header('Access-Control-Allow-Origin', '*');
         }
-        $exists = DB::table('quotes')
+        $quote = DB::table('quotes')
             ->where('quote_id', $id)
             ->where('organization_id', $orgUserId)
-            ->exists();
-        if (!$exists) return response()->json(['message' => 'Quote not found'], 404)->header('Access-Control-Allow-Origin','*');
+            ->first();
+        if (!$quote) return response()->json(['message' => 'Quote not found'], 404)->header('Access-Control-Allow-Origin','*');
+
         DB::table('quotes')
             ->where('quote_id', $id)
             ->where('organization_id', $orgUserId)
             ->update(['status' => $data['status']]);
+
+        // Create notification for quote status change
+        $notificationData = $this->getQuoteStatusNotificationData($data['status'], $quote);
+        if ($notificationData) {
+            Notification::create([
+                'organization_id' => $orgUserId,
+                'user_id' => null,
+                'type' => $notificationData['type'],
+                'category' => 'quote',
+                'icon' => $notificationData['icon'],
+                'message' => $notificationData['message'],
+                'link' => "/app/quotes",
+                'priority' => $notificationData['priority'],
+                'related_id' => $id,
+            ]);
+        }
+
         return response()->json(['message' => 'Quote status updated'])->header('Access-Control-Allow-Origin','*');
     }
 
@@ -261,5 +293,37 @@ class QuoteController extends Controller
         }
         return response()->json(['message' => 'Order created', 'order_id' => $orderId])
             ->header('Access-Control-Allow-Origin','*');
+    }
+
+    /**
+     * Get notification data based on quote status
+     */
+    private function getQuoteStatusNotificationData(string $status, object $quote): ?array
+    {
+        switch ($status) {
+            case 'approved':
+                return [
+                    'type' => 'success',
+                    'icon' => '✅',
+                    'message' => "Quote {$quote->quote_number} for {$quote->customer_name} has been approved",
+                    'priority' => 'medium'
+                ];
+            case 'rejected':
+                return [
+                    'type' => 'warning',
+                    'icon' => '❌',
+                    'message' => "Quote {$quote->quote_number} for {$quote->customer_name} has been rejected",
+                    'priority' => 'low'
+                ];
+            case 'expired':
+                return [
+                    'type' => 'warning',
+                    'icon' => '⏰',
+                    'message' => "Quote {$quote->quote_number} for {$quote->customer_name} has expired",
+                    'priority' => 'low'
+                ];
+            default:
+                return null;
+        }
     }
 }

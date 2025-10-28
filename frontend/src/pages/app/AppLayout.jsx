@@ -2,6 +2,7 @@ import { NavLink, Outlet, useNavigate, Link, useLocation } from 'react-router-do
 import { useState, useMemo, useEffect } from 'react'
 import { apiGet } from '../../lib/api'
 import { can } from '../../lib/permissions'
+import NotificationBell from '../../components/NotificationBell'
 
 export default function AppLayout() {
   const navigate = useNavigate()
@@ -435,6 +436,9 @@ export default function AppLayout() {
                   ))}
                 </nav>
               </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <NotificationBell />
             </div>
           </div>
         </header>

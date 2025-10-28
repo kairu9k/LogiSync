@@ -13,9 +13,11 @@ use App\Http\Controllers\Api\WarehouseController;
 use App\Http\Controllers\Api\AnalyticsController;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\SubscriptionController;
+use App\Http\Controllers\Api\PayMongoCheckoutController;
 use App\Http\Controllers\Api\BudgetController;
 use App\Http\Controllers\Api\ScheduleController;
 use App\Http\Controllers\Api\PricingController;
+use App\Http\Controllers\Api\NotificationController;
 
 // ===== PUBLIC ROUTES (No authentication required) =====
 Route::prefix('auth')->group(function () {
@@ -156,11 +158,21 @@ Route::middleware(['role:admin,booking_manager,warehouse_manager'])->group(funct
     Route::get('/dashboard/metrics', [DashboardController::class, 'getMetrics']);
     Route::get('/dashboard/warehouse-metrics', [WarehouseController::class, 'getDashboardMetrics']);
 
+    // Notifications
+    Route::get('/notifications', [NotificationController::class, 'index']);
+    Route::get('/notifications/unread', [NotificationController::class, 'getUnread']);
+    Route::patch('/notifications/{id}/read', [NotificationController::class, 'markAsRead']);
+    Route::post('/notifications/mark-all-read', [NotificationController::class, 'markAllAsRead']);
+    Route::delete('/notifications/{id}', [NotificationController::class, 'destroy']);
+    Route::delete('/notifications/clear-read', [NotificationController::class, 'clearRead']);
+
     // Subscriptions (all authenticated users)
     Route::get('/subscriptions/current', [SubscriptionController::class, 'getCurrentSubscription']);
     Route::post('/subscriptions/subscribe', [SubscriptionController::class, 'createPaymentIntent']);
     Route::post('/subscriptions/{id}/confirm', [SubscriptionController::class, 'confirmPayment']);
     Route::post('/subscriptions/{id}/cancel', [SubscriptionController::class, 'cancel']);
+    Route::post('/subscriptions/checkout', [PayMongoCheckoutController::class, 'createCheckout']);
+    Route::post('/subscriptions/payment-success', [PayMongoCheckoutController::class, 'handleSuccess']);
 
     // Pricing Configuration (all staff can view, only admin can update will be handled in controller)
     Route::get('/pricing/config', [PricingController::class, 'getConfig']);
@@ -174,4 +186,36 @@ Route::middleware(['role:driver'])->group(function () {
     Route::get('/driver/shipments', [DriverController::class, 'getMyShipments']);
     Route::get('/driver/shipments/{id}', [DriverController::class, 'getShipmentDetail']);
     Route::patch('/driver/shipments/{id}/status', [DriverController::class, 'updateShipmentStatus']);
+});
+
+// ===== TEST ROUTES (Development only) =====
+Route::get('/test-ably', function () {
+    try {
+        \Log::info('Test endpoint called');
+        \Log::info('Broadcast driver: ' . config('broadcasting.default'));
+
+        $event = new \App\Events\TestAblyConnection('Hello from LogiSync!');
+        \Log::info('Event created', [
+            'message' => $event->message,
+            'timestamp' => $event->timestamp
+        ]);
+
+        event($event);
+        \Log::info('Event fired successfully');
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Test event broadcasted via Ably',
+            'timestamp' => now()->toDateTimeString(),
+            'broadcast_driver' => config('broadcasting.default')
+        ]);
+    } catch (\Exception $e) {
+        \Log::error('Test Ably error: ' . $e->getMessage(), [
+            'trace' => $e->getTraceAsString()
+        ]);
+        return response()->json([
+            'success' => false,
+            'error' => $e->getMessage()
+        ], 500);
+    }
 });

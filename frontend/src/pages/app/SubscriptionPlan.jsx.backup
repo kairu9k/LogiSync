@@ -27,27 +27,7 @@ export default function SubscriptionPlan() {
     }
   }
 
-  useEffect(() => {
-    loadData()
-
-    // Check if returning from PayMongo
-    const urlParams = new URLSearchParams(window.location.search)
-    const paymentStatus = urlParams.get("payment")
-    const subscriptionId = urlParams.get("subscription_id")
-
-    if (paymentStatus === "success" && subscriptionId) {
-      apiPost("/api/subscriptions/payment-success", { subscription_id: subscriptionId })
-        .then(() => {
-          alert("✅ Payment successful! Your subscription is now active.")
-          window.history.replaceState({}, "", window.location.pathname)
-          loadData()
-        })
-        .catch(() => alert("Payment done but activation failed. Contact support."))
-    } else if (paymentStatus === "cancelled") {
-      alert("❌ Payment cancelled.")
-      window.history.replaceState({}, "", window.location.pathname)
-    }
-  }, [])
+  useEffect(() => { loadData() }, [])
 
   async function handleSubscribe(plan) {
     if (subscribing) return
@@ -59,21 +39,19 @@ export default function SubscriptionPlan() {
 
     setSubscribing(true)
     try {
-      const res = await apiPost('/api/subscriptions/checkout', { plan_id: plan.id })
+      const res = await apiPost('/api/subscriptions/subscribe', { plan_id: plan.id })
 
       if (!res.requires_payment) {
         // Free plan activated
         alert(res.message)
         await loadData()
       } else {
-        // Paid plan - redirect to PayMongo checkout
-        if (res.checkout_url) {
-          window.open(res.checkout_url, '_blank')
-          alert('✅ PayMongo checkout opened in new window!\n\n📝 Test Card:\nCard: 4343 4343 4343 4343\nExpiry: 12/25 | CVC: 123\n\nComplete payment and click OK to refresh.')
-          await loadData()
-        } else {
-          alert('Failed to create checkout session')
-        }
+        // Paid plan - redirect to payment
+        alert('✅ Payment intent created!\n\n' +
+              'In production, you would be redirected to PayMongo checkout.\n\n' +
+              'For demo: Your subscription is now pending payment.\n\n' +
+              'Test payment will be available once you connect your UnionBank account.')
+        await loadData()
       }
     } catch (e) {
       alert(e.message || 'Failed to subscribe')
@@ -303,7 +281,7 @@ export default function SubscriptionPlan() {
           <div style={{ marginTop: 16, padding: 12, background: 'color-mix(in oklab, var(--primary), transparent 90%)', border: '1px solid color-mix(in oklab, var(--primary), transparent 70%)', borderRadius: 6 }}>
             <strong style={{ color: 'var(--text)' }}>ℹ️ Test Mode Active</strong>
             <p style={{ margin: '8px 0 0 0', fontSize: 13, color: 'var(--muted)' }}>
-              Use test card 4343 4343 4343 4343 to demo the payment flow. No real charges will be made.
+              Currently in test mode. Payments will be processed when your UnionBank account is connected.
             </p>
           </div>
         </div>

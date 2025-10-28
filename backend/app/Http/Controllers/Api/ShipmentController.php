@@ -8,6 +8,7 @@ use App\Models\Shipment;
 use App\Models\Transport;
 use App\Models\Order;
 use App\Models\Invoice;
+use App\Events\ShipmentStatusUpdated;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -296,20 +297,30 @@ class ShipmentController extends Controller
                 ->header('Access-Control-Allow-Origin', '*');
         }
 
+        // Store old status for event
+        $oldStatus = $shipment->status;
+        $newStatus = $data['status'];
+
         DB::table('shipments')->where('shipment_id', $id)->update([
-            'status' => $data['status'],
+            'status' => $newStatus,
         ]);
 
         DB::table('tracking_history')->insert([
             'shipment_id' => $id,
             'location' => $data['location'],
-            'status' => $data['status'],
+            'status' => $newStatus,
             'details' => $data['details'] ?? null,
         ]);
 
         // Auto-generate invoice when shipment is delivered
-        if ($data['status'] === 'delivered') {
+        if ($newStatus === 'delivered') {
             $this->createInvoiceForDeliveredShipment($id);
+        }
+
+        // Broadcast real-time status update
+        $shipmentModel = Shipment::find($id);
+        if ($shipmentModel) {
+            event(new ShipmentStatusUpdated($shipmentModel, $oldStatus, $newStatus, 'admin'));
         }
 
         return response()->json(['message' => 'Shipment status updated'])

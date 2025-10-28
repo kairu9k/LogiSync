@@ -125,6 +125,7 @@ class AuthController extends Controller
                 'email' => $user->email,
                 'username' => $user->username ?? null,
                 'role' => $user->role ?? 'admin',
+                'organization_id' => $user->organization_id ?? null,
             ],
         ])->header('Access-Control-Allow-Origin', '*');
     }
@@ -217,6 +218,7 @@ class AuthController extends Controller
                 'email' => $user->email,
                 'username' => $user->username ?? null,
                 'role' => $user->role ?? 'admin',
+                'organization_id' => $user->organization_id ?? null,
             ],
             'token' => 'demo',
         ])->header('Access-Control-Allow-Origin', '*');

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Invoice;
 use App\Models\Shipment;
+use App\Events\ShipmentStatusUpdated;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -99,12 +100,13 @@ class DriverController extends Controller
             ->join('users as d', 't.driver_id', '=', 'd.user_id')
             ->leftJoin('orders as o', 's.order_id', '=', 'o.order_id')
             ->where('d.user_id', $driverId)
-            ->whereIn('s.status', ['pending', 'in_transit', 'out_for_delivery'])
+            ->whereIn('s.status', ['pending', 'picked_up', 'in_transit', 'out_for_delivery'])
             ->select(
                 's.shipment_id',
                 's.tracking_number',
                 's.receiver_name',
                 's.receiver_address',
+                's.receiver_contact',
                 's.destination_address',
                 's.status',
                 's.creation_date',
@@ -113,6 +115,7 @@ class DriverController extends Controller
                 't.registration_number',
                 't.vehicle_type'
             )
+            ->orderByRaw("FIELD(s.status, 'pending', 'picked_up', 'in_transit', 'out_for_delivery')")
             ->orderBy('s.departure_date')
             ->orderBy('s.creation_date')
             ->get();
@@ -123,6 +126,7 @@ class DriverController extends Controller
                 'tracking_number' => $s->tracking_number,
                 'receiver_name' => $s->receiver_name,
                 'receiver_address' => $s->receiver_address,
+                'receiver_phone' => $s->receiver_contact ?? 'N/A',
                 'destination_address' => $s->destination_address,
                 'status' => $s->status,
                 'customer' => $s->customer ?? 'N/A',
@@ -137,6 +141,7 @@ class DriverController extends Controller
             'summary' => [
                 'total' => $data->count(),
                 'pending' => $data->where('status', 'pending')->count(),
+                'picked_up' => $data->where('status', 'picked_up')->count(),
                 'in_transit' => $data->where('status', 'in_transit')->count(),
                 'out_for_delivery' => $data->where('status', 'out_for_delivery')->count(),
             ]
@@ -170,8 +175,17 @@ class DriverController extends Controller
                 ->header('Access-Control-Allow-Origin', '*');
         }
 
+        // Store old status for event
+        $oldStatus = $shipment->status;
+
         // Map driver status to system status
         $systemStatus = $this->mapDriverStatus($data['status']);
+
+        // Get better location info if generic location provided
+        $location = $data['location'];
+        if (in_array($location, ['Driver Location', 'In transit', 'Picked up from warehouse'])) {
+            $location = $this->getSmartLocation($shipmentId, $data['status']);
+        }
 
         // Update shipment status
         DB::table('shipments')->where('shipment_id', $shipmentId)->update([
@@ -181,7 +195,7 @@ class DriverController extends Controller
         // Add tracking history
         DB::table('tracking_history')->insert([
             'shipment_id' => $shipmentId,
-            'location' => $data['location'],
+            'location' => $location,
             'status' => $systemStatus,
             'details' => $data['notes'] ?? $this->getDefaultStatusMessage($data['status']),
         ]);
@@ -189,6 +203,19 @@ class DriverController extends Controller
         // Auto-generate invoice when driver marks shipment as delivered
         if ($systemStatus === 'delivered') {
             $this->createInvoiceForDeliveredShipment($shipmentId);
+        }
+
+        // Broadcast real-time status update
+        $shipmentModel = Shipment::find($shipmentId);
+        if ($shipmentModel) {
+            \Log::info('Broadcasting shipment status update', [
+                'shipment_id' => $shipmentId,
+                'old_status' => $oldStatus,
+                'new_status' => $systemStatus,
+                'organization_id' => $shipmentModel->order->organization_id ?? null
+            ]);
+            event(new ShipmentStatusUpdated($shipmentModel, $oldStatus, $systemStatus, 'driver'));
+            \Log::info('Broadcast event fired');
         }
 
         return response()->json([
@@ -200,7 +227,7 @@ class DriverController extends Controller
     private function mapDriverStatus($driverStatus)
     {
         $statusMap = [
-            'picked_up' => 'in_transit',
+            'picked_up' => 'picked_up',
             'in_transit' => 'in_transit',
             'out_for_delivery' => 'out_for_delivery',
             'delivered' => 'delivered',
@@ -223,6 +250,45 @@ class DriverController extends Controller
         ];
 
         return $messages[$driverStatus] ?? 'Status updated by driver';
+    }
+
+    private function getSmartLocation($shipmentId, $status)
+    {
+        // Get shipment with origin and destination info
+        $shipment = DB::table('shipments')
+            ->where('shipment_id', $shipmentId)
+            ->select('origin_name', 'origin_address', 'destination_address', 'receiver_name')
+            ->first();
+
+        if (!$shipment) {
+            return 'Unknown location';
+        }
+
+        // Return smart location based on status
+        switch ($status) {
+            case 'picked_up':
+                // Use origin name (should contain warehouse/pickup location)
+                return $shipment->origin_name ? "Picked up from {$shipment->origin_name}" : 'Picked up from warehouse';
+
+            case 'in_transit':
+                return 'In transit to destination';
+
+            case 'out_for_delivery':
+                // Use receiver name or destination
+                return $shipment->receiver_name ? "Out for delivery to {$shipment->receiver_name}" : 'Out for delivery';
+
+            case 'delivered':
+                return $shipment->receiver_name ? "Delivered to {$shipment->receiver_name}" : 'Delivered to customer';
+
+            case 'delivery_attempted':
+                return $shipment->destination_address ?? 'Delivery attempted';
+
+            case 'exception':
+                return 'Exception - requires attention';
+
+            default:
+                return 'Location update';
+        }
     }
 
     public function getShipmentDetail(Request $request, int $shipmentId)
