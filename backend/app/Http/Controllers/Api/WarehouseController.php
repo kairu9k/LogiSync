@@ -303,7 +303,15 @@ class WarehouseController extends Controller
 
     public function getUnassignedItems()
     {
-        $unassignedOrders = OrderDetail::getUnassignedItems();
+        $userId = request()->header('X-User-Id');
+        if (!$userId) {
+            return response()->json(['message' => 'Unauthorized - User ID required'], 401);
+        }
+
+        // Get organization user ID (admin's ID for team members, own ID for admins)
+        $orgUserId = UserHelper::getOrganizationUserId($userId);
+
+        $unassignedOrders = OrderDetail::getUnassignedItems($orgUserId);
 
         $data = $unassignedOrders->map(function ($order) {
             $quote = $order->quote;
@@ -337,7 +345,7 @@ class WarehouseController extends Controller
 
         // Get stats filtered by organization
         $stats = Warehouse::getWarehouseStats($orgUserId);
-        $unassignedCount = OrderDetail::getUnassignedItems()->count();
+        $unassignedCount = OrderDetail::getUnassignedItems($orgUserId)->count();
 
         // Get recent activity filtered by organization
         $recentAssignments = Inventory::with(['warehouse', 'order.organization'])

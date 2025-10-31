@@ -23,12 +23,18 @@ class OrderDetail extends Model
     }
 
     // Get unassigned orders (packages waiting to be stored in warehouse)
-    public static function getUnassignedItems()
+    public static function getUnassignedItems($orgUserId = null)
     {
         // Get orders that are processing or fulfilled but not yet assigned to warehouse
-        return Order::with('organization', 'quote')
+        $query = Order::with('organization', 'quote')
             ->whereDoesntHave('inventory') // Orders not in inventory yet
-            ->whereIn('order_status', ['processing', 'fulfilled'])
-            ->get();
+            ->whereIn('order_status', ['processing', 'fulfilled']);
+
+        // Filter by organization if provided
+        if ($orgUserId) {
+            $query->where('organization_id', $orgUserId);
+        }
+
+        return $query->get();
     }
 }

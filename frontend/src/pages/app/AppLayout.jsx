@@ -83,35 +83,87 @@ export default function AppLayout() {
         </div>
         <nav className="navlist">
           {can.viewDashboard() && (
-            <NavLink to="/app" end aria-label="Dashboard">
+            <NavLink
+              to="/app"
+              end
+              aria-label="Dashboard"
+              style={({ isActive }) => ({
+                background: isActive ? 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)' : 'transparent',
+                borderRadius: '10px',
+                margin: '4px 8px',
+                transition: 'all 0.3s ease',
+                boxShadow: isActive ? '0 4px 12px rgba(59, 130, 246, 0.3)' : 'none'
+              })}
+            >
               <span className="nav-icon">📊</span>
               <span className="nav-label">Dashboard</span>
             </NavLink>
           )}
 
           {can.viewQuotes() && (
-            <NavLink to="/app/quotes" aria-label="Quotes">
+            <NavLink
+              to="/app/quotes"
+              aria-label="Quotes"
+              style={({ isActive }) => ({
+                background: isActive ? 'linear-gradient(135deg, #ec4899 0%, #db2777 100%)' : 'transparent',
+                borderRadius: '10px',
+                margin: '4px 8px',
+                transition: 'all 0.3s ease',
+                boxShadow: isActive ? '0 4px 12px rgba(236, 72, 153, 0.3)' : 'none'
+              })}
+            >
               <span className="nav-icon">🧾</span>
               <span className="nav-label">Quotes</span>
             </NavLink>
           )}
 
           {can.viewOrders() && (
-            <NavLink to="/app/orders" aria-label="Orders">
+            <NavLink
+              to="/app/orders"
+              aria-label="Orders"
+              style={({ isActive }) => ({
+                background: isActive ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' : 'transparent',
+                borderRadius: '10px',
+                margin: '4px 8px',
+                transition: 'all 0.3s ease',
+                boxShadow: isActive ? '0 4px 12px rgba(245, 158, 11, 0.3)' : 'none'
+              })}
+            >
               <span className="nav-icon">📦</span>
               <span className="nav-label">Orders</span>
             </NavLink>
           )}
 
           {can.viewShipments() && (
-            <NavLink to="/app/shipments" aria-label="Shipments">
+            <NavLink
+              to="/app/shipments"
+              aria-label="Shipments"
+              style={({ isActive }) => ({
+                background: isActive ? 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)' : 'transparent',
+                borderRadius: '10px',
+                margin: '4px 8px',
+                transition: 'all 0.3s ease',
+                boxShadow: isActive ? '0 4px 12px rgba(6, 182, 212, 0.3)' : 'none'
+              })}
+            >
               <span className="nav-icon">🚚</span>
               <span className="nav-label">Shipments</span>
             </NavLink>
           )}
 
           {can.viewInvoices() && (
-            <NavLink to="/app/invoices" aria-label="Invoices" style={{ position: 'relative' }}>
+            <NavLink
+              to="/app/invoices"
+              aria-label="Invoices"
+              style={({ isActive }) => ({
+                position: 'relative',
+                background: isActive ? 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)' : 'transparent',
+                borderRadius: '10px',
+                margin: '4px 8px',
+                transition: 'all 0.3s ease',
+                boxShadow: isActive ? '0 4px 12px rgba(139, 92, 246, 0.3)' : 'none'
+              })}
+            >
               <span className="nav-icon">💳</span>
               <span className="nav-label">Invoices</span>
               {overdueCount > 0 && (
@@ -139,27 +191,47 @@ export default function AppLayout() {
 
           {/* Warehouses & Inventory Dropdown */}
           {(can.viewWarehouses() || can.viewInventory()) && (
-            <div style={{ position: 'relative' }}>
-              <button
-                className={`nav-link${warehousesOpen ? ' active' : ''}`}
+            <>
+              <div
                 onClick={() => setWarehousesOpen(!warehousesOpen)}
                 aria-label="Warehouses"
+                role="button"
+                onMouseEnter={(e) => {
+                  const arrow = e.currentTarget.querySelector('.dropdown-arrow')
+                  if (arrow) arrow.style.opacity = '1'
+                }}
+                onMouseLeave={(e) => {
+                  const arrow = e.currentTarget.querySelector('.dropdown-arrow')
+                  if (arrow) arrow.style.opacity = '0'
+                }}
                 style={{
-                  width: '100%',
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
+                  background: warehousesOpen ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : 'transparent',
+                  borderRadius: '10px',
+                  margin: '4px 8px',
+                  transition: 'all 0.3s ease',
+                  boxShadow: warehousesOpen ? '0 4px 12px rgba(16, 185, 129, 0.3)' : 'none',
+                  padding: '12px 14px',
+                  color: 'var(--text)',
                   display: 'flex',
                   alignItems: 'center',
-                  padding: '12px 16px',
-                  color: 'inherit',
-                  textAlign: 'left'
+                  gap: '12px',
+                  fontSize: '15px',
+                  cursor: 'pointer'
                 }}
               >
                 <span className="nav-icon">🏪</span>
                 <span className="nav-label">Warehouses</span>
-                <span style={{ marginLeft: 'auto', fontSize: '12px', transition: 'transform 0.2s', transform: warehousesOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
-              </button>
+                <span
+                  className="dropdown-arrow"
+                  style={{
+                    marginLeft: 'auto',
+                    fontSize: '10px',
+                    transition: 'transform 0.2s, opacity 0.3s',
+                    transform: warehousesOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                    opacity: 0
+                  }}
+                >▼</span>
+              </div>
 
               {warehousesOpen && (
                 <div className="settings-dropdown" style={{
@@ -208,32 +280,52 @@ export default function AppLayout() {
                   )}
                 </div>
               )}
-            </div>
+            </>
           )}
 
           {/* Transportation & Schedules Dropdown */}
           {can.viewTransportation() && (
-            <div style={{ position: 'relative' }}>
-              <button
-                className={`nav-link${transportationOpen ? ' active' : ''}`}
+            <>
+              <div
                 onClick={() => setTransportationOpen(!transportationOpen)}
                 aria-label="Transportation"
+                role="button"
+                onMouseEnter={(e) => {
+                  const arrow = e.currentTarget.querySelector('.dropdown-arrow')
+                  if (arrow) arrow.style.opacity = '1'
+                }}
+                onMouseLeave={(e) => {
+                  const arrow = e.currentTarget.querySelector('.dropdown-arrow')
+                  if (arrow) arrow.style.opacity = '0'
+                }}
                 style={{
-                  width: '100%',
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
+                  background: transportationOpen ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)' : 'transparent',
+                  borderRadius: '10px',
+                  margin: '4px 8px',
+                  transition: 'all 0.3s ease',
+                  boxShadow: transportationOpen ? '0 4px 12px rgba(239, 68, 68, 0.3)' : 'none',
+                  padding: '12px 14px',
+                  color: 'var(--text)',
                   display: 'flex',
                   alignItems: 'center',
-                  padding: '12px 16px',
-                  color: 'inherit',
-                  textAlign: 'left'
+                  gap: '12px',
+                  fontSize: '15px',
+                  cursor: 'pointer'
                 }}
               >
                 <span className="nav-icon">🚛</span>
                 <span className="nav-label">Transportation</span>
-                <span style={{ marginLeft: 'auto', fontSize: '12px', transition: 'transform 0.2s', transform: transportationOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
-              </button>
+                <span
+                  className="dropdown-arrow"
+                  style={{
+                    marginLeft: 'auto',
+                    fontSize: '10px',
+                    transition: 'transform 0.2s, opacity 0.3s',
+                    transform: transportationOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                    opacity: 0
+                  }}
+                >▼</span>
+              </div>
 
               {transportationOpen && (
                 <div className="settings-dropdown" style={{
@@ -278,11 +370,21 @@ export default function AppLayout() {
                   </NavLink>
                 </div>
               )}
-            </div>
+            </>
           )}
 
           {can.viewReports() && (
-            <NavLink to="/app/reports" aria-label="Reports">
+            <NavLink
+              to="/app/reports"
+              aria-label="Reports"
+              style={({ isActive }) => ({
+                background: isActive ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' : 'transparent',
+                borderRadius: '10px',
+                margin: '4px 8px',
+                transition: 'all 0.3s ease',
+                boxShadow: isActive ? '0 4px 12px rgba(245, 158, 11, 0.3)' : 'none'
+              })}
+            >
               <span className="nav-icon">📈</span>
               <span className="nav-label">Reports</span>
             </NavLink>
@@ -291,30 +393,48 @@ export default function AppLayout() {
 
         {/* Settings Section at Bottom */}
         <div style={{ marginTop: 'auto', padding: '8px', borderTop: '1px solid var(--border)' }}>
-          <div style={{ position: 'relative' }}>
-            <button
-              className={`nav-link${settingsOpen ? ' active' : ''}`}
-              onClick={() => setSettingsOpen(!settingsOpen)}
-              aria-label="Settings"
+          <div
+            onClick={() => setSettingsOpen(!settingsOpen)}
+            aria-label="Settings"
+            role="button"
+            onMouseEnter={(e) => {
+              const arrow = e.currentTarget.querySelector('.dropdown-arrow')
+              if (arrow) arrow.style.opacity = '1'
+            }}
+            onMouseLeave={(e) => {
+              const arrow = e.currentTarget.querySelector('.dropdown-arrow')
+              if (arrow) arrow.style.opacity = '0'
+            }}
+            style={{
+              background: settingsOpen ? 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)' : 'transparent',
+              borderRadius: '10px',
+              margin: '4px 8px',
+              transition: 'all 0.3s ease',
+              boxShadow: settingsOpen ? '0 4px 12px rgba(99, 102, 241, 0.3)' : 'none',
+              padding: '12px 14px',
+              color: 'var(--text)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              fontSize: '15px',
+              cursor: 'pointer'
+            }}
+          >
+            <span className="nav-icon">⚙️</span>
+            <span className="nav-label">Settings</span>
+            <span
+              className="dropdown-arrow"
               style={{
-                width: '100%',
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                padding: '12px 14px',
-                color: 'inherit',
-                textAlign: 'left',
-                borderRadius: '10px'
+                marginLeft: 'auto',
+                fontSize: '10px',
+                transition: 'transform 0.2s, opacity 0.3s',
+                transform: settingsOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                opacity: 0
               }}
-            >
-              <span className="nav-icon">⚙️</span>
-              <span className="nav-label">Settings</span>
-              <span style={{ marginLeft: 'auto', fontSize: '12px', transition: 'transform 0.2s', transform: settingsOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
-            </button>
+            >▼</span>
+          </div>
 
-            {settingsOpen && (
+          {settingsOpen && (
               <div style={{
                 background: 'var(--surface)',
                 borderRadius: '8px',
@@ -417,27 +537,52 @@ export default function AppLayout() {
                 </button>
               </div>
             )}
-          </div>
         </div>
       </aside>
       <main className="app-main">
-        <header className="app-topbar">
-          <div className="container" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: 56 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1 }}>
-              <button aria-label="Open menu" className="btn-icon only-mobile" onClick={() => setMobileOpen(true)}>
-                <span className="bar"/><span className="bar"/><span className="bar"/>
+        <header className="app-topbar" style={{
+          background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, rgba(139, 92, 246, 0.05) 100%)',
+          backdropFilter: 'blur(10px)',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)'
+        }}>
+          <div className="container" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: 56, padding: '0 20px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16, flex: 1 }}>
+              <button aria-label="Open menu" className="btn-icon only-mobile" onClick={() => setMobileOpen(true)} style={{
+                background: 'rgba(59, 130, 246, 0.1)',
+                border: 'none',
+                borderRadius: '8px',
+                padding: '8px 12px',
+                cursor: 'pointer',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '3px'
+              }}>
+                <span className="bar" style={{ background: '#3b82f6', height: '2px', width: '20px', borderRadius: '2px' }}/>
+                <span className="bar" style={{ background: '#3b82f6', height: '2px', width: '20px', borderRadius: '2px' }}/>
+                <span className="bar" style={{ background: '#3b82f6', height: '2px', width: '20px', borderRadius: '2px' }}/>
               </button>
-              <div style={{ flex: 1 }}>
-                <nav className="breadcrumbs">
-                  {breadcrumbs.map((c, i) => (
-                    <span key={c.to}>
-                      {i > 0 && <span className="sep">/</span>} <Link to={c.to}>{c.label}</Link>
-                    </span>
-                  ))}
-                </nav>
-              </div>
+              <nav className="breadcrumbs" style={{
+                fontSize: '13px',
+                color: 'rgba(255, 255, 255, 0.6)'
+              }}>
+                {breadcrumbs.map((c, i) => (
+                  <span key={c.to}>
+                    {i > 0 && <span className="sep" style={{ margin: '0 6px', color: 'rgba(255, 255, 255, 0.4)' }}>/</span>}
+                    <Link to={c.to} style={{
+                      color: i === breadcrumbs.length - 1 ? '#3b82f6' : 'rgba(255, 255, 255, 0.6)',
+                      textDecoration: 'none',
+                      fontWeight: i === breadcrumbs.length - 1 ? '600' : '400',
+                      transition: 'color 0.2s ease'
+                    }}
+                    onMouseOver={(e) => e.currentTarget.style.color = '#3b82f6'}
+                    onMouseOut={(e) => e.currentTarget.style.color = i === breadcrumbs.length - 1 ? '#3b82f6' : 'rgba(255, 255, 255, 0.6)'}
+                    >{c.label}</Link>
+                  </span>
+                ))}
+              </nav>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
               <NotificationBell />
             </div>
           </div>
