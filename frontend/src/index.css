@@ -238,6 +238,13 @@ img { max-width: 100%; display: block; }
 .input::placeholder { color: color-mix(in srgb, var(--muted), transparent 10%); }
 .input:focus { outline: none; border-color: color-mix(in srgb, var(--primary), transparent 30%); box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary), transparent 80%); }
 
+/* Placeholder for inputs on gradient/colored backgrounds */
+input::placeholder { color: rgba(255, 255, 255, 0.5) !important; }
+input::-webkit-input-placeholder { color: rgba(255, 255, 255, 0.5) !important; }
+input::-moz-placeholder { color: rgba(255, 255, 255, 0.5) !important; }
+input:-ms-input-placeholder { color: rgba(255, 255, 255, 0.5) !important; }
+input:-moz-placeholder { color: rgba(255, 255, 255, 0.5) !important; }
+
 label .label { font-size: 12px; text-transform: none; letter-spacing: 0; color: var(--muted); margin-bottom: 6px; display: block; }
 
 .form-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 8px; }

@@ -143,76 +143,403 @@ export default function Transportation() {
   }
 
   if (loading) {
-    return <div>Loading transportation...</div>
+    return (
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: '400px',
+        fontSize: '16px',
+        color: 'var(--gray-500)'
+      }}>
+        Loading transportation...
+      </div>
+    )
   }
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <h2 style={{ margin: 0 }}>Transportation Management</h2>
-        {can.manageShipments() && (
-          <button className="btn btn-primary" onClick={openCreateModal}>
-            + Add Vehicle
-          </button>
-        )}
+      {/* Header Section with Gradient */}
+      <div style={{
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        borderRadius: '16px',
+        padding: '32px',
+        marginBottom: '24px',
+        boxShadow: '0 10px 30px rgba(102, 126, 234, 0.2)'
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <h2 style={{ margin: 0, color: 'white', fontSize: '28px', fontWeight: '700', marginBottom: '8px' }}>
+              🚛 Transportation Management
+            </h2>
+            <p style={{ margin: 0, color: 'rgba(255,255,255,0.9)', fontSize: '15px' }}>
+              Manage your fleet vehicles and driver assignments
+            </p>
+          </div>
+          {can.manageShipments() && (
+            <button
+              className="btn btn-primary"
+              onClick={openCreateModal}
+              style={{
+                background: 'white',
+                color: '#667eea',
+                border: 'none',
+                padding: '12px 24px',
+                fontSize: '15px',
+                fontWeight: '600',
+                borderRadius: '10px',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                transition: 'all 0.3s ease'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.transform = 'translateY(-2px)'
+                e.currentTarget.style.boxShadow = '0 6px 20px rgba(0,0,0,0.2)'
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)'
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)'
+              }}
+            >
+              ➕ Add Vehicle
+            </button>
+          )}
+        </div>
       </div>
 
-      <div style={{ marginBottom: 16 }}>
-        <input
-          type="text"
-          className="input"
-          placeholder="Search by registration number, vehicle type, or driver..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          style={{ maxWidth: 400 }}
-        />
+      {/* Search Bar with Icon */}
+      <div style={{ marginBottom: '24px' }}>
+        <div style={{ position: 'relative', maxWidth: '500px' }}>
+          <span style={{
+            position: 'absolute',
+            left: '16px',
+            top: '50%',
+            transform: 'translateY(-50%)',
+            fontSize: '18px',
+            color: 'var(--gray-400)'
+          }}>🔍</span>
+          <input
+            type="text"
+            className="input"
+            placeholder="Search by registration number, vehicle type, or driver..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={{
+              paddingLeft: '48px',
+              width: '100%',
+              borderRadius: '12px',
+              border: '2px solid var(--gray-200)',
+              fontSize: '15px',
+              padding: '14px 14px 14px 48px',
+              transition: 'all 0.3s ease'
+            }}
+            onFocus={(e) => {
+              e.target.style.borderColor = '#667eea'
+              e.target.style.boxShadow = '0 0 0 3px rgba(102, 126, 234, 0.1)'
+            }}
+            onBlur={(e) => {
+              e.target.style.borderColor = 'var(--gray-200)'
+              e.target.style.boxShadow = 'none'
+            }}
+          />
+        </div>
       </div>
 
-      <div className="card" style={{ padding: 0 }}>
+      {/* Modern Card Table */}
+      <div style={{
+        background: 'rgba(255, 255, 255, 0.05)',
+        backdropFilter: 'blur(10px)',
+        borderRadius: '16px',
+        boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
+        overflow: 'hidden',
+        border: '1px solid rgba(255, 255, 255, 0.1)'
+      }}>
         {filteredTransports.length === 0 ? (
-          <div style={{ padding: 32, textAlign: 'center', color: 'var(--gray-500)' }}>
-            No transportation records found.
+          <div style={{
+            padding: '80px 32px',
+            textAlign: 'center',
+            color: 'rgba(255, 255, 255, 0.5)'
+          }}>
+            <div style={{ fontSize: '48px', marginBottom: '16px' }}>📦</div>
+            <div style={{ fontSize: '16px', fontWeight: '500', color: 'rgba(255, 255, 255, 0.7)' }}>No transportation records found.</div>
+            <div style={{ fontSize: '14px', marginTop: '8px' }}>Try adjusting your search or add a new vehicle.</div>
           </div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0 }}>
               <thead>
-                <tr style={{ borderBottom: '1px solid var(--gray-200)', background: 'var(--gray-50)' }}>
-                  <th style={{ padding: 12, textAlign: 'left', fontWeight: 600 }}>Vehicle ID</th>
-                  <th style={{ padding: 12, textAlign: 'left', fontWeight: 600 }}>Type</th>
-                  <th style={{ padding: 12, textAlign: 'left', fontWeight: 600 }}>Registration</th>
-                  <th style={{ padding: 12, textAlign: 'left', fontWeight: 600 }}>Capacity</th>
-                  <th style={{ padding: 12, textAlign: 'left', fontWeight: 600 }}>Driver</th>
-                  <th style={{ padding: 12, textAlign: 'left', fontWeight: 600 }}>Budget</th>
-                  <th style={{ padding: 12, textAlign: 'left', fontWeight: 600 }}>Schedule</th>
+                <tr style={{
+                  background: 'rgba(255, 255, 255, 0.08)',
+                  borderBottom: '2px solid rgba(255, 255, 255, 0.1)'
+                }}>
+                  <th style={{
+                    padding: '18px 20px',
+                    textAlign: 'left',
+                    fontWeight: '700',
+                    fontSize: '13px',
+                    color: 'rgba(255, 255, 255, 0.7)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}>Vehicle ID</th>
+                  <th style={{
+                    padding: '18px 20px',
+                    textAlign: 'left',
+                    fontWeight: '700',
+                    fontSize: '13px',
+                    color: 'rgba(255, 255, 255, 0.7)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}>Type</th>
+                  <th style={{
+                    padding: '18px 20px',
+                    textAlign: 'left',
+                    fontWeight: '700',
+                    fontSize: '13px',
+                    color: 'rgba(255, 255, 255, 0.7)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}>Registration</th>
+                  <th style={{
+                    padding: '18px 20px',
+                    textAlign: 'left',
+                    fontWeight: '700',
+                    fontSize: '13px',
+                    color: 'rgba(255, 255, 255, 0.7)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}>Capacity</th>
+                  <th style={{
+                    padding: '18px 20px',
+                    textAlign: 'left',
+                    fontWeight: '700',
+                    fontSize: '13px',
+                    color: 'rgba(255, 255, 255, 0.7)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}>Driver</th>
+                  <th style={{
+                    padding: '18px 20px',
+                    textAlign: 'left',
+                    fontWeight: '700',
+                    fontSize: '13px',
+                    color: 'rgba(255, 255, 255, 0.7)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}>Status</th>
+                  <th style={{
+                    padding: '18px 20px',
+                    textAlign: 'left',
+                    fontWeight: '700',
+                    fontSize: '13px',
+                    color: 'rgba(255, 255, 255, 0.7)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}>Budget</th>
+                  <th style={{
+                    padding: '18px 20px',
+                    textAlign: 'left',
+                    fontWeight: '700',
+                    fontSize: '13px',
+                    color: 'rgba(255, 255, 255, 0.7)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}>Schedule</th>
                   {can.manageShipments() && (
-                    <th style={{ padding: 12, textAlign: 'right', fontWeight: 600 }}>Actions</th>
+                    <th style={{
+                      padding: '18px 20px',
+                      textAlign: 'right',
+                      fontWeight: '700',
+                      fontSize: '13px',
+                      color: 'rgba(255, 255, 255, 0.7)',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px'
+                    }}>Actions</th>
                   )}
                 </tr>
               </thead>
               <tbody>
-                {filteredTransports.map((transport) => (
-                  <tr key={transport.id} style={{ borderBottom: '1px solid var(--gray-200)' }}>
-                    <td style={{ padding: 12 }}>{transport.vehicle_id}</td>
-                    <td style={{ padding: 12 }}>{transport.vehicle_type}</td>
-                    <td style={{ padding: 12 }}>
-                      <span className="badge">{transport.registration_number}</span>
+                {filteredTransports.map((transport, index) => (
+                  <tr
+                    key={transport.id}
+                    style={{
+                      borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+                      transition: 'all 0.2s ease',
+                      cursor: 'pointer',
+                      background: 'transparent'
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.background = 'transparent'
+                    }}
+                  >
+                    <td style={{
+                      padding: '20px',
+                      fontWeight: '600',
+                      color: '#667eea',
+                      fontSize: '14px'
+                    }}>{transport.vehicle_id}</td>
+                    <td style={{
+                      padding: '20px',
+                      fontSize: '14px',
+                      color: 'rgba(255, 255, 255, 0.9)'
+                    }}>
+                      <span style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '8px'
+                      }}>
+                        {transport.vehicle_type === 'Truck' && '🚚'}
+                        {transport.vehicle_type === 'Van' && '🚐'}
+                        {transport.vehicle_type === 'Car' && '🚗'}
+                        {transport.vehicle_type === 'Motorcycle' && '🏍️'}
+                        {transport.vehicle_type}
+                      </span>
                     </td>
-                    <td style={{ padding: 12 }}>{transport.capacity}</td>
-                    <td style={{ padding: 12 }}>{transport.driver_name}</td>
-                    <td style={{ padding: 12 }}>{transport.budget_name}</td>
-                    <td style={{ padding: 12 }}>{transport.schedule_name}</td>
+                    <td style={{ padding: '20px' }}>
+                      <span style={{
+                        display: 'inline-block',
+                        padding: '6px 14px',
+                        borderRadius: '8px',
+                        fontSize: '13px',
+                        fontWeight: '600',
+                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                        color: 'white',
+                        border: 'none',
+                        boxShadow: '0 2px 8px rgba(102, 126, 234, 0.25)'
+                      }}>
+                        {transport.registration_number}
+                      </span>
+                    </td>
+                    <td style={{
+                      padding: '20px',
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      color: 'rgba(255, 255, 255, 0.9)'
+                    }}>
+                      {transport.capacity}
+                    </td>
+                    <td style={{
+                      padding: '20px',
+                      fontSize: '14px',
+                      color: 'rgba(255, 255, 255, 0.9)'
+                    }}>
+                      <span style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '8px'
+                      }}>
+                        👤 {transport.driver_name}
+                      </span>
+                    </td>
+                    <td style={{ padding: '20px' }}>
+                      {transport.is_on_active_delivery ? (
+                        <span style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          padding: '8px 16px',
+                          borderRadius: '10px',
+                          fontSize: '13px',
+                          fontWeight: '700',
+                          background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+                          color: '#92400e',
+                          border: '2px solid #fcd34d',
+                          boxShadow: '0 2px 8px rgba(252, 211, 77, 0.3)'
+                        }}>
+                          <span>🚚</span>
+                          <span>On Delivery ({transport.active_delivery_count})</span>
+                        </span>
+                      ) : (
+                        <span style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          padding: '8px 16px',
+                          borderRadius: '10px',
+                          fontSize: '13px',
+                          fontWeight: '700',
+                          background: 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)',
+                          color: '#065f46',
+                          border: '2px solid #6ee7b7',
+                          boxShadow: '0 2px 8px rgba(110, 231, 183, 0.3)'
+                        }}>
+                          <span>✅</span>
+                          <span>Available</span>
+                        </span>
+                      )}
+                    </td>
+                    <td style={{
+                      padding: '20px',
+                      fontSize: '14px',
+                      color: 'rgba(255, 255, 255, 0.7)'
+                    }}>
+                      {transport.budget_name}
+                    </td>
+                    <td style={{
+                      padding: '20px',
+                      fontSize: '14px',
+                      color: 'rgba(255, 255, 255, 0.7)'
+                    }}>
+                      {transport.schedule_name}
+                    </td>
                     {can.manageShipments() && (
-                      <td style={{ padding: 12, textAlign: 'right' }}>
-                        <button className="btn btn-sm" onClick={() => openEditModal(transport)}>
-                          Edit
+                      <td style={{
+                        padding: '20px',
+                        textAlign: 'right',
+                        display: 'flex',
+                        gap: '8px',
+                        justifyContent: 'flex-end'
+                      }}>
+                        <button
+                          className="btn btn-sm"
+                          onClick={() => openEditModal(transport)}
+                          style={{
+                            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                            color: 'white',
+                            border: 'none',
+                            padding: '8px 16px',
+                            fontSize: '13px',
+                            fontWeight: '600',
+                            borderRadius: '8px',
+                            boxShadow: '0 2px 8px rgba(102, 126, 234, 0.3)',
+                            transition: 'all 0.2s ease'
+                          }}
+                          onMouseOver={(e) => {
+                            e.currentTarget.style.transform = 'translateY(-2px)'
+                            e.currentTarget.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.4)'
+                          }}
+                          onMouseOut={(e) => {
+                            e.currentTarget.style.transform = 'translateY(0)'
+                            e.currentTarget.style.boxShadow = '0 2px 8px rgba(102, 126, 234, 0.3)'
+                          }}
+                        >
+                          ✏️ Edit
                         </button>
                         <button
                           className="btn btn-sm btn-danger"
                           onClick={() => handleDelete(transport.id)}
-                          style={{ marginLeft: 8 }}
+                          style={{
+                            background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                            color: 'white',
+                            border: 'none',
+                            padding: '8px 16px',
+                            fontSize: '13px',
+                            fontWeight: '600',
+                            borderRadius: '8px',
+                            boxShadow: '0 2px 8px rgba(239, 68, 68, 0.3)',
+                            transition: 'all 0.2s ease'
+                          }}
+                          onMouseOver={(e) => {
+                            e.currentTarget.style.transform = 'translateY(-2px)'
+                            e.currentTarget.style.boxShadow = '0 4px 12px rgba(239, 68, 68, 0.4)'
+                          }}
+                          onMouseOut={(e) => {
+                            e.currentTarget.style.transform = 'translateY(0)'
+                            e.currentTarget.style.boxShadow = '0 2px 8px rgba(239, 68, 68, 0.3)'
+                          }}
                         >
-                          Delete
+                          🗑️ Delete
                         </button>
                       </td>
                     )}

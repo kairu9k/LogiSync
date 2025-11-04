@@ -138,41 +138,145 @@ export default function Shipments() {
   }
 
   return (
-    <div className="grid" style={{ gap: 16 }}>
-      <div className="card">
-        <h2 style={{ marginTop: 0 }}>Shipments</h2>
-        <div className="form-row">
-          <input
-            className="input"
-            placeholder="Search tracking # or customer"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-          />
-          <select className="input" value={status} onChange={(e) => setStatus(e.target.value)}>
-            <option value="any">Status: Any</option>
-            <option value="pending">Pending</option>
-            <option value="in_transit">In Transit</option>
-            <option value="out_for_delivery">Out for Delivery</option>
-            <option value="delivered">Delivered</option>
-            <option value="cancelled">Cancelled</option>
-          </select>
+    <div className="grid" style={{ gap: 24 }}>
+      {/* Header Section with Gradient */}
+      <div style={{
+        background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
+        borderRadius: '16px',
+        padding: '32px',
+        boxShadow: '0 10px 30px rgba(249, 115, 22, 0.2)'
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <h2 style={{ margin: 0, color: 'white', fontSize: '28px', fontWeight: '700', marginBottom: '8px' }}>
+              📦 Shipment Management
+            </h2>
+            <p style={{ margin: 0, color: 'rgba(255,255,255,0.9)', fontSize: '15px' }}>
+              Track and manage all shipments in real-time
+            </p>
+          </div>
         </div>
       </div>
 
-      {loading && <div className="card" style={{ padding: 16 }}>Loading shipments…</div>}
-      {error && <div className="card" style={{ padding: 16, color: 'var(--danger-600)' }}>{error}</div>}
+      {/* Filters */}
+      <div className="grid" style={{ gridTemplateColumns: 'repeat(2, minmax(0,1fr))', gap: 16 }}>
+        <div style={{ position: 'relative' }}>
+          <span style={{
+            position: 'absolute',
+            left: '16px',
+            top: '50%',
+            transform: 'translateY(-50%)',
+            fontSize: '18px',
+            color: 'var(--gray-400)'
+          }}>🔍</span>
+          <input
+            className="input"
+            placeholder="Search tracking # or customer..."
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            style={{
+              paddingLeft: '48px',
+              width: '100%',
+              borderRadius: '12px',
+              border: '2px solid var(--gray-200)',
+              fontSize: '15px',
+              padding: '14px 14px 14px 48px',
+              transition: 'all 0.3s ease'
+            }}
+            onFocus={(e) => {
+              e.target.style.borderColor = '#f97316'
+              e.target.style.boxShadow = '0 0 0 3px rgba(249, 115, 22, 0.1)'
+            }}
+            onBlur={(e) => {
+              e.target.style.borderColor = 'var(--gray-200)'
+              e.target.style.boxShadow = 'none'
+            }}
+          />
+        </div>
+        <select
+          className="input"
+          value={status}
+          onChange={(e) => setStatus(e.target.value)}
+          style={{
+            borderRadius: '12px',
+            border: '2px solid var(--gray-200)',
+            fontSize: '15px',
+            padding: '14px',
+            transition: 'all 0.3s ease'
+          }}
+          onFocus={(e) => {
+            e.target.style.borderColor = '#f97316'
+            e.target.style.boxShadow = '0 0 0 3px rgba(249, 115, 22, 0.1)'
+          }}
+          onBlur={(e) => {
+            e.target.style.borderColor = 'var(--gray-200)'
+            e.target.style.boxShadow = 'none'
+          }}
+        >
+          <option value="any">Status: Any</option>
+          <option value="pending">Pending</option>
+          <option value="in_transit">In Transit</option>
+          <option value="out_for_delivery">Out for Delivery</option>
+          <option value="delivered">Delivered</option>
+          <option value="cancelled">Cancelled</option>
+        </select>
+      </div>
+
+      {loading && (
+        <div style={{
+          background: 'rgba(255, 255, 255, 0.05)',
+          backdropFilter: 'blur(10px)',
+          borderRadius: '16px',
+          padding: '40px',
+          textAlign: 'center',
+          color: 'rgba(255, 255, 255, 0.7)',
+          border: '1px solid rgba(255, 255, 255, 0.1)'
+        }}>
+          Loading shipments…
+        </div>
+      )}
+      {error && (
+        <div style={{
+          background: 'rgba(239, 68, 68, 0.1)',
+          backdropFilter: 'blur(10px)',
+          borderRadius: '16px',
+          padding: '16px',
+          color: '#ef4444',
+          border: '1px solid rgba(239, 68, 68, 0.3)'
+        }}>
+          {error}
+        </div>
+      )}
 
       {!loading && !error && (
-        <div className="grid" style={{ gridTemplateColumns: 'repeat(2, minmax(0,1fr))', gap: 12 }}>
+        <div className="grid" style={{ gridTemplateColumns: 'repeat(2, minmax(0,1fr))', gap: 16 }}>
           {shipments.map((s) => (
             <div
               key={s.id}
-              className="card"
               style={{
-                padding: 16,
+                background: 'rgba(255, 255, 255, 0.05)',
+                backdropFilter: 'blur(10px)',
+                borderRadius: '16px',
+                padding: '20px',
                 position: 'relative',
-                opacity: s.status === 'delivered' ? 0.6 : 1,
-                overflow: 'hidden'
+                opacity: s.status === 'delivered' ? 0.7 : 1,
+                overflow: 'hidden',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                transition: 'all 0.3s ease'
+              }}
+              onMouseOver={(e) => {
+                if (s.status !== 'delivered') {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'
+                  e.currentTarget.style.transform = 'translateY(-4px)'
+                  e.currentTarget.style.boxShadow = '0 8px 20px rgba(0,0,0,0.3)'
+                }
+              }}
+              onMouseOut={(e) => {
+                if (s.status !== 'delivered') {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'
+                  e.currentTarget.style.transform = 'translateY(0)'
+                  e.currentTarget.style.boxShadow = 'none'
+                }
               }}
             >
               {s.status === 'delivered' && (
@@ -181,56 +285,145 @@ export default function Shipments() {
                   top: '50%',
                   left: '50%',
                   transform: 'translate(-50%, -50%) rotate(-25deg)',
-                  fontSize: '24px',
+                  fontSize: '28px',
                   fontWeight: 'bold',
-                  color: 'var(--success-300)',
+                  color: '#10b981',
+                  opacity: 0.3,
                   pointerEvents: 'none',
                   zIndex: 1,
-                  userSelect: 'none'
+                  userSelect: 'none',
+                  textShadow: '0 2px 10px rgba(16, 185, 129, 0.3)'
                 }}>
                   ✓ DELIVERED
                 </div>
               )}
               <button
-                className="btn btn-outline"
                 onClick={() => navigate(`/app/shipments/${s.id}`)}
                 style={{
                   position: 'absolute',
-                  top: 12,
-                  right: 12,
-                  padding: '4px 8px',
-                  fontSize: '0.75rem',
-                  zIndex: 2
+                  top: 16,
+                  right: 16,
+                  padding: '8px 16px',
+                  fontSize: '13px',
+                  zIndex: 2,
+                  background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontWeight: '500',
+                  transition: 'all 0.3s ease'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-2px)'
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(249, 115, 22, 0.4)'
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)'
+                  e.currentTarget.style.boxShadow = 'none'
                 }}
               >
-                View Details
+                View Details →
               </button>
-              <div className="muted">{s.tracking_number}</div>
-              <div><strong>Customer: {s.receiver}</strong></div>
-              <div>Prepared by: {s.customer}</div>
-              <div>Driver: {s.driver}</div>
-              <div>Vehicle: {s.vehicle}</div>
-              <div>
-                Status: <span className={getStatusBadgeClass(s.status)}>{s.status}</span>
+
+              <div style={{ marginBottom: '16px' }}>
+                <div style={{
+                  fontSize: '13px',
+                  color: 'rgba(255, 255, 255, 0.5)',
+                  marginBottom: '4px',
+                  fontWeight: '500'
+                }}>
+                  Tracking Number
+                </div>
+                <div style={{
+                  fontSize: '16px',
+                  fontWeight: '600',
+                  color: '#f97316',
+                  fontFamily: 'monospace'
+                }}>
+                  {s.tracking_number}
+                </div>
               </div>
+
+              <div style={{ display: 'grid', gap: '10px', marginBottom: '12px' }}>
+                <div>
+                  <span style={{ fontSize: '13px', color: 'rgba(255, 255, 255, 0.5)' }}>Receiver: </span>
+                  <span style={{ fontWeight: '600', color: 'rgba(255, 255, 255, 0.95)', fontSize: '14px' }}>{s.receiver}</span>
+                </div>
+                {s.customer && s.customer !== s.receiver && (
+                  <div>
+                    <span style={{ fontSize: '13px', color: 'rgba(255, 255, 255, 0.5)' }}>Ordered by: </span>
+                    <span style={{ color: 'rgba(255, 255, 255, 0.85)', fontSize: '14px' }}>{s.customer}</span>
+                  </div>
+                )}
+                <div>
+                  <span style={{ fontSize: '13px', color: 'rgba(255, 255, 255, 0.5)' }}>Driver: </span>
+                  <span style={{ color: 'rgba(255, 255, 255, 0.85)', fontSize: '14px' }}>{s.driver}</span>
+                </div>
+                <div>
+                  <span style={{ fontSize: '13px', color: 'rgba(255, 255, 255, 0.5)' }}>Vehicle: </span>
+                  <span style={{ color: 'rgba(255, 255, 255, 0.85)', fontSize: '14px' }}>{s.vehicle}</span>
+                </div>
+              </div>
+
+              <div style={{ marginBottom: '12px' }}>
+                <span style={{ fontSize: '13px', color: 'rgba(255, 255, 255, 0.5)', marginRight: '8px' }}>Status:</span>
+                <span className={getStatusBadgeClass(s.status)} style={{
+                  padding: '4px 12px',
+                  borderRadius: '6px',
+                  fontSize: '12px',
+                  fontWeight: '600'
+                }}>
+                  {s.status.replace('_', ' ').toUpperCase()}
+                </span>
+              </div>
+
               {s.status === 'pending' && s.origin_name && (
                 <div style={{
-                  marginTop: 8,
-                  padding: '8px 12px',
-                  backgroundColor: 'var(--surface-100)',
-                  borderRadius: '6px',
-                  borderLeft: '3px solid var(--warn-500)'
+                  marginTop: 12,
+                  padding: '12px',
+                  background: 'rgba(245, 158, 11, 0.1)',
+                  backdropFilter: 'blur(10px)',
+                  borderRadius: '10px',
+                  border: '1px solid rgba(245, 158, 11, 0.3)'
                 }}>
-                  <div style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--warn-700)', marginBottom: '4px' }}>
+                  <div style={{
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    color: '#f59e0b',
+                    marginBottom: '6px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}>
                     📍 Current Location (Warehouse Origin)
                   </div>
-                  <div style={{ fontSize: '0.875rem', fontWeight: '500' }}>{s.origin_name}</div>
+                  <div style={{
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    color: 'rgba(255, 255, 255, 0.95)'
+                  }}>
+                    {s.origin_name}
+                  </div>
                   {s.origin_address && (
-                    <div className="muted" style={{ fontSize: '0.75rem', marginTop: '2px' }}>{s.origin_address}</div>
+                    <div style={{
+                      fontSize: '12px',
+                      marginTop: '4px',
+                      color: 'rgba(255, 255, 255, 0.6)'
+                    }}>
+                      {s.origin_address}
+                    </div>
                   )}
                 </div>
               )}
-              <div className="muted" style={{ fontSize: '0.875rem' }}>
+
+              <div style={{
+                fontSize: '12px',
+                color: 'rgba(255, 255, 255, 0.5)',
+                marginTop: '12px',
+                paddingTop: '12px',
+                borderTop: '1px solid rgba(255, 255, 255, 0.1)'
+              }}>
                 Created: {new Date(s.creation_date).toLocaleDateString()}
                 {s.departure_date && ` • Departure: ${new Date(s.departure_date).toLocaleDateString()}`}
               </div>
@@ -244,15 +437,29 @@ export default function Shipments() {
                 />
               ) : (
                 <div style={{
-                  marginTop: 12,
-                  paddingTop: 12,
-                  borderTop: '1px solid var(--gray-200)',
+                  marginTop: 16,
+                  paddingTop: 16,
+                  borderTop: '1px solid rgba(255, 255, 255, 0.1)',
                   textAlign: 'center'
                 }}>
-                  <div className={`badge ${s.status === 'delivered' ? 'success' : 'danger'}`} style={{ fontSize: '14px' }}>
+                  <div style={{
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    display: 'inline-block',
+                    background: s.status === 'delivered'
+                      ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+                      : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                    color: 'white'
+                  }}>
                     {s.status === 'delivered' ? '✓ Shipment Completed' : '✗ Shipment Cancelled'}
                   </div>
-                  <div className="muted" style={{ fontSize: '12px', marginTop: '4px' }}>
+                  <div style={{
+                    fontSize: '12px',
+                    marginTop: '8px',
+                    color: 'rgba(255, 255, 255, 0.5)'
+                  }}>
                     No further status updates available
                   </div>
                 </div>
@@ -261,8 +468,22 @@ export default function Shipments() {
           ))}
 
           {shipments.length === 0 && (
-            <div className="card" style={{ padding: 16 }}>
-              No shipments found.
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.05)',
+              backdropFilter: 'blur(10px)',
+              borderRadius: '16px',
+              padding: '40px',
+              textAlign: 'center',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              gridColumn: '1 / -1'
+            }}>
+              <div style={{ fontSize: '48px', marginBottom: '16px', opacity: 0.5 }}>📦</div>
+              <div style={{ fontSize: '18px', fontWeight: '600', color: 'rgba(255, 255, 255, 0.9)', marginBottom: '8px' }}>
+                No shipments found
+              </div>
+              <div style={{ fontSize: '14px', color: 'rgba(255, 255, 255, 0.5)' }}>
+                Try adjusting your search or filter criteria
+              </div>
             </div>
           )}
         </div>
@@ -389,27 +610,65 @@ function StatusUpdateForm({ shipment, onUpdate, updating }) {
   const smartSuggestions = newStatus ? getSmartSuggestions(newStatus) : []
 
   return (
-    <form onSubmit={handleSubmit} style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--gray-200)' }}>
-      <div className="grid" style={{ gap: 8 }}>
-        <div style={{ marginBottom: 8 }}>
-          <div className="label">Current Status:
-            <span className={`badge ${
-              shipment.status === 'delivered' ? 'success' :
-              shipment.status === 'picked_up' ? 'success' :
-              shipment.status === 'out_for_delivery' ? 'warn' :
-              shipment.status === 'in_transit' ? 'info' : ''
-            }`} style={{ marginLeft: 4 }}>
-              {shipment.status.replace('_', ' ')}
+    <form onSubmit={handleSubmit} style={{
+      marginTop: 16,
+      paddingTop: 16,
+      borderTop: '1px solid rgba(255, 255, 255, 0.1)'
+    }}>
+      <div className="grid" style={{ gap: 12 }}>
+        <div style={{ marginBottom: 4 }}>
+          <div style={{
+            fontSize: '12px',
+            color: 'rgba(255, 255, 255, 0.5)',
+            marginBottom: '6px',
+            fontWeight: '500'
+          }}>
+            Current Status:
+            <span style={{
+              marginLeft: 8,
+              padding: '4px 10px',
+              borderRadius: '6px',
+              fontSize: '11px',
+              fontWeight: '600',
+              background: shipment.status === 'delivered' || shipment.status === 'picked_up'
+                ? 'rgba(16, 185, 129, 0.2)'
+                : shipment.status === 'out_for_delivery' || shipment.status === 'in_transit'
+                ? 'rgba(59, 130, 246, 0.2)'
+                : 'rgba(245, 158, 11, 0.2)',
+              color: shipment.status === 'delivered' || shipment.status === 'picked_up'
+                ? '#10b981'
+                : shipment.status === 'out_for_delivery' || shipment.status === 'in_transit'
+                ? '#3b82f6'
+                : '#f59e0b'
+            }}>
+              {shipment.status.replace('_', ' ').toUpperCase()}
             </span>
           </div>
         </div>
 
-        <div className="form-row">
+        <div className="form-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
           <select
             className="input"
             value={newStatus}
             onChange={(e) => setNewStatus(e.target.value)}
             required
+            style={{
+              borderRadius: '10px',
+              border: '2px solid rgba(255, 255, 255, 0.1)',
+              background: 'rgba(255, 255, 255, 0.05)',
+              color: 'rgba(255, 255, 255, 0.9)',
+              fontSize: '13px',
+              padding: '10px 12px',
+              transition: 'all 0.3s ease'
+            }}
+            onFocus={(e) => {
+              e.target.style.borderColor = '#f97316'
+              e.target.style.boxShadow = '0 0 0 3px rgba(249, 115, 22, 0.1)'
+            }}
+            onBlur={(e) => {
+              e.target.style.borderColor = 'rgba(255, 255, 255, 0.1)'
+              e.target.style.boxShadow = 'none'
+            }}
           >
             <option value="">Select next status…</option>
             {availableStatuses.map(option => (
@@ -424,13 +683,36 @@ function StatusUpdateForm({ shipment, onUpdate, updating }) {
             value={location}
             onChange={(e) => setLocation(e.target.value)}
             required
+            style={{
+              borderRadius: '10px',
+              border: '2px solid rgba(255, 255, 255, 0.1)',
+              background: 'rgba(255, 255, 255, 0.05)',
+              color: 'rgba(255, 255, 255, 0.9)',
+              fontSize: '13px',
+              padding: '10px 12px',
+              transition: 'all 0.3s ease'
+            }}
+            onFocus={(e) => {
+              e.target.style.borderColor = '#f97316'
+              e.target.style.boxShadow = '0 0 0 3px rgba(249, 115, 22, 0.1)'
+            }}
+            onBlur={(e) => {
+              e.target.style.borderColor = 'rgba(255, 255, 255, 0.1)'
+              e.target.style.boxShadow = 'none'
+            }}
           />
         </div>
 
         {/* Smart Suggestions */}
         {smartSuggestions.length > 0 && (
-          <div style={{ marginTop: 8 }}>
-            <label className="label" style={{ fontSize: '0.875rem', marginBottom: 6, display: 'block' }}>
+          <div style={{ marginTop: 4 }}>
+            <label style={{
+              fontSize: '12px',
+              color: 'rgba(255, 255, 255, 0.5)',
+              marginBottom: 8,
+              display: 'block',
+              fontWeight: '500'
+            }}>
               Quick details:
             </label>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
@@ -439,13 +721,29 @@ function StatusUpdateForm({ shipment, onUpdate, updating }) {
                   key={idx}
                   type="button"
                   onClick={() => handleSuggestionClick(suggestion)}
-                  className="btn btn-outline"
                   style={{
                     padding: '6px 12px',
-                    fontSize: '0.813rem',
-                    backgroundColor: details === suggestion.value ? 'var(--primary-100)' : 'transparent',
-                    borderColor: details === suggestion.value ? 'var(--primary-500)' : 'var(--border)',
-                    color: details === suggestion.value ? 'var(--primary-700)' : 'inherit'
+                    fontSize: '12px',
+                    borderRadius: '8px',
+                    border: '2px solid',
+                    borderColor: details === suggestion.value ? '#f97316' : 'rgba(255, 255, 255, 0.2)',
+                    background: details === suggestion.value ? 'rgba(249, 115, 22, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                    color: details === suggestion.value ? '#f97316' : 'rgba(255, 255, 255, 0.8)',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s ease',
+                    fontWeight: '500'
+                  }}
+                  onMouseOver={(e) => {
+                    if (details !== suggestion.value) {
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'
+                      e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)'
+                    }
+                  }}
+                  onMouseOut={(e) => {
+                    if (details !== suggestion.value) {
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'
+                      e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)'
+                    }
                   }}
                 >
                   {suggestion.label}
@@ -457,8 +755,21 @@ function StatusUpdateForm({ shipment, onUpdate, updating }) {
 
         {/* Signature Input */}
         {showSignatureInput && (
-          <div style={{ marginTop: 8, padding: 12, backgroundColor: 'var(--surface-100)', borderRadius: 8 }}>
-            <label className="label" style={{ fontSize: '0.875rem', marginBottom: 6 }}>
+          <div style={{
+            marginTop: 8,
+            padding: 14,
+            background: 'rgba(249, 115, 22, 0.1)',
+            backdropFilter: 'blur(10px)',
+            borderRadius: 10,
+            border: '1px solid rgba(249, 115, 22, 0.3)'
+          }}>
+            <label style={{
+              fontSize: '12px',
+              color: '#f97316',
+              marginBottom: 8,
+              display: 'block',
+              fontWeight: '600'
+            }}>
               Enter recipient name:
             </label>
             <div style={{ display: 'flex', gap: 8 }}>
@@ -468,21 +779,49 @@ function StatusUpdateForm({ shipment, onUpdate, updating }) {
                 value={signatureName}
                 onChange={(e) => setSignatureName(e.target.value)}
                 autoFocus
+                style={{
+                  flex: 1,
+                  borderRadius: '8px',
+                  border: '2px solid rgba(255, 255, 255, 0.2)',
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  color: 'rgba(255, 255, 255, 0.9)',
+                  fontSize: '13px',
+                  padding: '8px 12px'
+                }}
               />
               <button
                 type="button"
-                className="btn btn-primary"
                 onClick={handleSignatureSubmit}
                 disabled={!signatureName.trim()}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: !signatureName.trim() ? 'rgba(255, 255, 255, 0.1)' : 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
+                  color: 'white',
+                  fontSize: '13px',
+                  fontWeight: '600',
+                  cursor: !signatureName.trim() ? 'not-allowed' : 'pointer',
+                  opacity: !signatureName.trim() ? 0.5 : 1
+                }}
               >
                 Set
               </button>
               <button
                 type="button"
-                className="btn btn-outline"
                 onClick={() => {
                   setShowSignatureInput(false)
                   setSignatureName('')
+                }}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  border: '2px solid rgba(255, 255, 255, 0.2)',
+                  background: 'transparent',
+                  color: 'rgba(255, 255, 255, 0.8)',
+                  fontSize: '13px',
+                  fontWeight: '600',
+                  cursor: 'pointer'
                 }}
               >
                 Cancel
@@ -497,14 +836,56 @@ function StatusUpdateForm({ shipment, onUpdate, updating }) {
           placeholder="Additional details (optional, or use quick buttons above)"
           value={details}
           onChange={(e) => setDetails(e.target.value)}
+          style={{
+            borderRadius: '10px',
+            border: '2px solid rgba(255, 255, 255, 0.1)',
+            background: 'rgba(255, 255, 255, 0.05)',
+            color: 'rgba(255, 255, 255, 0.9)',
+            fontSize: '13px',
+            padding: '10px 12px',
+            transition: 'all 0.3s ease'
+          }}
+          onFocus={(e) => {
+            e.target.style.borderColor = '#f97316'
+            e.target.style.boxShadow = '0 0 0 3px rgba(249, 115, 22, 0.1)'
+          }}
+          onBlur={(e) => {
+            e.target.style.borderColor = 'rgba(255, 255, 255, 0.1)'
+            e.target.style.boxShadow = 'none'
+          }}
         />
 
         <button
-          className="btn btn-primary"
           type="submit"
           disabled={updating || !newStatus || !location}
+          style={{
+            padding: '12px 20px',
+            borderRadius: '10px',
+            border: 'none',
+            background: (updating || !newStatus || !location)
+              ? 'rgba(255, 255, 255, 0.1)'
+              : 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
+            color: 'white',
+            fontSize: '14px',
+            fontWeight: '600',
+            cursor: (updating || !newStatus || !location) ? 'not-allowed' : 'pointer',
+            opacity: (updating || !newStatus || !location) ? 0.5 : 1,
+            transition: 'all 0.3s ease'
+          }}
+          onMouseOver={(e) => {
+            if (!updating && newStatus && location) {
+              e.currentTarget.style.transform = 'translateY(-2px)'
+              e.currentTarget.style.boxShadow = '0 6px 16px rgba(249, 115, 22, 0.4)'
+            }
+          }}
+          onMouseOut={(e) => {
+            if (!updating && newStatus && location) {
+              e.currentTarget.style.transform = 'translateY(0)'
+              e.currentTarget.style.boxShadow = 'none'
+            }
+          }}
         >
-          {updating ? 'Updating Status...' : 'Update Status'}
+          {updating ? 'Updating Status...' : '📤 Update Status'}
         </button>
       </div>
     </form>

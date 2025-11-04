@@ -114,64 +114,99 @@ export default function SubscriptionPlan() {
   }
 
   return (
-    <div>
-      <h1 style={{ marginTop: 0 }}>Subscription & Billing</h1>
-      <p className="muted">Manage your LogiSync subscription</p>
-
-      {currentSubscription && currentSubscription.status === 'active' && (
-        <div className="card" style={{
-          background: 'var(--surface)',
-          border: '2px solid var(--accent)',
-          padding: 20,
-          marginTop: 24,
-          marginBottom: 24
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
-            <div>
-              <div style={{ fontSize: 14, color: 'var(--accent)', marginBottom: 4, fontWeight: 600 }}>
-                ✓ Current Active Plan
-              </div>
-              <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>
-                {currentSubscription.plan_name}
-              </div>
-              <div style={{ fontSize: 14, color: 'var(--muted)' }}>
-                {currentSubscription.expires_at
-                  ? `Renews on ${new Date(currentSubscription.expires_at).toLocaleDateString()}`
-                  : 'Active subscription'}
-              </div>
-            </div>
-            <button
-              className="btn btn-outline"
-              onClick={handleCancel}
-              style={{
-                borderColor: '#ef4444',
-                color: '#ef4444'
-              }}
-            >
-              Cancel Subscription
-            </button>
+    <div className="grid" style={{ gap: 24 }}>
+      {/* Header Section with Gradient */}
+      <div style={{
+        background: 'linear-gradient(135deg, #9FA2B2 0%, #7a7d8f 100%)',
+        borderRadius: '16px',
+        padding: '32px',
+        boxShadow: '0 10px 30px rgba(159, 162, 178, 0.2)'
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 20 }}>
+          <div>
+            <h2 style={{ margin: 0, color: 'white', fontSize: '28px', fontWeight: '700', marginBottom: '8px' }}>
+              💳 Subscription & Billing
+            </h2>
+            <p style={{ margin: 0, color: 'rgba(255,255,255,0.9)', fontSize: '15px' }}>
+              Manage your LogiSync subscription
+            </p>
           </div>
+
+          {/* Current Active Plan on the right side */}
+          {currentSubscription && currentSubscription.status === 'active' && (
+            <div style={{
+              padding: '16px 20px',
+              background: 'rgba(255, 255, 255, 0.15)',
+              backdropFilter: 'blur(10px)',
+              borderRadius: '12px',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
+              minWidth: '280px'
+            }}>
+              <div style={{ marginBottom: 8 }}>
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.8)', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  ✓ CURRENT ACTIVE PLAN
+                </div>
+                <div style={{ fontSize: 22, fontWeight: 700, color: 'white', marginBottom: 4 }}>
+                  {currentSubscription.plan_name}
+                </div>
+                <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.8)' }}>
+                  {currentSubscription.expires_at
+                    ? `Renews on ${new Date(currentSubscription.expires_at).toLocaleDateString()}`
+                    : 'Active subscription'}
+                </div>
+              </div>
+              <button
+                onClick={handleCancel}
+                style={{
+                  width: '100%',
+                  padding: '10px 20px',
+                  borderRadius: '10px',
+                  border: '2px solid rgba(255, 255, 255, 0.3)',
+                  background: 'rgba(239, 68, 68, 0.2)',
+                  color: 'white',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s ease'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.background = 'rgba(239, 68, 68, 0.4)'
+                  e.currentTarget.style.transform = 'translateY(-2px)'
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)'
+                  e.currentTarget.style.transform = 'translateY(0)'
+                }}
+              >
+                Cancel Subscription
+              </button>
+            </div>
+          )}
         </div>
-      )}
+      </div>
 
       {!currentSubscription || currentSubscription.status !== 'active' ? (
         <div className="card" style={{
-          background: 'var(--surface)',
-          border: '1px solid color-mix(in oklab, #ffab00, transparent 50%)',
-          padding: 16,
-          marginTop: 24,
-          marginBottom: 24
+          background: 'rgba(255, 171, 0, 0.1)',
+          border: '2px solid rgba(255, 171, 0, 0.3)',
+          padding: 20,
+          borderRadius: '12px'
         }}>
-          <div style={{ color: '#ffab00', fontWeight: 600, marginBottom: 4 }}>
+          <div style={{ color: '#ffab00', fontWeight: 700, marginBottom: 6, fontSize: '15px' }}>
             ⚠️ No Active Subscription
           </div>
-          <div style={{ color: 'var(--muted)', fontSize: 14 }}>
+          <div style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: 14 }}>
             Choose a plan below to unlock all features and start managing your logistics operations
           </div>
         </div>
       ) : null}
 
-      <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 20, marginTop: 24 }}>
+      {/* Plans Grid */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+        gap: 24
+      }}>
         {plans.map((plan, idx) => {
           const isCurrentPlan = currentSubscription?.slug === plan.slug
           const isFree = plan.price === 0
@@ -180,102 +215,195 @@ export default function SubscriptionPlan() {
           return (
             <div
               key={plan.id}
-              className="card"
               style={{
-                padding: 24,
+                background: 'rgba(255, 255, 255, 0.05)',
+                backdropFilter: 'blur(10px)',
+                borderRadius: '16px',
+                padding: 28,
                 border: isCurrentPlan
-                  ? '2px solid var(--primary)'
+                  ? '3px solid #9FA2B2'
                   : isPopular
-                    ? '2px solid var(--primary)'
-                    : '1px solid var(--border)',
+                    ? '3px solid #8b5cf6'
+                    : '2px solid rgba(255, 255, 255, 0.1)',
                 position: 'relative',
-                background: isCurrentPlan ? 'var(--surface)' : 'var(--surface)'
+                transition: 'all 0.3s ease',
+                boxShadow: isCurrentPlan
+                  ? '0 8px 24px rgba(159, 162, 178, 0.3)'
+                  : isPopular
+                    ? '0 8px 24px rgba(139, 92, 246, 0.2)'
+                    : '0 4px 20px rgba(0,0,0,0.3)'
+              }}
+              onMouseOver={(e) => {
+                if (!isCurrentPlan) {
+                  e.currentTarget.style.transform = 'translateY(-6px)'
+                  e.currentTarget.style.boxShadow = isPopular
+                    ? '0 12px 32px rgba(139, 92, 246, 0.3)'
+                    : '0 12px 32px rgba(159, 162, 178, 0.2)'
+                  e.currentTarget.style.borderColor = isPopular ? '#8b5cf6' : 'rgba(159, 162, 178, 0.5)'
+                }
+              }}
+              onMouseOut={(e) => {
+                if (!isCurrentPlan) {
+                  e.currentTarget.style.transform = 'translateY(0)'
+                  e.currentTarget.style.boxShadow = isPopular
+                    ? '0 8px 24px rgba(139, 92, 246, 0.2)'
+                    : '0 4px 20px rgba(0,0,0,0.3)'
+                  e.currentTarget.style.borderColor = isPopular ? '#8b5cf6' : 'rgba(255, 255, 255, 0.1)'
+                }
               }}
             >
               {isCurrentPlan && (
                 <div style={{
                   position: 'absolute',
-                  top: -12,
+                  top: 16,
                   right: 16,
-                  background: 'linear-gradient(135deg, var(--primary), var(--accent))',
-                  color: '#0b1020',
-                  padding: '6px 16px',
-                  borderRadius: 16,
-                  fontSize: 11,
+                  background: '#9FA2B2',
+                  color: 'white',
+                  padding: '8px 16px',
+                  borderRadius: 20,
+                  fontSize: 12,
                   fontWeight: 700,
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.5px'
+                  letterSpacing: '0.8px',
+                  boxShadow: '0 4px 12px rgba(159, 162, 178, 0.4)'
                 }}>
-                  Your Plan
+                  ✓ YOUR PLAN
                 </div>
               )}
 
               {!isCurrentPlan && isPopular && (
                 <div style={{
                   position: 'absolute',
-                  top: -12,
+                  top: 16,
                   right: 16,
-                  background: 'linear-gradient(135deg, var(--primary), var(--accent))',
-                  color: '#0b1020',
-                  padding: '6px 16px',
-                  borderRadius: 16,
-                  fontSize: 11,
+                  background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+                  color: 'white',
+                  padding: '8px 16px',
+                  borderRadius: 20,
+                  fontSize: 12,
                   fontWeight: 700,
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.5px'
+                  letterSpacing: '0.8px',
+                  boxShadow: '0 4px 12px rgba(139, 92, 246, 0.4)'
                 }}>
-                  Popular
+                  🔥 POPULAR
                 </div>
               )}
 
-              <div style={{ marginBottom: 20, marginTop: isCurrentPlan || isPopular ? 12 : 0 }}>
-                <h3 style={{ margin: 0, marginBottom: 8, fontSize: 20 }}>{plan.name}</h3>
-                <p className="muted" style={{ fontSize: 14, marginBottom: 20, minHeight: 40 }}>
+              <div style={{ marginBottom: 24 }}>
+                <h3 style={{
+                  margin: 0,
+                  marginBottom: 12,
+                  fontSize: '24px',
+                  fontWeight: '700',
+                  color: 'white'
+                }}>{plan.name}</h3>
+                <p style={{
+                  fontSize: 14,
+                  marginBottom: 24,
+                  lineHeight: '1.6',
+                  color: 'rgba(255, 255, 255, 0.7)',
+                  minHeight: 40
+                }}>
                   {plan.description}
                 </p>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 4 }}>
-                  <span style={{ fontSize: 40, fontWeight: 700, color: 'var(--text)' }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 8 }}>
+                  <span style={{
+                    fontSize: 42,
+                    fontWeight: 700,
+                    color: isFree ? '#10b981' : isPopular ? '#8b5cf6' : '#9FA2B2'
+                  }}>
                     {isFree ? 'Free' : formatMoney(plan.price)}
                   </span>
                   {!isFree && (
-                    <span className="muted" style={{ fontSize: 16 }}>
+                    <span style={{ fontSize: 16, color: 'rgba(255, 255, 255, 0.6)' }}>
                       /month
                     </span>
                   )}
                 </div>
               </div>
 
-              <div style={{ marginBottom: 24 }}>
-                <div className="label" style={{ marginBottom: 12, fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                  What's Included
-                </div>
+              <div style={{ marginBottom: 28 }}>
+                <div style={{
+                  fontSize: '12px',
+                  fontWeight: '700',
+                  color: isPopular ? '#8b5cf6' : '#9FA2B2',
+                  marginBottom: '14px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.8px'
+                }}>✨ WHAT'S INCLUDED</div>
                 {plan.features && plan.features.length > 0 ? (
-                  <ul style={{ margin: 0, paddingLeft: 0, listStyle: 'none', fontSize: 14 }}>
+                  <ul style={{
+                    margin: 0,
+                    paddingLeft: 0,
+                    listStyle: 'none',
+                    fontSize: 14,
+                    lineHeight: '2'
+                  }}>
                     {plan.features.map((feature, idx) => (
-                      <li key={idx} style={{ marginBottom: 10, color: 'var(--muted)', display: 'flex', alignItems: 'flex-start' }}>
-                        <span style={{ color: 'var(--accent)', marginRight: 8, fontSize: 16 }}>✓</span>
-                        <span>{feature}</span>
+                      <li key={idx} style={{
+                        marginBottom: 10,
+                        color: 'rgba(255, 255, 255, 0.9)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px'
+                      }}>
+                        <span style={{ color: '#10b981', fontSize: '16px' }}>✓</span> {feature}
                       </li>
                     ))}
                   </ul>
                 ) : (
-                  <p className="muted">Basic features included</p>
+                  <p style={{ fontSize: 14, color: 'rgba(255, 255, 255, 0.5)' }}>Basic features included</p>
                 )}
               </div>
 
               <button
-                className={isCurrentPlan ? 'btn' : isPopular ? 'btn btn-primary' : 'btn btn-outline'}
-                style={{ width: '100%', fontWeight: 600 }}
+                style={{
+                  width: '100%',
+                  padding: '14px 28px',
+                  fontSize: '15px',
+                  fontWeight: '700',
+                  borderRadius: '12px',
+                  border: 'none',
+                  background: isCurrentPlan
+                    ? 'rgba(255, 255, 255, 0.1)'
+                    : isPopular
+                      ? 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)'
+                      : 'linear-gradient(135deg, #9FA2B2 0%, #7a7d8f 100%)',
+                  color: 'white',
+                  cursor: isCurrentPlan || subscribing ? 'not-allowed' : 'pointer',
+                  opacity: isCurrentPlan || subscribing ? 0.6 : 1,
+                  transition: 'all 0.3s ease',
+                  boxShadow: isCurrentPlan
+                    ? 'none'
+                    : isPopular
+                      ? '0 4px 16px rgba(139, 92, 246, 0.3)'
+                      : '0 4px 16px rgba(159, 162, 178, 0.3)'
+                }}
                 disabled={isCurrentPlan || subscribing}
                 onClick={() => handleSubscribe(plan)}
+                onMouseOver={(e) => {
+                  if (!isCurrentPlan && !subscribing) {
+                    e.currentTarget.style.transform = 'translateY(-2px)'
+                    e.currentTarget.style.boxShadow = isPopular
+                      ? '0 8px 24px rgba(139, 92, 246, 0.5)'
+                      : '0 8px 24px rgba(159, 162, 178, 0.5)'
+                  }
+                }}
+                onMouseOut={(e) => {
+                  if (!isCurrentPlan && !subscribing) {
+                    e.currentTarget.style.transform = 'translateY(0)'
+                    e.currentTarget.style.boxShadow = isPopular
+                      ? '0 4px 16px rgba(139, 92, 246, 0.3)'
+                      : '0 4px 16px rgba(159, 162, 178, 0.3)'
+                  }
+                }}
               >
                 {subscribing
-                  ? 'Processing...'
+                  ? '⏳ Processing...'
                   : isCurrentPlan
                     ? '✓ Active Plan'
                     : isFree
-                      ? 'Get Started Free'
-                      : 'Subscribe Now'}
+                      ? '🚀 Get Started Free'
+                      : '💳 Subscribe Now'}
               </button>
             </div>
           )
@@ -283,31 +411,23 @@ export default function SubscriptionPlan() {
       </div>
 
       {plans.length === 0 && (
-        <div className="card" style={{ padding: 24, marginTop: 24, textAlign: 'center' }}>
-          <p className="muted">No subscription plans available at this time.</p>
+        <div style={{
+          background: 'rgba(255, 255, 255, 0.05)',
+          backdropFilter: 'blur(10px)',
+          borderRadius: '16px',
+          textAlign: 'center',
+          padding: '60px 20px',
+          border: '2px solid rgba(255, 255, 255, 0.1)'
+        }}>
+          <div style={{ fontSize: '64px', marginBottom: '20px' }}>📦</div>
+          <p style={{ margin: 0, fontSize: '18px', fontWeight: '600', color: 'rgba(255, 255, 255, 0.9)' }}>
+            No subscription plans available at this time.
+          </p>
+          <p style={{ margin: '12px 0 0 0', fontSize: '14px', color: 'rgba(255, 255, 255, 0.6)' }}>
+            Please check back later or contact support.
+          </p>
         </div>
       )}
-
-      <div className="card" style={{ marginTop: 32 }}>
-        <h3 style={{ marginTop: 0 }}>💳 Payment Information</h3>
-        <p className="muted" style={{ marginBottom: 16 }}>
-          LogiSync uses <strong style={{ color: 'var(--text)' }}>PayMongo</strong> for secure payment processing.
-        </p>
-        <div style={{ background: 'var(--bg-2)', padding: 16, borderRadius: 8, fontSize: 14, border: '1px solid var(--border)' }}>
-          <div style={{ marginBottom: 8, color: 'var(--text)' }}><strong>Accepted Payment Methods:</strong></div>
-          <ul style={{ margin: 0, paddingLeft: 20, color: 'var(--muted)' }}>
-            <li>Credit/Debit Cards (Visa, Mastercard)</li>
-            <li>GCash</li>
-            <li>PayMaya</li>
-          </ul>
-          <div style={{ marginTop: 16, padding: 12, background: 'color-mix(in oklab, var(--primary), transparent 90%)', border: '1px solid color-mix(in oklab, var(--primary), transparent 70%)', borderRadius: 6 }}>
-            <strong style={{ color: 'var(--text)' }}>ℹ️ Test Mode Active</strong>
-            <p style={{ margin: '8px 0 0 0', fontSize: 13, color: 'var(--muted)' }}>
-              Use test card 4343 4343 4343 4343 to demo the payment flow. No real charges will be made.
-            </p>
-          </div>
-        </div>
-      </div>
     </div>
   )
 }

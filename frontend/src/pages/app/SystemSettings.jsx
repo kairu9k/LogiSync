@@ -62,14 +62,47 @@ export default function SystemSettings() {
   }, [pricingConfig, previewInputs])
 
   return (
-    <div>
-      <h1 style={{ marginTop: 0 }}>System Settings</h1>
-      <p className="muted">Configure system preferences and integrations</p>
+    <div className="grid" style={{ gap: 24 }}>
+      {/* Header with Gradient */}
+      <div style={{
+        background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+        borderRadius: '16px',
+        padding: '32px',
+        boxShadow: '0 10px 30px rgba(139, 92, 246, 0.2)'
+      }}>
+        <h1 style={{
+          margin: 0,
+          color: 'white',
+          fontSize: '28px',
+          fontWeight: '700',
+          marginBottom: '8px'
+        }}>⚙️ System Settings</h1>
+        <p style={{
+          margin: 0,
+          color: 'rgba(255,255,255,0.9)',
+          fontSize: '15px'
+        }}>Configure system preferences and pricing formula</p>
+      </div>
 
       {/* Pricing Formula Section */}
-      <div className="card" style={{ marginTop: 24 }}>
-        <h2 style={{ marginTop: 0, marginBottom: 8 }}>💰 Pricing Formula</h2>
-        <p className="muted" style={{ marginBottom: 24 }}>Customize how shipping costs are calculated for all quotes</p>
+      <div style={{
+        background: 'rgba(255, 255, 255, 0.05)',
+        backdropFilter: 'blur(10px)',
+        borderRadius: '16px',
+        padding: '28px',
+        border: '2px solid rgba(255, 255, 255, 0.1)'
+      }}>
+        <h2 style={{
+          margin: '0 0 8px 0',
+          fontSize: '20px',
+          fontWeight: '700',
+          color: 'white'
+        }}>💰 Pricing Formula</h2>
+        <p style={{
+          margin: '0 0 24px 0',
+          fontSize: '14px',
+          color: 'rgba(255, 255, 255, 0.7)'
+        }}>Customize how shipping costs are calculated for all quotes</p>
 
         {pricingLoading ? (
           <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--gray-500)' }}>
@@ -77,123 +110,111 @@ export default function SystemSettings() {
           </div>
         ) : pricingConfig ? (
           <>
-            <div className="grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px', marginBottom: 24 }}>
+            <div className="grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px', marginBottom: 24 }}>
               <label>
-                <div className="label">Base Rate (₱)</div>
+                <div style={{
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  color: '#8b5cf6',
+                  marginBottom: '8px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px'
+                }}>Base Rate (₱)</div>
                 <input
                   type="number"
-                  className="input"
                   step="0.01"
                   min="0"
                   value={pricingConfig.base_rate}
                   onChange={(e) => handlePricingChange('base_rate', e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '10px 14px',
+                    fontSize: '14px',
+                    borderRadius: '10px',
+                    border: '2px solid var(--border)',
+                    transition: 'all 0.3s ease'
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = 'var(--primary-500)'
+                    e.target.style.boxShadow = '0 0 0 3px var(--primary-100)'
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = 'var(--border)'
+                    e.target.style.boxShadow = 'none'
+                  }}
                 />
-                <div className="helper">Fixed starting price for all shipments</div>
+                <div style={{
+                  fontSize: '12px',
+                  color: 'var(--text-muted)',
+                  marginTop: '6px'
+                }}>Fixed starting price for all shipments</div>
               </label>
 
-              <label>
-                <div className="label">Per Kilometer (₱)</div>
-                <input
-                  type="number"
-                  className="input"
-                  step="0.01"
-                  min="0"
-                  value={pricingConfig.per_km_rate}
-                  onChange={(e) => handlePricingChange('per_km_rate', e.target.value)}
-                />
-                <div className="helper">Cost per kilometer of distance</div>
-              </label>
-
-              <label>
-                <div className="label">Per Kilogram (₱)</div>
-                <input
-                  type="number"
-                  className="input"
-                  step="0.01"
-                  min="0"
-                  value={pricingConfig.per_kg_rate}
-                  onChange={(e) => handlePricingChange('per_kg_rate', e.target.value)}
-                />
-                <div className="helper">Cost per kilogram of weight</div>
-              </label>
-
-              <label>
-                <div className="label">Fuel Surcharge (%)</div>
-                <input
-                  type="number"
-                  className="input"
-                  step="0.01"
-                  min="0"
-                  max="100"
-                  value={pricingConfig.fuel_surcharge_percent}
-                  onChange={(e) => handlePricingChange('fuel_surcharge_percent', e.target.value)}
-                />
-                <div className="helper">Percentage added for fuel costs</div>
-              </label>
-
-              <label>
-                <div className="label">Insurance (%)</div>
-                <input
-                  type="number"
-                  className="input"
-                  step="0.01"
-                  min="0"
-                  max="100"
-                  value={pricingConfig.insurance_percent}
-                  onChange={(e) => handlePricingChange('insurance_percent', e.target.value)}
-                />
-                <div className="helper">Percentage for insurance coverage</div>
-              </label>
-
-              <label>
-                <div className="label">Minimum Charge (₱)</div>
-                <input
-                  type="number"
-                  className="input"
-                  step="0.01"
-                  min="0"
-                  value={pricingConfig.minimum_charge}
-                  onChange={(e) => handlePricingChange('minimum_charge', e.target.value)}
-                />
-                <div className="helper">Minimum amount to charge regardless of calculation</div>
-              </label>
-
-              <label>
-                <div className="label">Standard Multiplier (x)</div>
-                <input
-                  type="number"
-                  className="input"
-                  step="0.01"
-                  min="1"
-                  value={pricingConfig.priority_multiplier}
-                  onChange={(e) => handlePricingChange('priority_multiplier', e.target.value)}
-                />
-                <div className="helper">Multiplier for standard destinations</div>
-              </label>
-
-              <label>
-                <div className="label">Remote Multiplier (x)</div>
-                <input
-                  type="number"
-                  className="input"
-                  step="0.01"
-                  min="1"
-                  value={pricingConfig.express_multiplier}
-                  onChange={(e) => handlePricingChange('express_multiplier', e.target.value)}
-                />
-                <div className="helper">Multiplier for remote areas (provinces, islands)</div>
-              </label>
+              {[
+                { key: 'per_km_rate', label: 'Per Kilometer (₱)', helper: 'Cost per kilometer of distance', min: 0, step: '0.01' },
+                { key: 'per_kg_rate', label: 'Per Kilogram (₱)', helper: 'Cost per kilogram of weight', min: 0, step: '0.01' },
+                { key: 'fuel_surcharge_percent', label: 'Fuel Surcharge (%)', helper: 'Percentage added for fuel costs', min: 0, max: 100, step: '0.01' },
+                { key: 'insurance_percent', label: 'Insurance (%)', helper: 'Percentage for insurance coverage', min: 0, max: 100, step: '0.01' },
+                { key: 'minimum_charge', label: 'Minimum Charge (₱)', helper: 'Minimum amount to charge regardless of calculation', min: 0, step: '0.01' },
+                { key: 'priority_multiplier', label: 'Standard Multiplier (x)', helper: 'Multiplier for standard destinations', min: 1, step: '0.01' },
+                { key: 'express_multiplier', label: 'Remote Multiplier (x)', helper: 'Multiplier for remote areas (provinces, islands)', min: 1, step: '0.01' }
+              ].map(field => (
+                <label key={field.key}>
+                  <div style={{
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    color: '#8b5cf6',
+                    marginBottom: '8px',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}>{field.label}</div>
+                  <input
+                    type="number"
+                    step={field.step}
+                    min={field.min}
+                    max={field.max}
+                    value={pricingConfig[field.key]}
+                    onChange={(e) => handlePricingChange(field.key, e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '10px 14px',
+                      fontSize: '14px',
+                      borderRadius: '10px',
+                      border: '2px solid var(--border)',
+                      transition: 'all 0.3s ease'
+                    }}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = 'var(--primary-500)'
+                      e.target.style.boxShadow = '0 0 0 3px var(--primary-100)'
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = 'var(--border)'
+                      e.target.style.boxShadow = 'none'
+                    }}
+                  />
+                  <div style={{
+                    fontSize: '12px',
+                    color: 'var(--text-muted)',
+                    marginTop: '6px'
+                  }}>{field.helper}</div>
+                </label>
+              ))}
             </div>
 
             {/* Preview Calculator */}
             <div style={{
-              background: 'var(--gray-50)',
-              border: '1px solid var(--gray-200)',
-              borderRadius: '8px',
-              padding: '20px',
+              background: 'var(--surface-50)',
+              border: '2px solid var(--border)',
+              borderRadius: '12px',
+              padding: '24px',
               marginBottom: 24
             }}>
-              <h3 style={{ marginTop: 0, marginBottom: 16 }}>📊 Preview Calculation</h3>
+              <h3 style={{
+                marginTop: 0,
+                marginBottom: 20,
+                fontSize: '18px',
+                fontWeight: '700'
+              }}>📊 Preview Calculation</h3>
 
               <div className="grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: 16 }}>
                 <label>
@@ -295,8 +316,25 @@ export default function SystemSettings() {
               className="btn btn-primary"
               onClick={savePricingConfig}
               disabled={pricingSaving}
+              style={{
+                padding: '12px 28px',
+                fontSize: '15px',
+                fontWeight: '600',
+                borderRadius: '10px',
+                transition: 'all 0.3s ease'
+              }}
+              onMouseOver={(e) => {
+                if (!pricingSaving) {
+                  e.currentTarget.style.transform = 'translateY(-2px)'
+                  e.currentTarget.style.boxShadow = '0 6px 20px rgba(0,0,0,0.15)'
+                }
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)'
+                e.currentTarget.style.boxShadow = 'none'
+              }}
             >
-              {pricingSaving ? 'Saving...' : 'Save Pricing Formula'}
+              {pricingSaving ? '⏳ Saving...' : '💾 Save Pricing Formula'}
             </button>
           </>
         ) : (
@@ -306,70 +344,262 @@ export default function SystemSettings() {
         )}
       </div>
 
-      <div className="card" style={{ marginTop: 24 }}>
-        <h3 style={{ marginTop: 0 }}>General Settings</h3>
-        <div style={{ marginTop: 16 }}>
-          <label className="label">Company Name</label>
-          <input type="text" placeholder="Your company name" defaultValue="LogiSync Inc." />
+      <div style={{
+        background: 'rgba(255, 255, 255, 0.05)',
+        backdropFilter: 'blur(10px)',
+        borderRadius: '16px',
+        padding: '28px',
+        border: '2px solid rgba(255, 255, 255, 0.1)'
+      }}>
+        <h3 style={{
+          margin: '0 0 20px 0',
+          fontSize: '20px',
+          fontWeight: '700',
+          color: 'white'
+        }}>🔧 General Settings</h3>
+        <div style={{ marginBottom: 20 }}>
+          <label style={{
+            display: 'block',
+            fontSize: '12px',
+            fontWeight: '600',
+            color: '#8b5cf6',
+            marginBottom: '8px',
+            textTransform: 'uppercase',
+            letterSpacing: '0.5px'
+          }}>Company Name</label>
+          <input
+            type="text"
+            placeholder="Your company name"
+            defaultValue="LogiSync Inc."
+            style={{
+              width: '100%',
+              padding: '10px 14px',
+              fontSize: '14px',
+              borderRadius: '10px',
+              border: '2px solid var(--border)',
+              transition: 'all 0.3s ease'
+            }}
+            onFocus={(e) => {
+              e.target.style.borderColor = 'var(--primary-500)'
+              e.target.style.boxShadow = '0 0 0 3px var(--primary-100)'
+            }}
+            onBlur={(e) => {
+              e.target.style.borderColor = 'var(--border)'
+              e.target.style.boxShadow = 'none'
+            }}
+          />
         </div>
-        <div style={{ marginTop: 16 }}>
-          <label className="label">Company Email</label>
-          <input type="email" placeholder="contact@example.com" defaultValue="admin@logisync.com" />
+        <div style={{ marginBottom: 20 }}>
+          <label style={{
+            display: 'block',
+            fontSize: '12px',
+            fontWeight: '600',
+            color: '#8b5cf6',
+            marginBottom: '8px',
+            textTransform: 'uppercase',
+            letterSpacing: '0.5px'
+          }}>Company Email</label>
+          <input
+            type="email"
+            placeholder="contact@example.com"
+            defaultValue="admin@logisync.com"
+            style={{
+              width: '100%',
+              padding: '10px 14px',
+              fontSize: '14px',
+              borderRadius: '10px',
+              border: '2px solid var(--border)',
+              transition: 'all 0.3s ease'
+            }}
+            onFocus={(e) => {
+              e.target.style.borderColor = 'var(--primary-500)'
+              e.target.style.boxShadow = '0 0 0 3px var(--primary-100)'
+            }}
+            onBlur={(e) => {
+              e.target.style.borderColor = 'var(--border)'
+              e.target.style.boxShadow = 'none'
+            }}
+          />
         </div>
-        <div style={{ marginTop: 16 }}>
-          <label className="label">Time Zone</label>
-          <select defaultValue="Asia/Manila">
+        <div style={{ marginBottom: 24 }}>
+          <label style={{
+            display: 'block',
+            fontSize: '12px',
+            fontWeight: '600',
+            color: '#8b5cf6',
+            marginBottom: '8px',
+            textTransform: 'uppercase',
+            letterSpacing: '0.5px'
+          }}>Time Zone</label>
+          <select
+            defaultValue="Asia/Manila"
+            style={{
+              width: '100%',
+              padding: '10px 14px',
+              fontSize: '14px',
+              borderRadius: '10px',
+              border: '2px solid var(--border)',
+              transition: 'all 0.3s ease'
+            }}
+            onFocus={(e) => {
+              e.target.style.borderColor = 'var(--primary-500)'
+              e.target.style.boxShadow = '0 0 0 3px var(--primary-100)'
+            }}
+            onBlur={(e) => {
+              e.target.style.borderColor = 'var(--border)'
+              e.target.style.boxShadow = 'none'
+            }}
+          >
             <option value="Asia/Manila">Asia/Manila (PHT)</option>
             <option value="UTC">UTC</option>
             <option value="America/New_York">America/New_York (EST)</option>
           </select>
         </div>
-        <button className="btn btn-primary" style={{ marginTop: 16 }}>
-          Save Changes
+        <button
+          className="btn btn-primary"
+          style={{
+            padding: '10px 24px',
+            fontSize: '14px',
+            fontWeight: '600',
+            borderRadius: '10px',
+            transition: 'all 0.2s ease'
+          }}
+          onMouseOver={(e) => {
+            e.currentTarget.style.transform = 'translateY(-1px)'
+            e.currentTarget.style.boxShadow = '0 6px 20px rgba(0,0,0,0.15)'
+          }}
+          onMouseOut={(e) => {
+            e.currentTarget.style.transform = 'translateY(0)'
+            e.currentTarget.style.boxShadow = 'none'
+          }}
+        >
+          💾 Save Changes
         </button>
       </div>
 
-      <div className="card" style={{ marginTop: 24 }}>
-        <h3 style={{ marginTop: 0 }}>Notifications</h3>
-        <div style={{ marginTop: 16 }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-            <input type="checkbox" defaultChecked />
-            <span>Email notifications for new orders</span>
+      <div style={{
+        background: 'rgba(255, 255, 255, 0.05)',
+        backdropFilter: 'blur(10px)',
+        borderRadius: '16px',
+        padding: '28px',
+        border: '2px solid rgba(255, 255, 255, 0.1)'
+      }}>
+        <h3 style={{
+          margin: '0 0 20px 0',
+          fontSize: '20px',
+          fontWeight: '700',
+          color: 'white'
+        }}>🔔 Notifications</h3>
+        <div style={{ marginBottom: 16 }}>
+          <label style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            cursor: 'pointer',
+            padding: '12px',
+            borderRadius: '8px',
+            transition: 'background 0.2s ease'
+          }}
+          onMouseOver={(e) => e.currentTarget.style.background = 'var(--surface-50)'}
+          onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
+          >
+            <input type="checkbox" defaultChecked style={{ width: '18px', height: '18px', cursor: 'pointer' }} />
+            <span style={{ fontSize: '14px', fontWeight: '500' }}>Email notifications for new orders</span>
           </label>
         </div>
-        <div style={{ marginTop: 12 }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-            <input type="checkbox" defaultChecked />
-            <span>Email notifications for shipment updates</span>
+        <div style={{ marginBottom: 16 }}>
+          <label style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            cursor: 'pointer',
+            padding: '12px',
+            borderRadius: '8px',
+            transition: 'background 0.2s ease'
+          }}
+          onMouseOver={(e) => e.currentTarget.style.background = 'var(--surface-50)'}
+          onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
+          >
+            <input type="checkbox" defaultChecked style={{ width: '18px', height: '18px', cursor: 'pointer' }} />
+            <span style={{ fontSize: '14px', fontWeight: '500' }}>Email notifications for shipment updates</span>
           </label>
         </div>
-        <div style={{ marginTop: 12 }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-            <input type="checkbox" />
-            <span>SMS notifications for urgent alerts</span>
+        <div style={{ marginBottom: 24 }}>
+          <label style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            cursor: 'pointer',
+            padding: '12px',
+            borderRadius: '8px',
+            transition: 'background 0.2s ease'
+          }}
+          onMouseOver={(e) => e.currentTarget.style.background = 'var(--surface-50)'}
+          onMouseOut={(e) => e.currentTarget.style.background = 'transparent'}
+          >
+            <input type="checkbox" style={{ width: '18px', height: '18px', cursor: 'pointer' }} />
+            <span style={{ fontSize: '14px', fontWeight: '500' }}>SMS notifications for urgent alerts</span>
           </label>
         </div>
-        <button className="btn btn-primary" style={{ marginTop: 16 }}>
-          Save Changes
+        <button
+          className="btn btn-primary"
+          style={{
+            padding: '10px 24px',
+            fontSize: '14px',
+            fontWeight: '600',
+            borderRadius: '10px',
+            transition: 'all 0.2s ease'
+          }}
+          onMouseOver={(e) => {
+            e.currentTarget.style.transform = 'translateY(-1px)'
+            e.currentTarget.style.boxShadow = '0 6px 20px rgba(0,0,0,0.15)'
+          }}
+          onMouseOut={(e) => {
+            e.currentTarget.style.transform = 'translateY(0)'
+            e.currentTarget.style.boxShadow = 'none'
+          }}
+        >
+          💾 Save Changes
         </button>
       </div>
 
-      <div className="card" style={{ marginTop: 24 }}>
-        <h3 style={{ marginTop: 0 }}>Integrations</h3>
-        <p className="muted">Coming soon: Connect with third-party services</p>
-        <ul style={{ marginTop: 16, paddingLeft: 20 }}>
-          <li>Payment Gateways (PayPal, Stripe)</li>
-          <li>GPS Tracking Services</li>
-          <li>Email Service Providers</li>
-          <li>SMS Gateways</li>
-        </ul>
-      </div>
-
-      <div className="card" style={{ marginTop: 24, borderColor: 'var(--danger-300)' }}>
-        <h3 style={{ marginTop: 0, color: 'var(--danger-600)' }}>Danger Zone</h3>
-        <p className="muted">Irreversible actions - proceed with caution</p>
-        <button className="btn btn-danger" style={{ marginTop: 16 }}>
-          Delete Account
+      <div style={{
+        background: 'rgba(239, 68, 68, 0.1)',
+        backdropFilter: 'blur(10px)',
+        borderRadius: '16px',
+        padding: '28px',
+        border: '2px solid rgba(239, 68, 68, 0.3)'
+      }}>
+        <h3 style={{
+          margin: '0 0 12px 0',
+          fontSize: '20px',
+          fontWeight: '700',
+          color: '#ef4444'
+        }}>⚠️ Danger Zone</h3>
+        <p style={{
+          margin: '0 0 20px 0',
+          fontSize: '14px',
+          color: 'rgba(255, 255, 255, 0.7)'
+        }}>Irreversible actions - proceed with caution</p>
+        <button
+          className="btn btn-danger"
+          style={{
+            padding: '10px 24px',
+            fontSize: '14px',
+            fontWeight: '600',
+            borderRadius: '10px',
+            transition: 'all 0.2s ease'
+          }}
+          onMouseOver={(e) => {
+            e.currentTarget.style.transform = 'translateY(-1px)'
+            e.currentTarget.style.boxShadow = '0 6px 20px rgba(239, 68, 68, 0.3)'
+          }}
+          onMouseOut={(e) => {
+            e.currentTarget.style.transform = 'translateY(0)'
+            e.currentTarget.style.boxShadow = 'none'
+          }}
+        >
+          🗑️ Delete Account
         </button>
       </div>
     </div>

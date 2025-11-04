@@ -496,55 +496,56 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="grid" style={{ gap: 16 }}>
+    <div className="grid" style={{ gap: 24 }}>
       {/* Welcome Card */}
       {user && (
-        <div className="card" style={{
-          padding: '24px',
-          background: 'linear-gradient(135deg, var(--primary-50), var(--primary-100))',
-          border: '1px solid var(--primary-200)'
+        <div style={{
+          padding: '32px',
+          background: 'linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)',
+          borderRadius: '16px',
+          boxShadow: '0 10px 30px rgba(168, 85, 247, 0.2)'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
-              <h2 style={{ margin: '0 0 8px 0', fontSize: '24px', color: 'var(--text)' }}>
+              <h2 style={{ margin: '0 0 12px 0', fontSize: '28px', color: 'white', fontWeight: '700' }}>
                 Welcome back, {user.username || user.email}!
               </h2>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '12px' }}>
-                <span style={{ fontSize: '14px', color: 'var(--text-muted)', fontWeight: 500 }}>Your Role:</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '16px' }}>
+                <span style={{ fontSize: '14px', color: 'rgba(255,255,255,0.9)', fontWeight: 600 }}>Your Role:</span>
                 <span style={{
                   fontSize: '13px',
                   fontWeight: 600,
-                  padding: '4px 12px',
-                  borderRadius: '16px',
-                  background: user.role === 'admin' ? 'var(--primary-600)' :
-                              user.role === 'booking_manager' ? 'var(--success-600)' :
-                              user.role === 'warehouse_manager' ? 'var(--warning-600)' : 'var(--gray-600)',
-                  color: 'white'
+                  padding: '6px 16px',
+                  borderRadius: '20px',
+                  background: 'rgba(255, 255, 255, 0.2)',
+                  backdropFilter: 'blur(10px)',
+                  color: 'white',
+                  border: '1px solid rgba(255, 255, 255, 0.3)'
                 }}>
                   {user.role === 'admin' ? '👑 Administrator' :
                    user.role === 'booking_manager' ? '📋 Booking Manager' :
                    user.role === 'warehouse_manager' ? '📦 Warehouse Manager' : user.role}
                 </span>
               </div>
-              <div style={{ marginTop: '16px', fontSize: '14px', color: 'var(--text-muted)', lineHeight: 1.6 }}>
+              <div style={{ marginTop: '20px', fontSize: '14px', color: 'rgba(255,255,255,0.9)', lineHeight: 1.6 }}>
                 {user.role === 'admin' && (
                   <>
-                    <strong style={{ color: 'var(--text)' }}>Full System Access:</strong> Manage users, configure pricing, view all reports, and control system settings.
+                    <strong style={{ color: 'white' }}>Full System Access:</strong> Manage users, configure pricing, view all reports, and control system settings.
                   </>
                 )}
                 {user.role === 'booking_manager' && (
                   <>
-                    <strong style={{ color: 'var(--text)' }}>Booking Operations:</strong> Create quotes, manage orders, assign shipments, and track deliveries.
+                    <strong style={{ color: 'white' }}>Booking Operations:</strong> Create quotes, manage orders, assign shipments, and track deliveries.
                   </>
                 )}
                 {user.role === 'warehouse_manager' && (
                   <>
-                    <strong style={{ color: 'var(--text)' }}>Warehouse Operations:</strong> Manage inventory, track stock levels, and coordinate with booking team.
+                    <strong style={{ color: 'white' }}>Warehouse Operations:</strong> Manage inventory, track stock levels, and coordinate with booking team.
                   </>
                 )}
               </div>
             </div>
-            <div style={{ fontSize: '64px', opacity: 0.8 }}>
+            <div style={{ fontSize: '72px', opacity: 0.9, filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.2))' }}>
               {user.role === 'admin' ? '👑' :
                user.role === 'booking_manager' ? '📋' :
                user.role === 'warehouse_manager' ? '📦' : '👤'}
@@ -554,50 +555,140 @@ export default function Dashboard() {
       )}
 
       <div className="grid" style={{ gridTemplateColumns: 'repeat(5, minmax(0,1fr))', gap: 16 }}>
-        <article className="card">
-          <div className="label">Total Orders</div>
-          <div className="stat">{loading ? '...' : dashboardData.orders.total}</div>
+        <article style={{
+          background: 'rgba(255, 255, 255, 0.05)',
+          backdropFilter: 'blur(10px)',
+          borderRadius: '16px',
+          padding: '20px',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          transition: 'all 0.3s ease',
+          cursor: 'pointer'
+        }}
+        onMouseOver={(e) => {
+          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'
+          e.currentTarget.style.transform = 'translateY(-4px)'
+          e.currentTarget.style.boxShadow = '0 8px 20px rgba(0,0,0,0.3)'
+        }}
+        onMouseOut={(e) => {
+          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'
+          e.currentTarget.style.transform = 'translateY(0)'
+          e.currentTarget.style.boxShadow = 'none'
+        }}>
+          <div style={{ fontSize: '13px', color: 'rgba(255, 255, 255, 0.6)', marginBottom: '8px', fontWeight: '600' }}>🛒 Total Orders</div>
+          <div style={{ fontSize: '32px', fontWeight: '700', color: 'rgba(255, 255, 255, 0.95)' }}>{loading ? '...' : dashboardData.orders.total}</div>
           {!loading && dashboardData.orders.fulfilled > 0 && (
-            <div className="muted" style={{ fontSize: '12px', color: 'var(--success-600)' }}>
-              {dashboardData.orders.fulfilled} fulfilled
+            <div style={{ fontSize: '12px', color: '#10b981', marginTop: '8px', fontWeight: '600' }}>
+              ✓ {dashboardData.orders.fulfilled} fulfilled
             </div>
           )}
         </article>
-        <article className="card">
-          <div className="label">Active Shipments</div>
-          <div className="stat">{loading ? '...' : dashboardData.shipments.active}</div>
+        <article style={{
+          background: 'rgba(255, 255, 255, 0.05)',
+          backdropFilter: 'blur(10px)',
+          borderRadius: '16px',
+          padding: '20px',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          transition: 'all 0.3s ease',
+          cursor: 'pointer'
+        }}
+        onMouseOver={(e) => {
+          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'
+          e.currentTarget.style.transform = 'translateY(-4px)'
+          e.currentTarget.style.boxShadow = '0 8px 20px rgba(0,0,0,0.3)'
+        }}
+        onMouseOut={(e) => {
+          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'
+          e.currentTarget.style.transform = 'translateY(0)'
+          e.currentTarget.style.boxShadow = 'none'
+        }}>
+          <div style={{ fontSize: '13px', color: 'rgba(255, 255, 255, 0.6)', marginBottom: '8px', fontWeight: '600' }}>📦 Active Shipments</div>
+          <div style={{ fontSize: '32px', fontWeight: '700', color: 'rgba(255, 255, 255, 0.95)' }}>{loading ? '...' : dashboardData.shipments.active}</div>
           {!loading && dashboardData.shipments.delivered > 0 && (
-            <div className="muted" style={{ fontSize: '12px', color: 'var(--success-600)' }}>
-              {dashboardData.shipments.delivered} delivered
+            <div style={{ fontSize: '12px', color: '#10b981', marginTop: '8px', fontWeight: '600' }}>
+              ✓ {dashboardData.shipments.delivered} delivered
             </div>
           )}
         </article>
-        <article className="card">
-          <div className="label">Quote Requests</div>
-          <div className="stat">{loading ? '...' : dashboardData.quotes.pending}</div>
+        <article style={{
+          background: 'rgba(255, 255, 255, 0.05)',
+          backdropFilter: 'blur(10px)',
+          borderRadius: '16px',
+          padding: '20px',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          transition: 'all 0.3s ease',
+          cursor: 'pointer'
+        }}
+        onMouseOver={(e) => {
+          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'
+          e.currentTarget.style.transform = 'translateY(-4px)'
+          e.currentTarget.style.boxShadow = '0 8px 20px rgba(0,0,0,0.3)'
+        }}
+        onMouseOut={(e) => {
+          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'
+          e.currentTarget.style.transform = 'translateY(0)'
+          e.currentTarget.style.boxShadow = 'none'
+        }}>
+          <div style={{ fontSize: '13px', color: 'rgba(255, 255, 255, 0.6)', marginBottom: '8px', fontWeight: '600' }}>📋 Quote Requests</div>
+          <div style={{ fontSize: '32px', fontWeight: '700', color: 'rgba(255, 255, 255, 0.95)' }}>{loading ? '...' : dashboardData.quotes.pending}</div>
           {!loading && dashboardData.quotes.approved > 0 && (
-            <div className="muted" style={{ fontSize: '12px', color: 'var(--info-600)' }}>
-              {dashboardData.quotes.approved} approved
+            <div style={{ fontSize: '12px', color: '#3b82f6', marginTop: '8px', fontWeight: '600' }}>
+              ✓ {dashboardData.quotes.approved} approved
             </div>
           )}
         </article>
-        <article className="card">
-          <div className="label">Warehouse Items</div>
-          <div className="stat">{loading ? '...' : dashboardData.warehouse.total_items || 0}</div>
+        <article style={{
+          background: 'rgba(255, 255, 255, 0.05)',
+          backdropFilter: 'blur(10px)',
+          borderRadius: '16px',
+          padding: '20px',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          transition: 'all 0.3s ease',
+          cursor: 'pointer'
+        }}
+        onMouseOver={(e) => {
+          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'
+          e.currentTarget.style.transform = 'translateY(-4px)'
+          e.currentTarget.style.boxShadow = '0 8px 20px rgba(0,0,0,0.3)'
+        }}
+        onMouseOut={(e) => {
+          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'
+          e.currentTarget.style.transform = 'translateY(0)'
+          e.currentTarget.style.boxShadow = 'none'
+        }}>
+          <div style={{ fontSize: '13px', color: 'rgba(255, 255, 255, 0.6)', marginBottom: '8px', fontWeight: '600' }}>📦 Warehouse Items</div>
+          <div style={{ fontSize: '32px', fontWeight: '700', color: 'rgba(255, 255, 255, 0.95)' }}>{loading ? '...' : dashboardData.warehouse.total_items || 0}</div>
           {!loading && dashboardData.warehouse.unassigned_items > 0 && (
-            <div className="muted" style={{ fontSize: '12px', color: 'var(--warning-600)' }}>
-              {dashboardData.warehouse.unassigned_items} unassigned
+            <div style={{ fontSize: '12px', color: '#f59e0b', marginTop: '8px', fontWeight: '600' }}>
+              ⚠ {dashboardData.warehouse.unassigned_items} unassigned
             </div>
           )}
         </article>
-        <article className="card">
-          <div className="label">Unpaid Invoices</div>
-          <div className="stat">
+        <article style={{
+          background: 'rgba(255, 255, 255, 0.05)',
+          backdropFilter: 'blur(10px)',
+          borderRadius: '16px',
+          padding: '20px',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          transition: 'all 0.3s ease',
+          cursor: 'pointer'
+        }}
+        onMouseOver={(e) => {
+          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'
+          e.currentTarget.style.transform = 'translateY(-4px)'
+          e.currentTarget.style.boxShadow = '0 8px 20px rgba(0,0,0,0.3)'
+        }}
+        onMouseOut={(e) => {
+          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'
+          e.currentTarget.style.transform = 'translateY(0)'
+          e.currentTarget.style.boxShadow = 'none'
+        }}>
+          <div style={{ fontSize: '13px', color: 'rgba(255, 255, 255, 0.6)', marginBottom: '8px', fontWeight: '600' }}>💰 Unpaid Invoices</div>
+          <div style={{ fontSize: '28px', fontWeight: '700', color: 'rgba(255, 255, 255, 0.95)' }}>
             {loading ? '...' : dashboardData.invoices.formatted_total_unpaid}
           </div>
           {!loading && dashboardData.invoices.overdue > 0 && (
-            <div className="muted" style={{ fontSize: '12px', color: 'var(--danger-600)' }}>
-              {dashboardData.invoices.overdue} overdue
+            <div style={{ fontSize: '12px', color: '#ef4444', marginTop: '8px', fontWeight: '600' }}>
+              ⚠ {dashboardData.invoices.overdue} overdue
             </div>
           )}
         </article>

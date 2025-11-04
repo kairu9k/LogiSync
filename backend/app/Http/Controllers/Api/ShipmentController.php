@@ -131,6 +131,7 @@ class ShipmentController extends Controller
             'id' => (int) $shipment->shipment_id,
             'tracking_number' => $shipment->tracking_number,
             'receiver_name' => $shipment->receiver_name,
+            'receiver_contact' => $shipment->receiver_contact ?? 'N/A',
             'receiver_address' => $shipment->receiver_address,
             'origin_name' => $shipment->origin_name,
             'origin_address' => $shipment->origin_address,
@@ -239,12 +240,16 @@ class ShipmentController extends Controller
                 // Note: charges come from frontend in pesos (e.g., 336), not centavos
                 $chargesInPesos = $data['charges'];
 
+                $frontendUrl = env('FRONTEND_URL', 'http://localhost:5173');
+
                 $emailBody = "Hello {$data['receiver_name']},\n\n";
                 $emailBody .= "Your shipment has been created and is ready for dispatch!\n\n";
                 $emailBody .= "Tracking Number: {$trackingNumber}\n";
                 $emailBody .= "Destination: {$data['destination_name']}\n";
                 $emailBody .= "Estimated Charges: ₱" . number_format($chargesInPesos, 2) . "\n\n";
-                $emailBody .= "You can track your shipment status using the tracking number above.\n\n";
+                $emailBody .= "Track Your Shipment:\n";
+                $emailBody .= "Visit our website: {$frontendUrl}\n";
+                $emailBody .= "Enter your tracking number on the landing page to see real-time updates.\n\n";
                 $emailBody .= "If you have any questions, please contact us.\n\n";
                 $emailBody .= "Best regards,\nLogiSync Team\nDavao City, Philippines";
 
@@ -256,6 +261,32 @@ class ShipmentController extends Controller
                 // Log error but don't fail the shipment creation
                 \Log::error('Failed to send tracking email: ' . $e->getMessage());
             }
+        }
+
+        // Send SMS notification if receiver contact is provided
+        if (!empty($data['receiver_contact'])) {
+            try {
+                \Log::info('Attempting to send SMS', [
+                    'receiver_contact' => $data['receiver_contact'],
+                    'receiver_name' => $data['receiver_name'],
+                    'tracking_number' => $trackingNumber
+                ]);
+
+                $smsMessage = "Hello {$data['receiver_name']}! Your shipment #{$trackingNumber} is ready for dispatch to {$data['destination_name']}. Track at logisync.com -LogiSync";
+
+                $smsSent = $this->sendSMS($data['receiver_contact'], $smsMessage);
+
+                if ($smsSent) {
+                    \Log::info('SMS sent successfully to ' . $data['receiver_contact']);
+                } else {
+                    \Log::warning('SMS sending returned false for ' . $data['receiver_contact']);
+                }
+            } catch (\Exception $e) {
+                // Log error but don't fail the shipment creation
+                \Log::error('Failed to send SMS notification: ' . $e->getMessage());
+            }
+        } else {
+            \Log::info('No receiver contact provided, skipping SMS notification');
         }
 
         return response()->json([
@@ -576,5 +607,88 @@ class ShipmentController extends Controller
             'history' => $data,
             'count' => $data->count()
         ])->header('Access-Control-Allow-Origin', '*');
+    }
+
+    /**
+     * Send SMS notification using Semaphore API
+     *
+     * @param string $phoneNumber - Philippine mobile number (e.g., 09123456789 or +639123456789)
+     * @param string $message - SMS message content
+     * @return bool - Success status
+     */
+    private function sendSMS(string $phoneNumber, string $message): bool
+    {
+        // Get Semaphore API key from environment
+        $apiKey = env('SEMAPHORE_API_KEY');
+
+        if (empty($apiKey)) {
+            \Log::warning('Semaphore API key not configured. SMS not sent.');
+            return false;
+        }
+
+        // Format phone number to Philippine format (+63)
+        $phoneNumber = $this->formatPhoneNumber($phoneNumber);
+
+        try {
+            $ch = curl_init();
+            $parameters = [
+                'apikey' => $apiKey,
+                'number' => $phoneNumber,
+                'message' => $message,
+                'sendername' => env('SEMAPHORE_SENDER_NAME', 'LogiSync')
+            ];
+
+            curl_setopt($ch, CURLOPT_URL, 'https://api.semaphore.co/api/v4/messages');
+            curl_setopt($ch, CURLOPT_POST, 1);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($parameters));
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+
+            $output = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+
+            if ($httpCode >= 200 && $httpCode < 300) {
+                \Log::info('SMS sent successfully', ['phone' => $phoneNumber]);
+                return true;
+            } else {
+                \Log::error('Failed to send SMS', [
+                    'phone' => $phoneNumber,
+                    'http_code' => $httpCode,
+                    'response' => $output
+                ]);
+                return false;
+            }
+        } catch (\Exception $e) {
+            \Log::error('SMS sending exception: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Format phone number to Philippine international format
+     *
+     * @param string $phoneNumber
+     * @return string
+     */
+    private function formatPhoneNumber(string $phoneNumber): string
+    {
+        // Remove spaces, dashes, and parentheses
+        $phoneNumber = preg_replace('/[\s\-\(\)]/', '', $phoneNumber);
+
+        // If starts with 0, replace with +63
+        if (substr($phoneNumber, 0, 1) === '0') {
+            $phoneNumber = '+63' . substr($phoneNumber, 1);
+        }
+        // If starts with 63 but no +, add +
+        elseif (substr($phoneNumber, 0, 2) === '63') {
+            $phoneNumber = '+' . $phoneNumber;
+        }
+        // If doesn't start with + or 63, assume it's a local number without 0
+        elseif (substr($phoneNumber, 0, 1) !== '+') {
+            $phoneNumber = '+63' . $phoneNumber;
+        }
+
+        return $phoneNumber;
     }
 }

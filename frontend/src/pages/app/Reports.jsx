@@ -68,16 +68,52 @@ export default function Reports() {
   }
 
   return (
-    <div className="grid" style={{ gap: 16 }}>
-      {/* Header */}
-      <div className="card">
+    <div className="grid" style={{ gap: 24 }}>
+      {/* Header Section with Gradient */}
+      <div style={{
+        background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+        borderRadius: '16px',
+        padding: '32px',
+        boxShadow: '0 10px 30px rgba(245, 158, 11, 0.2)'
+      }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h2 style={{ marginTop: 0 }}>Reports & Analytics</h2>
+          <div>
+            <h2 style={{ margin: 0, color: 'white', fontSize: '28px', fontWeight: '700', marginBottom: '8px' }}>
+              📊 Reports & Analytics
+            </h2>
+            <p style={{ margin: 0, color: 'rgba(255,255,255,0.9)', fontSize: '15px' }}>
+              Comprehensive insights and business intelligence
+            </p>
+          </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button
-              className="btn btn-outline"
               onClick={() => downloadReport(activeTab)}
               disabled={loading}
+              style={{
+                padding: '10px 20px',
+                fontSize: '14px',
+                fontWeight: '600',
+                background: 'white',
+                color: '#f59e0b',
+                border: 'none',
+                borderRadius: '10px',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                transition: 'all 0.3s ease',
+                cursor: loading ? 'not-allowed' : 'pointer',
+                opacity: loading ? 0.6 : 1
+              }}
+              onMouseOver={(e) => {
+                if (!loading) {
+                  e.currentTarget.style.transform = 'translateY(-2px)'
+                  e.currentTarget.style.boxShadow = '0 6px 20px rgba(0,0,0,0.2)'
+                }
+              }}
+              onMouseOut={(e) => {
+                if (!loading) {
+                  e.currentTarget.style.transform = 'translateY(0)'
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)'
+                }
+              }}
             >
               📥 Export {tabs.find(t => t.id === activeTab)?.label.replace(/📊|💰|🚚|👥|📦/g, '').trim()}
             </button>
@@ -86,23 +122,43 @@ export default function Reports() {
 
         {/* Date Range Controls */}
         {activeTab !== 'inventory' && (
-          <div className="form-row" style={{ marginTop: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0,1fr))', gap: 16, marginTop: 20 }}>
             <label>
-              <div className="label">From Date</div>
+              <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.9)', marginBottom: 6, fontWeight: '600' }}>From Date</div>
               <input
                 type="date"
                 className="input"
                 value={dateRange.date_from}
                 onChange={(e) => handleDateChange('date_from', e.target.value)}
+                style={{
+                  borderRadius: '10px',
+                  border: '2px solid rgba(255,255,255,0.3)',
+                  fontSize: '14px',
+                  padding: '10px',
+                  background: 'rgba(0, 0, 0, 0.2)',
+                  color: 'white',
+                  transition: 'all 0.3s ease',
+                  colorScheme: 'dark'
+                }}
               />
             </label>
             <label>
-              <div className="label">To Date</div>
+              <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.9)', marginBottom: 6, fontWeight: '600' }}>To Date</div>
               <input
                 type="date"
                 className="input"
                 value={dateRange.date_to}
                 onChange={(e) => handleDateChange('date_to', e.target.value)}
+                style={{
+                  borderRadius: '10px',
+                  border: '2px solid rgba(255,255,255,0.3)',
+                  fontSize: '14px',
+                  padding: '10px',
+                  background: 'rgba(0, 0, 0, 0.2)',
+                  color: 'white',
+                  transition: 'all 0.3s ease',
+                  colorScheme: 'dark'
+                }}
               />
             </label>
           </div>
@@ -110,14 +166,46 @@ export default function Reports() {
       </div>
 
       {/* Tab Navigation */}
-      <div className="card">
-        <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid var(--gray-200)', paddingBottom: 16 }}>
+      <div style={{
+        background: 'rgba(255, 255, 255, 0.05)',
+        backdropFilter: 'blur(10px)',
+        borderRadius: '16px',
+        padding: '20px',
+        border: '1px solid rgba(255, 255, 255, 0.1)',
+        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)'
+      }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 20 }}>
           {tabs.map(tab => (
             <button
               key={tab.id}
-              className={`btn ${activeTab === tab.id ? 'btn-primary' : 'btn-outline'}`}
               onClick={() => setActiveTab(tab.id)}
-              style={{ minWidth: '120px' }}
+              style={{
+                minWidth: '120px',
+                padding: '10px 20px',
+                fontSize: '14px',
+                fontWeight: '600',
+                borderRadius: '10px',
+                border: 'none',
+                background: activeTab === tab.id
+                  ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)'
+                  : 'rgba(255, 255, 255, 0.05)',
+                color: activeTab === tab.id ? 'white' : 'var(--text)',
+                cursor: 'pointer',
+                transition: 'all 0.3s ease',
+                boxShadow: activeTab === tab.id ? '0 4px 12px rgba(245, 158, 11, 0.3)' : 'none'
+              }}
+              onMouseOver={(e) => {
+                if (activeTab !== tab.id) {
+                  e.currentTarget.style.background = 'rgba(245, 158, 11, 0.1)'
+                }
+                e.currentTarget.style.transform = 'translateY(-2px)'
+              }}
+              onMouseOut={(e) => {
+                if (activeTab !== tab.id) {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'
+                }
+                e.currentTarget.style.transform = 'translateY(0)'
+              }}
             >
               {tab.label}
             </button>
@@ -149,29 +237,93 @@ function OverviewReport({ data }) {
     <div className="grid" style={{ gap: 16 }}>
       {/* Key Metrics */}
       <div className="grid" style={{ gridTemplateColumns: 'repeat(4, minmax(0,1fr))', gap: 12 }}>
-        <div className="card" style={{ padding: 12, textAlign: 'center' }}>
-          <div style={{ fontSize: '24px', fontWeight: 'bold', color: 'var(--primary-600)' }}>
+        <div style={{
+          background: 'rgba(245, 158, 11, 0.1)',
+          backdropFilter: 'blur(10px)',
+          borderRadius: '12px',
+          padding: '20px',
+          textAlign: 'center',
+          border: '1px solid rgba(245, 158, 11, 0.2)',
+          transition: 'all 0.3s ease'
+        }}
+        onMouseOver={(e) => {
+          e.currentTarget.style.transform = 'translateY(-4px)'
+          e.currentTarget.style.boxShadow = '0 8px 20px rgba(245, 158, 11, 0.2)'
+        }}
+        onMouseOut={(e) => {
+          e.currentTarget.style.transform = 'translateY(0)'
+          e.currentTarget.style.boxShadow = 'none'
+        }}>
+          <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#f59e0b', marginBottom: '8px' }}>
             {data.formatted_revenue}
           </div>
-          <div className="muted">Total Revenue</div>
+          <div style={{ color: 'var(--muted)', fontSize: '14px' }}>Total Revenue</div>
         </div>
-        <div className="card" style={{ padding: 12, textAlign: 'center' }}>
-          <div style={{ fontSize: '24px', fontWeight: 'bold', color: 'var(--info-600)' }}>
+        <div style={{
+          background: 'rgba(59, 130, 246, 0.1)',
+          backdropFilter: 'blur(10px)',
+          borderRadius: '12px',
+          padding: '20px',
+          textAlign: 'center',
+          border: '1px solid rgba(59, 130, 246, 0.2)',
+          transition: 'all 0.3s ease'
+        }}
+        onMouseOver={(e) => {
+          e.currentTarget.style.transform = 'translateY(-4px)'
+          e.currentTarget.style.boxShadow = '0 8px 20px rgba(59, 130, 246, 0.2)'
+        }}
+        onMouseOut={(e) => {
+          e.currentTarget.style.transform = 'translateY(0)'
+          e.currentTarget.style.boxShadow = 'none'
+        }}>
+          <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#3b82f6', marginBottom: '8px' }}>
             {data.total_orders}
           </div>
-          <div className="muted">Total Orders</div>
+          <div style={{ color: 'var(--muted)', fontSize: '14px' }}>Total Orders</div>
         </div>
-        <div className="card" style={{ padding: 12, textAlign: 'center' }}>
-          <div style={{ fontSize: '24px', fontWeight: 'bold', color: 'var(--success-600)' }}>
+        <div style={{
+          background: 'rgba(16, 185, 129, 0.1)',
+          backdropFilter: 'blur(10px)',
+          borderRadius: '12px',
+          padding: '20px',
+          textAlign: 'center',
+          border: '1px solid rgba(16, 185, 129, 0.2)',
+          transition: 'all 0.3s ease'
+        }}
+        onMouseOver={(e) => {
+          e.currentTarget.style.transform = 'translateY(-4px)'
+          e.currentTarget.style.boxShadow = '0 8px 20px rgba(16, 185, 129, 0.2)'
+        }}
+        onMouseOut={(e) => {
+          e.currentTarget.style.transform = 'translateY(0)'
+          e.currentTarget.style.boxShadow = 'none'
+        }}>
+          <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#10b981', marginBottom: '8px' }}>
             {data.fulfillment_rate}%
           </div>
-          <div className="muted">Fulfillment Rate</div>
+          <div style={{ color: 'var(--muted)', fontSize: '14px' }}>Fulfillment Rate</div>
         </div>
-        <div className="card" style={{ padding: 12, textAlign: 'center' }}>
-          <div style={{ fontSize: '24px', fontWeight: 'bold', color: 'var(--warning-600)' }}>
+        <div style={{
+          background: 'rgba(245, 158, 11, 0.1)',
+          backdropFilter: 'blur(10px)',
+          borderRadius: '12px',
+          padding: '20px',
+          textAlign: 'center',
+          border: '1px solid rgba(245, 158, 11, 0.2)',
+          transition: 'all 0.3s ease'
+        }}
+        onMouseOver={(e) => {
+          e.currentTarget.style.transform = 'translateY(-4px)'
+          e.currentTarget.style.boxShadow = '0 8px 20px rgba(245, 158, 11, 0.2)'
+        }}
+        onMouseOut={(e) => {
+          e.currentTarget.style.transform = 'translateY(0)'
+          e.currentTarget.style.boxShadow = 'none'
+        }}>
+          <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#f59e0b', marginBottom: '8px' }}>
             {data.avg_delivery_days}
           </div>
-          <div className="muted">Avg Delivery Days</div>
+          <div style={{ color: 'var(--muted)', fontSize: '14px' }}>Avg Delivery Days</div>
         </div>
       </div>
 

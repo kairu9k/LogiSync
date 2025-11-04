@@ -999,80 +999,31 @@ export default function DriverDashboard() {
             </div>
 
             {isTracking && currentLocation && (
-              <>
-                <div style={{
-                  background: 'rgba(255,255,255,0.2)',
-                  borderRadius: '8px',
-                  padding: '12px',
-                  marginTop: '12px'
-                }}>
-                  <div style={{ fontSize: '12px', fontWeight: '600', opacity: 0.9, marginBottom: '8px' }}>
-                    CURRENT LOCATION
+              <div style={{
+                background: 'rgba(255,255,255,0.2)',
+                borderRadius: '8px',
+                padding: '12px',
+                marginTop: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '12px'
+              }}>
+                <div>
+                  <div style={{ fontSize: '12px', fontWeight: '600', opacity: 0.9, marginBottom: '4px' }}>
+                    📍 LOCATION ACTIVE
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', fontSize: '13px' }}>
-                    <div>
-                      <div style={{ opacity: 0.8 }}>Latitude:</div>
-                      <div style={{ fontFamily: 'monospace', fontWeight: '500' }}>
-                        {currentLocation.latitude.toFixed(6)}
-                      </div>
-                    </div>
-                    <div>
-                      <div style={{ opacity: 0.8 }}>Longitude:</div>
-                      <div style={{ fontFamily: 'monospace', fontWeight: '500' }}>
-                        {currentLocation.longitude.toFixed(6)}
-                      </div>
-                    </div>
-                    <div>
-                      <div style={{ opacity: 0.8 }}>Accuracy:</div>
-                      <div style={{ fontWeight: '500' }}>±{currentLocation.accuracy.toFixed(0)}m</div>
-                    </div>
-                    <div>
-                      <div style={{ opacity: 0.8 }}>Last Update:</div>
-                      <div style={{ fontWeight: '500' }}>
-                        {lastUpdateTime ? lastUpdateTime.toLocaleTimeString() : 'Just now'}
-                      </div>
-                    </div>
+                  <div style={{ fontSize: '13px', opacity: 0.9 }}>
+                    Accuracy: ±{currentLocation.accuracy.toFixed(0)}m
                   </div>
                 </div>
-
-                {/* Mini Map */}
-                <div style={{
-                  marginTop: '12px',
-                  borderRadius: '8px',
-                  overflow: 'hidden',
-                  height: '200px',
-                  border: '2px solid rgba(255,255,255,0.3)'
-                }}>
-                  <MapContainer
-                    center={[currentLocation.latitude, currentLocation.longitude]}
-                    zoom={15}
-                    style={{ height: '100%', width: '100%' }}
-                    zoomControl={true}
-                  >
-                    <TileLayer
-                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                    />
-                    <Marker
-                      position={[currentLocation.latitude, currentLocation.longitude]}
-                      icon={truckIcon}
-                    >
-                      <Popup>
-                        <div style={{ textAlign: 'center' }}>
-                          <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>🚛 Your Location</div>
-                          <div style={{ fontSize: '12px', color: '#666' }}>
-                            Tracking {shipments.filter(s => s.status === 'in_transit' || s.status === 'out_for_delivery' || s.status === 'pending').length} shipments
-                          </div>
-                          <div style={{ fontSize: '11px', color: '#999', marginTop: '4px' }}>
-                            Accuracy: ±{currentLocation.accuracy.toFixed(0)}m
-                          </div>
-                        </div>
-                      </Popup>
-                    </Marker>
-                    <MapUpdater center={[currentLocation.latitude, currentLocation.longitude]} />
-                  </MapContainer>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: '11px', opacity: 0.8, marginBottom: '2px' }}>Last Update</div>
+                  <div style={{ fontSize: '13px', fontWeight: '600' }}>
+                    {lastUpdateTime ? lastUpdateTime.toLocaleTimeString() : 'Just now'}
+                  </div>
                 </div>
-              </>
+              </div>
             )}
 
             {gpsError && (
@@ -1174,138 +1125,81 @@ export default function DriverDashboard() {
       </div>
 
       {summary && (
-        <div className="grid" style={{ gridTemplateColumns: 'repeat(5, minmax(0,1fr))', gap: '16px', marginBottom: '16px' }}>
-          <div className="card" style={{ padding: '16px', textAlign: 'center' }}>
-            <div style={{ fontSize: '32px', fontWeight: 'bold', color: 'var(--primary-600)', marginBottom: '8px' }}>
-              {summary.total || 0}
-            </div>
-            <div className="muted" style={{ fontSize: '14px' }}>Total Shipments</div>
-          </div>
-          <div className="card" style={{ padding: '16px', textAlign: 'center' }}>
-            <div style={{ fontSize: '32px', fontWeight: 'bold', color: 'var(--warning-600)', marginBottom: '8px' }}>
+        <div className="grid" style={{ gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: '12px', marginBottom: '16px' }}>
+          <div className="card" style={{ padding: '14px', textAlign: 'center' }}>
+            <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#f59e0b', marginBottom: '4px' }}>
               {summary.pending || 0}
             </div>
-            <div className="muted" style={{ fontSize: '14px' }}>Pending</div>
+            <div className="muted" style={{ fontSize: '13px' }}>📦 Pending</div>
           </div>
-          <div className="card" style={{ padding: '16px', textAlign: 'center' }}>
-            <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#10b981', marginBottom: '8px' }}>
-              {summary.picked_up || 0}
-            </div>
-            <div className="muted" style={{ fontSize: '14px' }}>Picked Up</div>
-          </div>
-          <div className="card" style={{ padding: '16px', textAlign: 'center' }}>
-            <div style={{ fontSize: '32px', fontWeight: 'bold', color: 'var(--info-600)', marginBottom: '8px' }}>
+          <div className="card" style={{ padding: '14px', textAlign: 'center' }}>
+            <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#3b82f6', marginBottom: '4px' }}>
               {summary.in_transit || 0}
             </div>
-            <div className="muted" style={{ fontSize: '14px' }}>In Transit</div>
+            <div className="muted" style={{ fontSize: '13px' }}>🚛 In Transit</div>
           </div>
-          <div className="card" style={{ padding: '16px', textAlign: 'center' }}>
-            <div style={{ fontSize: '32px', fontWeight: 'bold', color: 'var(--success-600)', marginBottom: '8px' }}>
+          <div className="card" style={{ padding: '14px', textAlign: 'center' }}>
+            <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#8b5cf6', marginBottom: '4px' }}>
               {summary.out_for_delivery || 0}
             </div>
-            <div className="muted" style={{ fontSize: '14px' }}>For Delivery</div>
+            <div className="muted" style={{ fontSize: '13px' }}>🚚 For Delivery</div>
           </div>
         </div>
       )}
 
       {/* Vehicle Capacity Indicator */}
       {vehicleCapacity && (
-        <div className="card" style={{ padding: '16px', marginBottom: '16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
-            {/* Pie Chart */}
-            <div style={{ position: 'relative', width: '120px', height: '120px', flexShrink: 0 }}>
-              <svg viewBox="0 0 36 36" style={{ transform: 'rotate(-90deg)', width: '100%', height: '100%' }}>
-                {/* Background circle (available capacity - green) */}
-                <circle
-                  cx="18"
-                  cy="18"
-                  r="15.9155"
-                  fill="transparent"
-                  stroke="#e5e7eb"
-                  strokeWidth="3.8"
-                />
-                {/* Current load (colored based on utilization) */}
-                {vehicleCapacity.utilization_percent > 0 && (
-                  <circle
-                    cx="18"
-                    cy="18"
-                    r="15.9155"
-                    fill="transparent"
-                    stroke={vehicleCapacity.utilization_percent >= 90 ? '#ef4444' :
-                           vehicleCapacity.utilization_percent >= 70 ? '#f59e0b' :
-                           '#3b82f6'}
-                    strokeWidth="3.8"
-                    strokeDasharray={`${vehicleCapacity.utilization_percent} ${100 - vehicleCapacity.utilization_percent}`}
-                  />
-                )}
-              </svg>
-              <div style={{
-                position: 'absolute',
-                top: '50%',
-                left: '50%',
-                transform: 'translate(-50%, -50%)',
-                textAlign: 'center'
-              }}>
-                <div style={{ fontSize: '24px', fontWeight: 'bold', color: 'var(--gray-800)' }}>
-                  {vehicleCapacity.utilization_percent}%
-                </div>
-                <div style={{ fontSize: '11px', color: 'var(--gray-600)', marginTop: '2px' }}>
-                  Used
-                </div>
+        <div className="card" style={{ padding: '14px', marginBottom: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
+            <div>
+              <div style={{ fontWeight: 600, fontSize: '16px' }}>
+                🚛 {vehicleCapacity.vehicle_id} - {vehicleCapacity.vehicle_type}
               </div>
             </div>
 
-            {/* Vehicle Info and Capacity Details */}
-            <div style={{ flex: 1 }}>
-              <div style={{ marginBottom: '12px' }}>
-                <div style={{ fontWeight: 600, fontSize: '18px', marginBottom: '4px' }}>
-                  🚛 Your Vehicle: {vehicleCapacity.vehicle_id} ({vehicleCapacity.registration})
-                </div>
-                <div className="muted" style={{ fontSize: '14px' }}>
-                  {vehicleCapacity.vehicle_type}
+            <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '11px', color: 'var(--gray-600)', marginBottom: '2px' }}>Load</div>
+                <div style={{ fontSize: '18px', fontWeight: 'bold', color: vehicleCapacity.utilization_percent >= 90 ? '#ef4444' : vehicleCapacity.utilization_percent >= 70 ? '#f59e0b' : '#3b82f6' }}>
+                  {vehicleCapacity.current_load} kg
                 </div>
               </div>
 
-              <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
-                <div>
-                  <div style={{ fontSize: '12px', color: 'var(--gray-600)', marginBottom: '2px' }}>Current Load</div>
-                  <div style={{ fontSize: '20px', fontWeight: 'bold', color: vehicleCapacity.utilization_percent >= 90 ? 'var(--danger-600)' :
-                           vehicleCapacity.utilization_percent >= 70 ? 'var(--warning-600)' :
-                           'var(--info-600)' }}>
-                    {vehicleCapacity.current_load} kg
-                  </div>
-                </div>
+              <div style={{ fontSize: '20px', color: 'var(--gray-400)' }}>/</div>
 
-                <div>
-                  <div style={{ fontSize: '12px', color: 'var(--gray-600)', marginBottom: '2px' }}>Available</div>
-                  <div style={{ fontSize: '20px', fontWeight: 'bold', color: 'var(--success-600)' }}>
-                    {vehicleCapacity.available_capacity} kg
-                  </div>
-                </div>
-
-                <div>
-                  <div style={{ fontSize: '12px', color: 'var(--gray-600)', marginBottom: '2px' }}>Total Capacity</div>
-                  <div style={{ fontSize: '20px', fontWeight: 'bold', color: 'var(--gray-700)' }}>
-                    {vehicleCapacity.capacity} kg
-                  </div>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '11px', color: 'var(--gray-600)', marginBottom: '2px' }}>Capacity</div>
+                <div style={{ fontSize: '18px', fontWeight: 'bold', color: 'var(--gray-700)' }}>
+                  {vehicleCapacity.capacity} kg
                 </div>
               </div>
 
-              {vehicleCapacity.utilization_percent >= 90 && (
-                <div style={{
-                  marginTop: '12px',
-                  padding: '8px 12px',
-                  background: 'var(--danger-50)',
-                  border: '1px solid var(--danger-200)',
-                  borderRadius: '6px',
-                  fontSize: '13px',
-                  color: 'var(--danger-700)'
-                }}>
-                  ⚠️ <strong>Warning:</strong> Vehicle is at {vehicleCapacity.utilization_percent}% capacity. Be cautious with additional loads.
-                </div>
-              )}
+              <div style={{
+                padding: '6px 12px',
+                borderRadius: '6px',
+                background: vehicleCapacity.utilization_percent >= 90 ? '#fee2e2' : vehicleCapacity.utilization_percent >= 70 ? '#fef3c7' : '#dbeafe',
+                color: vehicleCapacity.utilization_percent >= 90 ? '#991b1b' : vehicleCapacity.utilization_percent >= 70 ? '#92400e' : '#1e40af',
+                fontSize: '14px',
+                fontWeight: '700'
+              }}>
+                {vehicleCapacity.utilization_percent}%
+              </div>
             </div>
           </div>
+
+          {vehicleCapacity.utilization_percent >= 90 && (
+            <div style={{
+              marginTop: '10px',
+              padding: '8px 12px',
+              background: '#fee2e2',
+              borderRadius: '6px',
+              fontSize: '12px',
+              color: '#991b1b',
+              fontWeight: '500'
+            }}>
+              ⚠️ Near capacity limit - be cautious with additional loads
+            </div>
+          )}
         </div>
       )}
 

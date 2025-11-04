@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { getShipment, updateShipmentStatus, apiGet } from '../../lib/api'
+import { getShipment, apiGet } from '../../lib/api'
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
@@ -32,7 +32,6 @@ export default function ShipmentDetail() {
   const [shipment, setShipment] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [updating, setUpdating] = useState(false)
   const [gpsLocation, setGpsLocation] = useState(null)
   const [gpsLoading, setGpsLoading] = useState(false)
 
@@ -75,22 +74,6 @@ export default function ShipmentDetail() {
     }
   }
 
-  async function handleStatusUpdate(newStatus, location, details = '') {
-    try {
-      setUpdating(true)
-      await updateShipmentStatus(id, {
-        status: newStatus,
-        location,
-        details
-      })
-      await load()
-    } catch (e) {
-      alert(e.message || 'Failed to update status')
-    } finally {
-      setUpdating(false)
-    }
-  }
-
   function getStatusBadgeClass(status) {
     switch (status) {
       case 'delivered': return 'badge success'
@@ -106,87 +89,200 @@ export default function ShipmentDetail() {
   if (!shipment) return null
 
   return (
-    <div className="grid" style={{ gap: 16 }}>
-      <div className="card" style={{ padding: 16 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h2 style={{ marginTop: 0 }}>Shipment {shipment.tracking_number}</h2>
-          <button className="btn btn-outline" onClick={() => navigate(-1)}>Back</button>
-        </div>
-
-        <div className="grid" style={{ gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 12 }}>
+    <div className="grid" style={{ gap: 24 }}>
+      {/* Header with Gradient */}
+      <div style={{
+        background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
+        borderRadius: '16px',
+        padding: '32px',
+        boxShadow: '0 10px 30px rgba(249, 115, 22, 0.2)'
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 20 }}>
           <div>
-            <div className="label">Tracking Number</div>
-            <div style={{ fontFamily: 'monospace', fontSize: '1.1em' }}>{shipment.tracking_number}</div>
+            <h2 style={{ margin: 0, color: 'white', fontSize: '28px', fontWeight: '700', marginBottom: '8px' }}>
+              📦 Shipment Details
+            </h2>
+            <p style={{ margin: 0, color: 'rgba(255,255,255,0.9)', fontSize: '15px', fontFamily: 'monospace' }}>
+              {shipment.tracking_number}
+            </p>
           </div>
+          <button
+            className="btn"
+            onClick={() => navigate(-1)}
+            style={{
+              padding: '12px 24px',
+              borderRadius: '10px',
+              border: '2px solid rgba(255, 255, 255, 0.3)',
+              background: 'rgba(255, 255, 255, 0.15)',
+              backdropFilter: 'blur(10px)',
+              color: 'white',
+              fontSize: '14px',
+              fontWeight: '600',
+              cursor: 'pointer',
+              transition: 'all 0.3s ease'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.25)'
+              e.currentTarget.style.transform = 'translateY(-2px)'
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)'
+              e.currentTarget.style.transform = 'translateY(0)'
+            }}
+          >
+            ← Back
+          </button>
+        </div>
+      </div>
+
+      {/* Shipment Information Card */}
+      <div style={{
+        background: 'rgba(255, 255, 255, 0.05)',
+        backdropFilter: 'blur(10px)',
+        borderRadius: '16px',
+        padding: '28px',
+        border: '2px solid rgba(255, 255, 255, 0.1)'
+      }}>
+        <h3 style={{ margin: '0 0 24px 0', fontSize: '20px', fontWeight: '700', color: 'white' }}>
+          📋 Shipment Information
+        </h3>
+        <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 20 }}>
           <div>
-            <div className="label">Status</div>
-            <div>
-              <span className={getStatusBadgeClass(shipment.status)}>{shipment.status}</span>
+            <div style={{ fontSize: '12px', fontWeight: '600', color: '#f97316', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              Tracking Number
+            </div>
+            <div style={{ fontFamily: 'monospace', fontSize: '15px', color: 'rgba(255, 255, 255, 0.9)', fontWeight: '600' }}>
+              {shipment.tracking_number}
             </div>
           </div>
           <div>
-            <div className="label">Creation Date</div>
-            <div>{new Date(shipment.creation_date).toLocaleDateString()}</div>
+            <div style={{ fontSize: '12px', fontWeight: '600', color: '#f97316', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              Status
+            </div>
+            <div>
+              <span className={getStatusBadgeClass(shipment.status)} style={{ fontSize: '13px', padding: '6px 12px' }}>
+                {shipment.status}
+              </span>
+            </div>
           </div>
           <div>
-            <div className="label">Customer</div>
-            <div>{shipment.receiver_name}</div>
+            <div style={{ fontSize: '12px', fontWeight: '600', color: '#f97316', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              Creation Date
+            </div>
+            <div style={{ fontSize: '15px', color: 'rgba(255, 255, 255, 0.9)' }}>
+              {new Date(shipment.creation_date).toLocaleDateString()}
+            </div>
           </div>
           <div>
-            <div className="label">Prepared by</div>
-            <div>{shipment.customer}</div>
+            <div style={{ fontSize: '12px', fontWeight: '600', color: '#f97316', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              Customer
+            </div>
+            <div style={{ fontSize: '15px', color: 'rgba(255, 255, 255, 0.9)' }}>
+              {shipment.customer}
+            </div>
           </div>
           <div>
-            <div className="label">Driver</div>
-            <div>{shipment.driver}</div>
+            <div style={{ fontSize: '12px', fontWeight: '600', color: '#f97316', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              Contact Number
+            </div>
+            <div style={{ fontSize: '15px', color: 'rgba(255, 255, 255, 0.9)', fontFamily: 'monospace' }}>
+              📞 {shipment.receiver_contact || 'N/A'}
+            </div>
           </div>
           <div>
-            <div className="label">Vehicle</div>
-            <div>{shipment.vehicle} ({shipment.vehicle_type})</div>
+            <div style={{ fontSize: '12px', fontWeight: '600', color: '#f97316', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              Driver
+            </div>
+            <div style={{ fontSize: '15px', color: 'rgba(255, 255, 255, 0.9)' }}>
+              {shipment.driver}
+            </div>
           </div>
           <div>
-            <div className="label">Charges</div>
-            <div>₱{shipment.charges?.toLocaleString()}</div>
+            <div style={{ fontSize: '12px', fontWeight: '600', color: '#f97316', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              Vehicle
+            </div>
+            <div style={{ fontSize: '15px', color: 'rgba(255, 255, 255, 0.9)' }}>
+              {shipment.vehicle} ({shipment.vehicle_type})
+            </div>
           </div>
           <div>
-            <div className="label">Departure Date</div>
-            <div>{shipment.departure_date ? new Date(shipment.departure_date).toLocaleDateString() : 'Not set'}</div>
+            <div style={{ fontSize: '12px', fontWeight: '600', color: '#f97316', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              Charges
+            </div>
+            <div style={{ fontSize: '18px', color: '#10b981', fontWeight: '700' }}>
+              ₱{shipment.charges?.toLocaleString()}
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: '12px', fontWeight: '600', color: '#f97316', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              Departure Date
+            </div>
+            <div style={{ fontSize: '15px', color: 'rgba(255, 255, 255, 0.9)' }}>
+              {shipment.departure_date ? new Date(shipment.departure_date).toLocaleDateString() : 'Not set'}
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="card" style={{ padding: 16 }}>
-        <h3 style={{ marginTop: 0 }}>Addresses</h3>
-        <div className="grid" style={{ gridTemplateColumns: 'repeat(2, minmax(0,1fr))', gap: 16 }}>
-          <div>
-            <div className="label">Origin</div>
-            <div><strong>{shipment.origin_name}</strong></div>
-            <div className="muted" style={{ fontSize: '0.875rem', marginTop: 4 }}>
+      {/* Addresses Card */}
+      <div style={{
+        background: 'rgba(255, 255, 255, 0.05)',
+        backdropFilter: 'blur(10px)',
+        borderRadius: '16px',
+        padding: '28px',
+        border: '2px solid rgba(255, 255, 255, 0.1)'
+      }}>
+        <h3 style={{ margin: '0 0 24px 0', fontSize: '20px', fontWeight: '700', color: 'white' }}>
+          📍 Addresses
+        </h3>
+        <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 24 }}>
+          <div style={{
+            background: 'rgba(249, 115, 22, 0.1)',
+            padding: '20px',
+            borderRadius: '12px',
+            border: '2px solid rgba(249, 115, 22, 0.3)'
+          }}>
+            <div style={{ fontSize: '12px', fontWeight: '600', color: '#f97316', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              📤 Origin
+            </div>
+            <div style={{ fontSize: '16px', fontWeight: '700', color: 'white', marginBottom: '8px' }}>
+              {shipment.origin_name}
+            </div>
+            <div style={{ fontSize: '14px', color: 'rgba(255, 255, 255, 0.7)', lineHeight: '1.6' }}>
               {shipment.origin_address}
             </div>
           </div>
-          <div>
-            <div className="label">Destination</div>
-            <div><strong>{shipment.destination_name}</strong></div>
-            <div className="muted" style={{ fontSize: '0.875rem', marginTop: 4 }}>
-              {shipment.destination_address}
+          <div style={{
+            background: 'rgba(16, 185, 129, 0.1)',
+            padding: '20px',
+            borderRadius: '12px',
+            border: '2px solid rgba(16, 185, 129, 0.3)'
+          }}>
+            <div style={{ fontSize: '12px', fontWeight: '600', color: '#10b981', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              📥 Receiver Address
             </div>
-          </div>
-        </div>
-        <div style={{ marginTop: 16 }}>
-          <div className="label">Receiver Address</div>
-          <div className="muted" style={{ fontSize: '0.875rem', marginTop: 4 }}>
-            {shipment.receiver_address}
+            <div style={{ fontSize: '16px', fontWeight: '700', color: 'white', marginBottom: '8px' }}>
+              {shipment.receiver_name}
+            </div>
+            <div style={{ fontSize: '14px', color: 'rgba(255, 255, 255, 0.7)', lineHeight: '1.6' }}>
+              {shipment.receiver_address}
+            </div>
           </div>
         </div>
       </div>
 
       {/* GPS Live Location Map */}
       {gpsLocation && (
-        <div className="card" style={{ padding: 16 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-            <h3 style={{ marginTop: 0, marginBottom: 0 }}>📍 Live GPS Location</h3>
-            {gpsLoading && <span style={{ fontSize: '0.875rem', color: '#666' }}>Updating...</span>}
+        <div style={{
+          background: 'rgba(255, 255, 255, 0.05)',
+          backdropFilter: 'blur(10px)',
+          borderRadius: '16px',
+          padding: '28px',
+          border: '2px solid rgba(255, 255, 255, 0.1)'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+            <h3 style={{ margin: 0, fontSize: '20px', fontWeight: '700', color: 'white' }}>📍 Live GPS Location</h3>
+            {gpsLoading && <span style={{ fontSize: '14px', color: '#f97316', fontWeight: '600' }}>Updating...</span>}
           </div>
 
           <div style={{ height: '400px', borderRadius: '8px', overflow: 'hidden', marginBottom: 12 }}>
@@ -220,22 +316,58 @@ export default function ShipmentDetail() {
             </MapContainer>
           </div>
 
-          <div className="grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, fontSize: '0.875rem' }}>
-            <div>
-              <div className="label" style={{ fontSize: '0.75rem' }}>Latitude</div>
-              <div style={{ fontFamily: 'monospace' }}>{gpsLocation.latitude.toFixed(6)}</div>
+          <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 16 }}>
+            <div style={{
+              background: 'rgba(249, 115, 22, 0.1)',
+              padding: '16px',
+              borderRadius: '10px',
+              border: '1px solid rgba(249, 115, 22, 0.2)'
+            }}>
+              <div style={{ fontSize: '12px', fontWeight: '600', color: '#f97316', marginBottom: '8px', textTransform: 'uppercase' }}>
+                Latitude
+              </div>
+              <div style={{ fontFamily: 'monospace', fontSize: '14px', color: 'white', fontWeight: '600' }}>
+                {gpsLocation.latitude.toFixed(6)}
+              </div>
             </div>
-            <div>
-              <div className="label" style={{ fontSize: '0.75rem' }}>Longitude</div>
-              <div style={{ fontFamily: 'monospace' }}>{gpsLocation.longitude.toFixed(6)}</div>
+            <div style={{
+              background: 'rgba(249, 115, 22, 0.1)',
+              padding: '16px',
+              borderRadius: '10px',
+              border: '1px solid rgba(249, 115, 22, 0.2)'
+            }}>
+              <div style={{ fontSize: '12px', fontWeight: '600', color: '#f97316', marginBottom: '8px', textTransform: 'uppercase' }}>
+                Longitude
+              </div>
+              <div style={{ fontFamily: 'monospace', fontSize: '14px', color: 'white', fontWeight: '600' }}>
+                {gpsLocation.longitude.toFixed(6)}
+              </div>
             </div>
-            <div>
-              <div className="label" style={{ fontSize: '0.75rem' }}>Accuracy</div>
-              <div>{gpsLocation.accuracy.toFixed(0)}m</div>
+            <div style={{
+              background: 'rgba(249, 115, 22, 0.1)',
+              padding: '16px',
+              borderRadius: '10px',
+              border: '1px solid rgba(249, 115, 22, 0.2)'
+            }}>
+              <div style={{ fontSize: '12px', fontWeight: '600', color: '#f97316', marginBottom: '8px', textTransform: 'uppercase' }}>
+                Accuracy
+              </div>
+              <div style={{ fontSize: '14px', color: 'white', fontWeight: '600' }}>
+                {gpsLocation.accuracy.toFixed(0)}m
+              </div>
             </div>
-            <div>
-              <div className="label" style={{ fontSize: '0.75rem' }}>Last Update</div>
-              <div>{new Date(gpsLocation.recorded_at).toLocaleTimeString()}</div>
+            <div style={{
+              background: 'rgba(249, 115, 22, 0.1)',
+              padding: '16px',
+              borderRadius: '10px',
+              border: '1px solid rgba(249, 115, 22, 0.2)'
+            }}>
+              <div style={{ fontSize: '12px', fontWeight: '600', color: '#f97316', marginBottom: '8px', textTransform: 'uppercase' }}>
+                Last Update
+              </div>
+              <div style={{ fontSize: '14px', color: 'white', fontWeight: '600' }}>
+                {new Date(gpsLocation.recorded_at).toLocaleTimeString()}
+              </div>
             </div>
           </div>
         </div>
@@ -243,50 +375,69 @@ export default function ShipmentDetail() {
 
       {/* Show message if no GPS data for active shipment */}
       {!gpsLocation && (shipment.status === 'in_transit' || shipment.status === 'out_for_delivery') && (
-        <div className="card" style={{ padding: 16, textAlign: 'center', color: '#666' }}>
-          📍 No GPS data available yet. The driver needs to start GPS tracking from their mobile app.
+        <div style={{
+          background: 'rgba(255, 171, 0, 0.1)',
+          border: '2px solid rgba(255, 171, 0, 0.3)',
+          padding: '24px',
+          borderRadius: '12px',
+          textAlign: 'center'
+        }}>
+          <div style={{ fontSize: '48px', marginBottom: '12px' }}>📍</div>
+          <div style={{ color: '#ffab00', fontWeight: '600', fontSize: '15px' }}>
+            No GPS data available yet. The driver needs to start GPS tracking from their mobile app.
+          </div>
         </div>
       )}
 
-      <div className="card" style={{ padding: 16 }}>
-        <h3 style={{ marginTop: 0 }}>Update Status</h3>
-        <StatusUpdateForm
-          onUpdate={handleStatusUpdate}
-          updating={updating}
-        />
-      </div>
-
       {shipment.tracking_history?.length > 0 && (
-        <div className="card" style={{ padding: 16 }}>
-          <h3 style={{ marginTop: 0 }}>Tracking History</h3>
-          <div className="grid" style={{ gap: 12 }}>
+        <div style={{
+          background: 'rgba(255, 255, 255, 0.05)',
+          backdropFilter: 'blur(10px)',
+          borderRadius: '16px',
+          padding: '28px',
+          border: '2px solid rgba(255, 255, 255, 0.1)'
+        }}>
+          <h3 style={{ margin: '0 0 24px 0', fontSize: '20px', fontWeight: '700', color: 'white' }}>
+            📜 Tracking History
+          </h3>
+          <div className="grid" style={{ gap: 16 }}>
             {shipment.tracking_history.map((item, index) => (
               <div
                 key={item.id}
-                className="card"
                 style={{
-                  padding: 12,
+                  background: 'rgba(255, 255, 255, 0.03)',
+                  padding: '20px',
+                  borderRadius: '12px',
                   borderLeft: `4px solid ${
-                    item.status === 'delivered' ? 'var(--success-500)' :
-                    item.status === 'in_transit' || item.status === 'out_for_delivery' ? 'var(--info-500)' :
-                    item.status === 'pending' ? 'var(--warning-500)' : 'var(--danger-500)'
-                  }`
+                    item.status === 'delivered' ? '#10b981' :
+                    item.status === 'in_transit' || item.status === 'out_for_delivery' ? '#3b82f6' :
+                    item.status === 'pending' ? '#f59e0b' : '#ef4444'
+                  }`,
+                  transition: 'all 0.3s ease'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'
+                  e.currentTarget.style.transform = 'translateX(4px)'
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)'
+                  e.currentTarget.style.transform = 'translateX(0)'
                 }}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
                   <div>
-                    <span className={getStatusBadgeClass(item.status)}>
+                    <span className={getStatusBadgeClass(item.status)} style={{ fontSize: '12px', padding: '6px 12px', fontWeight: '700' }}>
                       {item.status.replace('_', ' ').toUpperCase()}
                     </span>
-                    <div style={{ fontWeight: 'bold', marginTop: 4 }}>{item.location}</div>
+                    <div style={{ fontWeight: '700', marginTop: 8, fontSize: '15px', color: 'white' }}>{item.location}</div>
                   </div>
-                  <div className="muted" style={{ fontSize: '0.875rem', textAlign: 'right' }}>
+                  <div style={{ fontSize: '13px', textAlign: 'right', color: 'rgba(255, 255, 255, 0.6)' }}>
                     {new Date(item.timestamp).toLocaleDateString()}<br />
                     {new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </div>
                 </div>
                 {item.details && (
-                  <div className="muted" style={{ fontSize: '0.875rem' }}>
+                  <div style={{ fontSize: '14px', color: 'rgba(255, 255, 255, 0.7)', lineHeight: '1.6' }}>
                     {item.details}
                   </div>
                 )}
@@ -296,63 +447,5 @@ export default function ShipmentDetail() {
         </div>
       )}
     </div>
-  )
-}
-
-function StatusUpdateForm({ onUpdate, updating }) {
-  const [newStatus, setNewStatus] = useState('')
-  const [location, setLocation] = useState('')
-  const [details, setDetails] = useState('')
-
-  const handleSubmit = (e) => {
-    e.preventDefault()
-    if (!newStatus || !location) return
-
-    onUpdate(newStatus, location, details)
-    setNewStatus('')
-    setLocation('')
-    setDetails('')
-  }
-
-  return (
-    <form onSubmit={handleSubmit} className="grid" style={{ gap: 12 }}>
-      <div className="form-row">
-        <select
-          className="input"
-          value={newStatus}
-          onChange={(e) => setNewStatus(e.target.value)}
-          required
-        >
-          <option value="">Select new status…</option>
-          <option value="pending">Pending</option>
-          <option value="in_transit">In Transit</option>
-          <option value="out_for_delivery">Out for Delivery</option>
-          <option value="delivered">Delivered</option>
-          <option value="cancelled">Cancelled</option>
-        </select>
-        <input
-          className="input"
-          placeholder="Current location *"
-          value={location}
-          onChange={(e) => setLocation(e.target.value)}
-          required
-        />
-      </div>
-      <input
-        className="input"
-        placeholder="Additional details (optional)"
-        value={details}
-        onChange={(e) => setDetails(e.target.value)}
-      />
-      <div className="form-actions">
-        <button
-          className="btn btn-primary"
-          type="submit"
-          disabled={updating || !newStatus || !location}
-        >
-          {updating ? 'Updating...' : 'Update Status'}
-        </button>
-      </div>
-    </form>
   )
 }

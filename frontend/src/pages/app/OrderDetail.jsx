@@ -82,6 +82,17 @@ export default function OrderDetail() {
   if (error) return <div className="card" style={{ padding: 16, color: 'var(--danger-600)' }}>{error}</div>
   if (!order) return null
 
+  // Parse dimensions from JSON string
+  const parseDimensions = (dimStr) => {
+    if (!dimStr) return 'N/A'
+    try {
+      const dims = typeof dimStr === 'string' ? JSON.parse(dimStr) : dimStr
+      return `${dims.L} × ${dims.W} × ${dims.H} cm`
+    } catch (e) {
+      return dimStr
+    }
+  }
+
   return (
     <div className="grid" style={{ gap: 16 }}>
       <div className="card" style={{ padding: 16 }}>
@@ -181,13 +192,67 @@ export default function OrderDetail() {
         )}
 
         {/* Context-Aware Action Buttons */}
-        <div className="form-actions" style={{ marginTop: 12 }}>
+        <div className="form-actions" style={{ marginTop: 12, display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           {order.status === 'pending' && (
             <>
-              <button className="btn btn-primary" disabled={updating} onClick={() => setStatus('processing')}>
+              <button
+                disabled={updating}
+                onClick={() => setStatus('processing')}
+                style={{
+                  padding: '10px 20px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: updating ? 'rgba(59, 130, 246, 0.5)' : 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                  color: 'white',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  cursor: updating ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.3s ease',
+                  boxShadow: '0 2px 8px rgba(59, 130, 246, 0.3)'
+                }}
+                onMouseOver={(e) => {
+                  if (!updating) {
+                    e.currentTarget.style.transform = 'translateY(-2px)'
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.5)'
+                  }
+                }}
+                onMouseOut={(e) => {
+                  if (!updating) {
+                    e.currentTarget.style.transform = 'translateY(0)'
+                    e.currentTarget.style.boxShadow = '0 2px 8px rgba(59, 130, 246, 0.3)'
+                  }
+                }}
+              >
                 📦 Start Processing
               </button>
-              <button className="btn btn-danger" disabled={updating} onClick={() => setStatus('canceled')}>
+              <button
+                disabled={updating}
+                onClick={() => setStatus('canceled')}
+                style={{
+                  padding: '10px 20px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: updating ? 'rgba(239, 68, 68, 0.5)' : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                  color: 'white',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  cursor: updating ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.3s ease',
+                  boxShadow: '0 2px 8px rgba(239, 68, 68, 0.3)'
+                }}
+                onMouseOver={(e) => {
+                  if (!updating) {
+                    e.currentTarget.style.transform = 'translateY(-2px)'
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(239, 68, 68, 0.5)'
+                  }
+                }}
+                onMouseOut={(e) => {
+                  if (!updating) {
+                    e.currentTarget.style.transform = 'translateY(0)'
+                    e.currentTarget.style.boxShadow = '0 2px 8px rgba(239, 68, 68, 0.3)'
+                  }
+                }}
+              >
                 Cancel Order
               </button>
             </>
@@ -195,13 +260,93 @@ export default function OrderDetail() {
 
           {order.status === 'processing' && (
             <>
-              <button className="btn btn-success" disabled={updating} onClick={() => setStatus('fulfilled')}>
+              <button
+                disabled={updating}
+                onClick={() => setStatus('fulfilled')}
+                style={{
+                  padding: '10px 20px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: updating ? 'rgba(16, 185, 129, 0.5)' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  color: 'white',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  cursor: updating ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.3s ease',
+                  boxShadow: '0 2px 8px rgba(16, 185, 129, 0.3)'
+                }}
+                onMouseOver={(e) => {
+                  if (!updating) {
+                    e.currentTarget.style.transform = 'translateY(-2px)'
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.5)'
+                  }
+                }}
+                onMouseOut={(e) => {
+                  if (!updating) {
+                    e.currentTarget.style.transform = 'translateY(0)'
+                    e.currentTarget.style.boxShadow = '0 2px 8px rgba(16, 185, 129, 0.3)'
+                  }
+                }}
+              >
                 ✅ Ready to Ship
               </button>
-              <button className="btn btn-outline" disabled={updating} onClick={() => setStatus('pending')}>
+              <button
+                disabled={updating}
+                onClick={() => setStatus('pending')}
+                style={{
+                  padding: '10px 20px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: updating ? 'rgba(100, 116, 139, 0.5)' : 'rgba(100, 116, 139, 0.2)',
+                  color: 'var(--text)',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  cursor: updating ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.3s ease'
+                }}
+                onMouseOver={(e) => {
+                  if (!updating) {
+                    e.currentTarget.style.background = 'rgba(100, 116, 139, 0.3)'
+                    e.currentTarget.style.transform = 'translateY(-2px)'
+                  }
+                }}
+                onMouseOut={(e) => {
+                  if (!updating) {
+                    e.currentTarget.style.background = 'rgba(100, 116, 139, 0.2)'
+                    e.currentTarget.style.transform = 'translateY(0)'
+                  }
+                }}
+              >
                 ⏮️ Back to Pending
               </button>
-              <button className="btn btn-danger" disabled={updating} onClick={() => setStatus('canceled')}>
+              <button
+                disabled={updating}
+                onClick={() => setStatus('canceled')}
+                style={{
+                  padding: '10px 20px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: updating ? 'rgba(239, 68, 68, 0.5)' : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                  color: 'white',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  cursor: updating ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.3s ease',
+                  boxShadow: '0 2px 8px rgba(239, 68, 68, 0.3)'
+                }}
+                onMouseOver={(e) => {
+                  if (!updating) {
+                    e.currentTarget.style.transform = 'translateY(-2px)'
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(239, 68, 68, 0.5)'
+                  }
+                }}
+                onMouseOut={(e) => {
+                  if (!updating) {
+                    e.currentTarget.style.transform = 'translateY(0)'
+                    e.currentTarget.style.boxShadow = '0 2px 8px rgba(239, 68, 68, 0.3)'
+                  }
+                }}
+              >
                 Cancel Order
               </button>
             </>
@@ -209,17 +354,97 @@ export default function OrderDetail() {
 
           {order.status === 'fulfilled' && !shipment && (
             <>
-              <button className="btn btn-outline" disabled={updating} onClick={() => setStatus('processing')}>
+              <button
+                disabled={updating}
+                onClick={() => setStatus('processing')}
+                style={{
+                  padding: '10px 20px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: updating ? 'rgba(100, 116, 139, 0.5)' : 'rgba(100, 116, 139, 0.2)',
+                  color: 'var(--text)',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  cursor: updating ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.3s ease'
+                }}
+                onMouseOver={(e) => {
+                  if (!updating) {
+                    e.currentTarget.style.background = 'rgba(100, 116, 139, 0.3)'
+                    e.currentTarget.style.transform = 'translateY(-2px)'
+                  }
+                }}
+                onMouseOut={(e) => {
+                  if (!updating) {
+                    e.currentTarget.style.background = 'rgba(100, 116, 139, 0.2)'
+                    e.currentTarget.style.transform = 'translateY(0)'
+                  }
+                }}
+              >
                 ⏮️ Back to Processing
               </button>
-              <button className="btn btn-danger" disabled={updating} onClick={() => setStatus('canceled')}>
+              <button
+                disabled={updating}
+                onClick={() => setStatus('canceled')}
+                style={{
+                  padding: '10px 20px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: updating ? 'rgba(239, 68, 68, 0.5)' : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                  color: 'white',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  cursor: updating ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.3s ease',
+                  boxShadow: '0 2px 8px rgba(239, 68, 68, 0.3)'
+                }}
+                onMouseOver={(e) => {
+                  if (!updating) {
+                    e.currentTarget.style.transform = 'translateY(-2px)'
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(239, 68, 68, 0.5)'
+                  }
+                }}
+                onMouseOut={(e) => {
+                  if (!updating) {
+                    e.currentTarget.style.transform = 'translateY(0)'
+                    e.currentTarget.style.boxShadow = '0 2px 8px rgba(239, 68, 68, 0.3)'
+                  }
+                }}
+              >
                 Cancel Order
               </button>
             </>
           )}
 
           {order.status === 'canceled' && (
-            <button className="btn" disabled={updating} onClick={() => setStatus('pending')}>
+            <button
+              disabled={updating}
+              onClick={() => setStatus('pending')}
+              style={{
+                padding: '10px 20px',
+                borderRadius: '8px',
+                border: 'none',
+                background: updating ? 'rgba(99, 102, 241, 0.5)' : 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                color: 'white',
+                fontSize: '14px',
+                fontWeight: '600',
+                cursor: updating ? 'not-allowed' : 'pointer',
+                transition: 'all 0.3s ease',
+                boxShadow: '0 2px 8px rgba(99, 102, 241, 0.3)'
+              }}
+              onMouseOver={(e) => {
+                if (!updating) {
+                  e.currentTarget.style.transform = 'translateY(-2px)'
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(99, 102, 241, 0.5)'
+                }
+              }}
+              onMouseOut={(e) => {
+                if (!updating) {
+                  e.currentTarget.style.transform = 'translateY(0)'
+                  e.currentTarget.style.boxShadow = '0 2px 8px rgba(99, 102, 241, 0.3)'
+                }
+              }}
+            >
               🔄 Restore Order
             </button>
           )}
@@ -232,11 +457,34 @@ export default function OrderDetail() {
           <h3 style={{ marginTop: 0 }}>Shipment</h3>
           {order.status === 'fulfilled' && !shipment && (
             <button
-              className="btn btn-primary"
               onClick={() => setShowCreateShipment(true)}
               disabled={creatingShipment}
+              style={{
+                padding: '10px 20px',
+                borderRadius: '8px',
+                border: 'none',
+                background: creatingShipment ? 'rgba(59, 130, 246, 0.5)' : 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                color: 'white',
+                fontSize: '14px',
+                fontWeight: '600',
+                cursor: creatingShipment ? 'not-allowed' : 'pointer',
+                transition: 'all 0.3s ease',
+                boxShadow: '0 2px 8px rgba(59, 130, 246, 0.3)'
+              }}
+              onMouseOver={(e) => {
+                if (!creatingShipment) {
+                  e.currentTarget.style.transform = 'translateY(-2px)'
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.5)'
+                }
+              }}
+              onMouseOut={(e) => {
+                if (!creatingShipment) {
+                  e.currentTarget.style.transform = 'translateY(0)'
+                  e.currentTarget.style.boxShadow = '0 2px 8px rgba(59, 130, 246, 0.3)'
+                }
+              }}
             >
-              Create Shipment
+              🚚 Create Shipment
             </button>
           )}
         </div>
@@ -346,8 +594,11 @@ export default function OrderDetail() {
 
             <div>
               <div className="label">Dimensions</div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--muted)', marginBottom: '4px', fontStyle: 'italic' }}>
+                (Length × Width × Height)
+              </div>
               <div style={{ fontSize: '1.1rem', fontWeight: 500 }}>
-                {order.dimensions || 'N/A'}
+                {parseDimensions(order.dimensions)}
               </div>
             </div>
 
@@ -634,7 +885,7 @@ function CreateShipmentForm({ order, onSubmit, onCancel, creating }) {
               required
             />
             <div style={{ fontSize: '0.75rem', color: 'var(--gray-600)', marginTop: 4 }}>
-              📞 Driver will use this to contact receiver for delivery
+              📞 Used for SMS notifications and driver contact (e.g., 09171234567)
             </div>
           </label>
 
@@ -648,7 +899,7 @@ function CreateShipmentForm({ order, onSubmit, onCancel, creating }) {
               onChange={(e) => handleInputChange('receiver_email', e.target.value)}
             />
             <div style={{ fontSize: '0.75rem', color: 'var(--gray-600)', marginTop: 4 }}>
-              📧 Customer will receive tracking number via email
+              📧 Customer will receive tracking number via email & SMS
             </div>
           </label>
 

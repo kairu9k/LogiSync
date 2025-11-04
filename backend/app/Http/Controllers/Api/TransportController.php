@@ -63,6 +63,14 @@ class TransportController extends Controller
             $availableCapacity = $capacity - $currentLoad;
             $utilizationPercent = $capacity > 0 ? round(($currentLoad / $capacity) * 100, 1) : 0;
 
+            // Check if driver is currently on an active delivery
+            $activeDeliveryCount = DB::table('shipments')
+                ->where('transport_id', $t->transport_id)
+                ->whereIn('status', ['in_transit', 'out_for_delivery'])
+                ->count();
+
+            $isOnActiveDelivery = $activeDeliveryCount > 0;
+
             return [
                 'id' => (int) $t->transport_id,
                 'vehicle_id' => $t->vehicle_id,
@@ -78,6 +86,8 @@ class TransportController extends Controller
                 'driver_email' => $t->driver_email,
                 'budget_name' => $t->budget_name ?? 'N/A',
                 'schedule_name' => $t->schedule_name ?? 'N/A',
+                'is_on_active_delivery' => $isOnActiveDelivery,
+                'active_delivery_count' => $activeDeliveryCount,
                 'label' => "{$t->vehicle_id} ({$t->registration_number}) - {$t->vehicle_type} [{$currentLoad}kg / {$capacity}kg]"
             ];
         });
@@ -134,6 +144,8 @@ class TransportController extends Controller
             'schedule_id' => (int) $transport->schedule_id,
             'budget_name' => $transport->budget_name ?? 'N/A',
             'schedule_name' => $transport->schedule_name ?? 'N/A',
+                'is_on_active_delivery' => $isOnActiveDelivery,
+                'active_delivery_count' => $activeDeliveryCount,
         ]])->header('Access-Control-Allow-Origin', '*');
     }
 

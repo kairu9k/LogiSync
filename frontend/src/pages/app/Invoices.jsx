@@ -349,100 +349,324 @@ export default function Invoices() {
   }
 
   return (
-    <div className="grid" style={{ gap: 16 }}>
-      {summary && summary.total_unpaid > 0 && (
-        <div className="card" style={{
-          padding: 16,
-          background: 'var(--warning-50)',
-          border: '1px solid var(--warning-200)'
-        }}>
-          <h3 style={{ marginTop: 0, color: 'var(--warning-800)' }}>
-            Outstanding Balance
-          </h3>
-          <div style={{ fontSize: '24px', fontWeight: 'bold', color: 'var(--warning-700)' }}>
-            ₱{(summary.total_unpaid / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-          </div>
-          <div className="muted">Total unpaid amount across all pending and overdue invoices</div>
-        </div>
-      )}
-
-      <div className="card">
+    <div className="grid" style={{ gap: 24 }}>
+      {/* Header Section with Gradient */}
+      <div style={{
+        background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+        borderRadius: '16px',
+        padding: '32px',
+        boxShadow: '0 10px 30px rgba(139, 92, 246, 0.2)'
+      }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h2 style={{ marginTop: 0 }}>Invoices</h2>
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div>
+            <h2 style={{ margin: 0, color: 'white', fontSize: '28px', fontWeight: '700', marginBottom: '8px' }}>
+              💰 Invoice Management
+            </h2>
+            <p style={{ margin: 0, color: 'rgba(255,255,255,0.9)', fontSize: '15px' }}>
+              Track payments and manage billing
+            </p>
+          </div>
+          <div style={{ display: 'flex', gap: '12px' }}>
             <button
               className="btn btn-outline"
               onClick={() => fetchInvoices({ q, status })}
               disabled={loading}
+              style={{
+                background: 'rgba(255, 255, 255, 0.2)',
+                color: 'white',
+                border: '1px solid rgba(255, 255, 255, 0.3)',
+                padding: '10px 20px',
+                fontSize: '14px',
+                fontWeight: '600',
+                borderRadius: '10px',
+                backdropFilter: 'blur(10px)',
+                transition: 'all 0.3s ease'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)'
+                e.currentTarget.style.transform = 'translateY(-2px)'
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'
+                e.currentTarget.style.transform = 'translateY(0)'
+              }}
             >
               {loading ? 'Refreshing...' : '🔄 Refresh'}
             </button>
-            <button className="btn btn-outline" onClick={updateOverdueStatuses}>
-              Update Overdue
+            <button
+              className="btn btn-outline"
+              onClick={updateOverdueStatuses}
+              style={{
+                background: 'white',
+                color: '#8b5cf6',
+                border: 'none',
+                padding: '10px 20px',
+                fontSize: '14px',
+                fontWeight: '600',
+                borderRadius: '10px',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                transition: 'all 0.3s ease'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.transform = 'translateY(-2px)'
+                e.currentTarget.style.boxShadow = '0 6px 20px rgba(0,0,0,0.2)'
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)'
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)'
+              }}
+            >
+              📊 Update Overdue
             </button>
           </div>
         </div>
-
-        <div className="form-row">
-          <input
-            className="input"
-            placeholder="Search invoices or customers"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-          />
-          <select className="input" value={status} onChange={(e) => setStatus(e.target.value)}>
-            <option value="any">Status: Any</option>
-            <option value="pending">Pending</option>
-            <option value="paid">Paid</option>
-            <option value="overdue">Overdue</option>
-            <option value="cancelled">Cancelled</option>
-          </select>
-        </div>
-
-        {summary && (
-          <div className="grid" style={{ gridTemplateColumns: 'repeat(4, minmax(0,1fr))', gap: 12, marginTop: 16 }}>
-            <div className="card" style={{ padding: 12, textAlign: 'center' }}>
-              <div style={{ fontSize: '24px', fontWeight: 'bold', color: 'var(--primary-600)' }}>
-                {summary.total || 0}
-              </div>
-              <div className="muted">Total Invoices</div>
-            </div>
-            <div className="card" style={{ padding: 12, textAlign: 'center' }}>
-              <div style={{ fontSize: '24px', fontWeight: 'bold', color: 'var(--warning-600)' }}>
-                {summary.pending || 0}
-              </div>
-              <div className="muted">Pending</div>
-            </div>
-            <div className="card" style={{ padding: 12, textAlign: 'center' }}>
-              <div style={{ fontSize: '24px', fontWeight: 'bold', color: 'var(--success-600)' }}>
-                {summary.paid || 0}
-              </div>
-              <div className="muted">Paid</div>
-            </div>
-            <div className="card" style={{ padding: 12, textAlign: 'center' }}>
-              <div style={{ fontSize: '24px', fontWeight: 'bold', color: 'var(--danger-600)' }}>
-                {summary.overdue || 0}
-              </div>
-              <div className="muted">Overdue</div>
-            </div>
-          </div>
-        )}
       </div>
 
-      {loading && <div className="card" style={{ padding: 16 }}>Loading invoices…</div>}
-      {error && <div className="card" style={{ padding: 16, color: 'var(--danger-600)' }}>{error}</div>}
+      {/* Outstanding Balance Alert */}
+      {summary && summary.total_unpaid > 0 && (
+        <div style={{
+          background: 'rgba(245, 158, 11, 0.1)',
+          backdropFilter: 'blur(10px)',
+          borderRadius: '16px',
+          padding: '24px',
+          border: '1px solid rgba(245, 158, 11, 0.3)'
+        }}>
+          <h3 style={{ marginTop: 0, color: '#f59e0b', fontSize: '20px', marginBottom: '12px' }}>
+            ⚠️ Outstanding Balance
+          </h3>
+          <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#f59e0b', marginBottom: '8px' }}>
+            ₱{(summary.total_unpaid / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+          </div>
+          <div style={{ fontSize: '14px', color: 'rgba(255, 255, 255, 0.7)' }}>
+            Total unpaid amount across all pending and overdue invoices
+          </div>
+        </div>
+      )}
+
+      {/* Filters */}
+      <div className="grid" style={{ gridTemplateColumns: 'repeat(2, minmax(0,1fr))', gap: 16 }}>
+        <div style={{ position: 'relative' }}>
+          <span style={{
+            position: 'absolute',
+            left: '16px',
+            top: '50%',
+            transform: 'translateY(-50%)',
+            fontSize: '18px',
+            color: 'var(--gray-400)'
+          }}>🔍</span>
+          <input
+            className="input"
+            placeholder="Search invoices or customers..."
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            style={{
+              paddingLeft: '48px',
+              width: '100%',
+              borderRadius: '12px',
+              border: '2px solid var(--gray-200)',
+              fontSize: '15px',
+              padding: '14px 14px 14px 48px',
+              transition: 'all 0.3s ease'
+            }}
+            onFocus={(e) => {
+              e.target.style.borderColor = '#8b5cf6'
+              e.target.style.boxShadow = '0 0 0 3px rgba(139, 92, 246, 0.1)'
+            }}
+            onBlur={(e) => {
+              e.target.style.borderColor = 'var(--gray-200)'
+              e.target.style.boxShadow = 'none'
+            }}
+          />
+        </div>
+        <select
+          className="input"
+          value={status}
+          onChange={(e) => setStatus(e.target.value)}
+          style={{
+            borderRadius: '12px',
+            border: '2px solid var(--gray-200)',
+            fontSize: '15px',
+            padding: '14px',
+            transition: 'all 0.3s ease'
+          }}
+          onFocus={(e) => {
+            e.target.style.borderColor = '#8b5cf6'
+            e.target.style.boxShadow = '0 0 0 3px rgba(139, 92, 246, 0.1)'
+          }}
+          onBlur={(e) => {
+            e.target.style.borderColor = 'var(--gray-200)'
+            e.target.style.boxShadow = 'none'
+          }}
+        >
+          <option value="any">Status: Any</option>
+          <option value="pending">Pending</option>
+          <option value="paid">Paid</option>
+          <option value="overdue">Overdue</option>
+          <option value="cancelled">Cancelled</option>
+        </select>
+      </div>
+
+      {/* Stats Overview */}
+      {summary && (
+        <div className="grid" style={{ gridTemplateColumns: 'repeat(4, minmax(0,1fr))', gap: 16 }}>
+          <div style={{
+            background: 'rgba(255, 255, 255, 0.05)',
+            backdropFilter: 'blur(10px)',
+            borderRadius: '16px',
+            padding: '24px',
+            textAlign: 'center',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            transition: 'all 0.3s ease',
+            cursor: 'pointer'
+          }}
+          onMouseOver={(e) => {
+            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'
+            e.currentTarget.style.transform = 'translateY(-4px)'
+            e.currentTarget.style.boxShadow = '0 8px 20px rgba(0,0,0,0.3)'
+          }}
+          onMouseOut={(e) => {
+            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'
+            e.currentTarget.style.transform = 'translateY(0)'
+            e.currentTarget.style.boxShadow = 'none'
+          }}>
+            <div style={{ fontSize: '36px', fontWeight: 'bold', color: '#a78bfa', marginBottom: '8px' }}>
+              {summary.total || 0}
+            </div>
+            <div style={{ fontSize: '14px', color: 'rgba(255, 255, 255, 0.7)', fontWeight: '500' }}>Total Invoices</div>
+          </div>
+          <div style={{
+            background: 'rgba(255, 255, 255, 0.05)',
+            backdropFilter: 'blur(10px)',
+            borderRadius: '16px',
+            padding: '24px',
+            textAlign: 'center',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            transition: 'all 0.3s ease',
+            cursor: 'pointer'
+          }}
+          onMouseOver={(e) => {
+            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'
+            e.currentTarget.style.transform = 'translateY(-4px)'
+            e.currentTarget.style.boxShadow = '0 8px 20px rgba(0,0,0,0.3)'
+          }}
+          onMouseOut={(e) => {
+            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'
+            e.currentTarget.style.transform = 'translateY(0)'
+            e.currentTarget.style.boxShadow = 'none'
+          }}>
+            <div style={{ fontSize: '36px', fontWeight: 'bold', color: '#f59e0b', marginBottom: '8px' }}>
+              {summary.pending || 0}
+            </div>
+            <div style={{ fontSize: '14px', color: 'rgba(255, 255, 255, 0.7)', fontWeight: '500' }}>Pending</div>
+          </div>
+          <div style={{
+            background: 'rgba(255, 255, 255, 0.05)',
+            backdropFilter: 'blur(10px)',
+            borderRadius: '16px',
+            padding: '24px',
+            textAlign: 'center',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            transition: 'all 0.3s ease',
+            cursor: 'pointer'
+          }}
+          onMouseOver={(e) => {
+            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'
+            e.currentTarget.style.transform = 'translateY(-4px)'
+            e.currentTarget.style.boxShadow = '0 8px 20px rgba(0,0,0,0.3)'
+          }}
+          onMouseOut={(e) => {
+            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'
+            e.currentTarget.style.transform = 'translateY(0)'
+            e.currentTarget.style.boxShadow = 'none'
+          }}>
+            <div style={{ fontSize: '36px', fontWeight: 'bold', color: '#10b981', marginBottom: '8px' }}>
+              {summary.paid || 0}
+            </div>
+            <div style={{ fontSize: '14px', color: 'rgba(255, 255, 255, 0.7)', fontWeight: '500' }}>Paid</div>
+          </div>
+          <div style={{
+            background: 'rgba(255, 255, 255, 0.05)',
+            backdropFilter: 'blur(10px)',
+            borderRadius: '16px',
+            padding: '24px',
+            textAlign: 'center',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            transition: 'all 0.3s ease',
+            cursor: 'pointer'
+          }}
+          onMouseOver={(e) => {
+            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'
+            e.currentTarget.style.transform = 'translateY(-4px)'
+            e.currentTarget.style.boxShadow = '0 8px 20px rgba(0,0,0,0.3)'
+          }}
+          onMouseOut={(e) => {
+            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'
+            e.currentTarget.style.transform = 'translateY(0)'
+            e.currentTarget.style.boxShadow = 'none'
+          }}>
+            <div style={{ fontSize: '36px', fontWeight: 'bold', color: '#ef4444', marginBottom: '8px' }}>
+              {summary.overdue || 0}
+            </div>
+            <div style={{ fontSize: '14px', color: 'rgba(255, 255, 255, 0.7)', fontWeight: '500' }}>Overdue</div>
+          </div>
+        </div>
+      )}
+
+      {loading && (
+        <div style={{
+          background: 'rgba(255, 255, 255, 0.05)',
+          backdropFilter: 'blur(10px)',
+          borderRadius: '16px',
+          padding: '40px',
+          textAlign: 'center',
+          color: 'rgba(255, 255, 255, 0.7)',
+          border: '1px solid rgba(255, 255, 255, 0.1)'
+        }}>
+          Loading invoices…
+        </div>
+      )}
+      {error && (
+        <div style={{
+          background: 'rgba(239, 68, 68, 0.1)',
+          backdropFilter: 'blur(10px)',
+          borderRadius: '16px',
+          padding: '16px',
+          color: '#ef4444',
+          border: '1px solid rgba(239, 68, 68, 0.3)'
+        }}>
+          {error}
+        </div>
+      )}
 
       {!loading && !error && (
-        <div className="grid" style={{ gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 12 }}>
+        <div className="grid" style={{ gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 16 }}>
           {invoices.map((invoice) => (
             <div
               key={invoice.id}
-              className="card"
               style={{
-                padding: 16,
+                background: 'rgba(255, 255, 255, 0.05)',
+                backdropFilter: 'blur(10px)',
+                borderRadius: '16px',
+                padding: '20px',
                 opacity: invoice.status === 'paid' ? 0.6 : 1,
                 position: 'relative',
-                overflow: 'hidden'
+                overflow: 'hidden',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                transition: 'all 0.3s ease'
+              }}
+              onMouseOver={(e) => {
+                if (invoice.status !== 'paid') {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'
+                  e.currentTarget.style.transform = 'translateY(-4px)'
+                  e.currentTarget.style.boxShadow = '0 8px 20px rgba(0,0,0,0.3)'
+                }
+              }}
+              onMouseOut={(e) => {
+                if (invoice.status !== 'paid') {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'
+                  e.currentTarget.style.transform = 'translateY(0)'
+                  e.currentTarget.style.boxShadow = 'none'
+                }
               }}
             >
               {invoice.status === 'paid' && (
@@ -461,14 +685,14 @@ export default function Invoices() {
                   ✓ PAID
                 </div>
               )}
-              <div className="muted" style={{ fontFamily: 'monospace' }}>
+              <div style={{ fontFamily: 'monospace', fontSize: '13px', color: 'rgba(255, 255, 255, 0.6)', marginBottom: '8px' }}>
                 {invoice.invoice_number}
               </div>
-              <div style={{ fontWeight: 'bold', margin: '8px 0' }}>
-                {invoice.customer}
+              <div style={{ fontWeight: 'bold', margin: '8px 0', fontSize: '16px', color: 'rgba(255, 255, 255, 0.95)' }}>
+                👤 {invoice.customer}
               </div>
 
-              <div style={{ margin: '8px 0', fontSize: '20px', fontWeight: 'bold', color: invoice.status === 'paid' ? 'var(--success-600)' : 'var(--primary-600)' }}>
+              <div style={{ margin: '12px 0', fontSize: '24px', fontWeight: 'bold', color: invoice.status === 'paid' ? '#10b981' : '#a78bfa' }}>
                 {invoice.formatted_amount}
               </div>
 
@@ -484,27 +708,27 @@ export default function Invoices() {
               </div>
 
               {invoice.tracking_number && (
-                <div className="muted" style={{ fontSize: '0.875rem', margin: '4px 0' }}>
+                <div style={{ fontSize: '13px', margin: '8px 0', color: 'rgba(255, 255, 255, 0.7)' }}>
                   📦 Tracking: {invoice.tracking_number}
                 </div>
               )}
 
-              <div className="muted" style={{ fontSize: '0.875rem', margin: '4px 0' }}>
+              <div style={{ fontSize: '13px', margin: '8px 0', color: 'rgba(255, 255, 255, 0.7)' }}>
                 📅 Due: {new Date(invoice.due_date).toLocaleDateString()}
                 {invoice.is_overdue && (
-                  <span style={{ color: 'var(--danger-600)', marginLeft: 4 }}>
+                  <span style={{ color: '#ef4444', marginLeft: 4 }}>
                     ⚠️
                   </span>
                 )}
               </div>
 
-              <div className="muted" style={{ fontSize: '0.875rem', margin: '4px 0' }}>
+              <div style={{ fontSize: '13px', margin: '8px 0', color: 'rgba(255, 255, 255, 0.7)' }}>
                 📊 Type: {invoice.invoice_type}
               </div>
 
               {invoice.payment_date && (
-                <div className="muted" style={{ fontSize: '0.875rem', margin: '4px 0' }}>
-                  Paid: {new Date(invoice.payment_date).toLocaleDateString()}
+                <div style={{ fontSize: '13px', margin: '8px 0', color: 'rgba(255, 255, 255, 0.7)' }}>
+                  ✓ Paid: {new Date(invoice.payment_date).toLocaleDateString()}
                   {invoice.payment_method && ` via ${invoice.payment_method}`}
                 </div>
               )}
@@ -513,17 +737,17 @@ export default function Invoices() {
                 {/* Customer Contact Info for Collections */}
                 {(invoice.is_overdue || invoice.status === 'pending') && (
                   <div style={{
-                    marginBottom: 8,
-                    padding: 8,
-                    backgroundColor: invoice.is_overdue ? 'var(--danger-50)' : 'var(--warning-50)',
-                    borderRadius: 4,
-                    border: `1px solid ${invoice.is_overdue ? 'var(--danger-200)' : 'var(--warning-200)'}`
+                    marginBottom: 12,
+                    padding: '12px',
+                    background: invoice.is_overdue ? 'rgba(239, 68, 68, 0.1)' : 'rgba(245, 158, 11, 0.1)',
+                    borderRadius: '8px',
+                    border: `1px solid ${invoice.is_overdue ? 'rgba(239, 68, 68, 0.3)' : 'rgba(245, 158, 11, 0.3)'}`
                   }}>
-                    <div className="muted" style={{ fontSize: '0.75rem', marginBottom: 4 }}>
+                    <div style={{ fontSize: '12px', marginBottom: 6, fontWeight: '600', color: invoice.is_overdue ? '#ef4444' : '#f59e0b' }}>
                       {invoice.is_overdue ? '🚨 Collection Required' : '💰 Payment Pending'}
                     </div>
                     {invoice.customer_email && (
-                      <div className="muted" style={{ fontSize: '0.75rem' }}>
+                      <div style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.7)' }}>
                         📧 {invoice.customer_email}
                       </div>
                     )}
@@ -534,7 +758,29 @@ export default function Invoices() {
                   <button
                     className="btn btn-outline"
                     onClick={() => generateInvoicePDF(invoice)}
-                    style={{ flex: 1, minWidth: '80px', zIndex: 2, position: 'relative' }}
+                    style={{
+                      flex: 1,
+                      minWidth: '80px',
+                      zIndex: 2,
+                      position: 'relative',
+                      background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '8px',
+                      fontWeight: '600',
+                      fontSize: '13px',
+                      padding: '8px',
+                      boxShadow: '0 2px 8px rgba(139, 92, 246, 0.3)',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.transform = 'translateY(-2px)'
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(139, 92, 246, 0.4)'
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.transform = 'translateY(0)'
+                      e.currentTarget.style.boxShadow = '0 2px 8px rgba(139, 92, 246, 0.3)'
+                    }}
                   >
                     📄 PDF
                   </button>
@@ -549,9 +795,31 @@ export default function Invoices() {
                         }
                       }}
                       disabled={updating === invoice.id}
-                      style={{ flex: 1, minWidth: '80px', zIndex: 2, position: 'relative' }}
+                      style={{
+                        flex: 1,
+                        minWidth: '80px',
+                        zIndex: 2,
+                        position: 'relative',
+                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '8px',
+                        fontWeight: '600',
+                        fontSize: '13px',
+                        padding: '8px',
+                        boxShadow: '0 2px 8px rgba(16, 185, 129, 0.3)',
+                        transition: 'all 0.2s ease'
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.transform = 'translateY(-2px)'
+                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.4)'
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.transform = 'translateY(0)'
+                        e.currentTarget.style.boxShadow = '0 2px 8px rgba(16, 185, 129, 0.3)'
+                      }}
                     >
-                      {updating === invoice.id ? 'Processing...' : 'Mark Paid'}
+                      {updating === invoice.id ? 'Processing...' : '✓ Mark Paid'}
                     </button>
                   )}
 
@@ -564,9 +832,31 @@ export default function Invoices() {
                           'Customer contact info not available'
                         alert(`Follow up required for ${invoice.invoice_number}\nCustomer: ${invoice.customer}\n${contact}\nAmount: ${invoice.formatted_amount}\nDays overdue: ${invoice.days_overdue}`)
                       }}
-                      style={{ flex: 1, minWidth: '80px', zIndex: 2, position: 'relative' }}
+                      style={{
+                        flex: 1,
+                        minWidth: '80px',
+                        zIndex: 2,
+                        position: 'relative',
+                        background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '8px',
+                        fontWeight: '600',
+                        fontSize: '13px',
+                        padding: '8px',
+                        boxShadow: '0 2px 8px rgba(239, 68, 68, 0.3)',
+                        transition: 'all 0.2s ease'
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.transform = 'translateY(-2px)'
+                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(239, 68, 68, 0.4)'
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.transform = 'translateY(0)'
+                        e.currentTarget.style.boxShadow = '0 2px 8px rgba(239, 68, 68, 0.3)'
+                      }}
                     >
-                      Follow Up
+                      📞 Follow Up
                     </button>
                   )}
                 </div>
@@ -575,10 +865,18 @@ export default function Invoices() {
           ))}
 
           {invoices.length === 0 && (
-            <div className="card" style={{ padding: 16, gridColumn: '1 / -1', textAlign: 'center' }}>
-              <div style={{ fontSize: '48px', marginBottom: 16 }}>📄</div>
-              <h3 style={{ margin: '0 0 8px 0' }}>No invoices found</h3>
-              <p className="muted">Invoices will appear here when shipments are delivered.</p>
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.05)',
+              backdropFilter: 'blur(10px)',
+              borderRadius: '16px',
+              padding: '60px 32px',
+              gridColumn: '1 / -1',
+              textAlign: 'center',
+              border: '1px solid rgba(255, 255, 255, 0.1)'
+            }}>
+              <div style={{ fontSize: '64px', marginBottom: 20 }}>💰</div>
+              <h3 style={{ margin: '0 0 12px 0', color: 'rgba(255, 255, 255, 0.9)', fontSize: '20px' }}>No invoices found</h3>
+              <p style={{ color: 'rgba(255, 255, 255, 0.6)', margin: 0 }}>Invoices will appear here when shipments are delivered.</p>
             </div>
           )}
         </div>

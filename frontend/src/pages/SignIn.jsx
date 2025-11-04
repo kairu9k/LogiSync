@@ -45,15 +45,49 @@ export default function SignIn() {
   return (
     <div className="page">
       <Header />
-      <main className="main">
-        <div className="container" style={{ maxWidth: 880, width: "100%" }}>
-          <h1 className="section-title" style={{ marginBottom: 16 }}>
-            Sign in
-          </h1>
-          <form className="card form-card form" onSubmit={onSubmit}>
-            <div style={{ display: "grid", gap: 16 }}>
+      <main className="main" style={{
+        background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, rgba(139, 92, 246, 0.05) 100%)',
+        minHeight: '80vh',
+        display: 'flex',
+        alignItems: 'center',
+        padding: '60px 20px'
+      }}>
+        <div className="container" style={{ maxWidth: 480, width: "100%", margin: '0 auto' }}>
+          <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+            <h1 style={{
+              fontSize: '2.5rem',
+              fontWeight: '800',
+              background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              marginBottom: '12px'
+            }}>
+              Welcome Back
+            </h1>
+            <p style={{
+              fontSize: '1rem',
+              color: '#64748b'
+            }}>
+              Sign in to your LogiSync account
+            </p>
+          </div>
+
+          <form className="card" onSubmit={onSubmit} style={{
+            background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.25) 0%, rgba(139, 92, 246, 0.25) 100%)',
+            backdropFilter: 'blur(20px)',
+            borderRadius: '20px',
+            padding: '40px',
+            border: '1px solid rgba(139, 92, 246, 0.3)',
+            boxShadow: '0 8px 32px rgba(59, 130, 246, 0.2)'
+          }}>
+            <div style={{ display: "grid", gap: 24 }}>
               <label>
-                <div className="label">Email</div>
+                <div className="label" style={{
+                  marginBottom: '8px',
+                  fontWeight: '600',
+                  color: '#e2e8f0',
+                  fontSize: '0.875rem'
+                }}>Email</div>
                 <input
                   type="email"
                   name="email"
@@ -62,10 +96,32 @@ export default function SignIn() {
                   onChange={onChange}
                   placeholder="you@company.com"
                   className="input"
+                  style={{
+                    padding: '12px 16px',
+                    fontSize: '15px',
+                    borderRadius: '10px',
+                    border: '2px solid rgba(59, 130, 246, 0.3)',
+                    transition: 'all 0.3s ease',
+                    background: 'rgba(30, 41, 59, 0.5)',
+                    color: '#e2e8f0'
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#3b82f6'
+                    e.target.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)'
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = 'rgba(59, 130, 246, 0.2)'
+                    e.target.style.boxShadow = 'none'
+                  }}
                 />
               </label>
               <label>
-                <div className="label">Password</div>
+                <div className="label" style={{
+                  marginBottom: '8px',
+                  fontWeight: '600',
+                  color: '#e2e8f0',
+                  fontSize: '0.875rem'
+                }}>Password</div>
                 <input
                   type="password"
                   name="password"
@@ -74,6 +130,23 @@ export default function SignIn() {
                   onChange={onChange}
                   placeholder="••••••••"
                   className="input"
+                  style={{
+                    padding: '12px 16px',
+                    fontSize: '15px',
+                    borderRadius: '10px',
+                    border: '2px solid rgba(59, 130, 246, 0.3)',
+                    transition: 'all 0.3s ease',
+                    background: 'rgba(30, 41, 59, 0.5)',
+                    color: '#e2e8f0'
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#3b82f6'
+                    e.target.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)'
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = 'rgba(59, 130, 246, 0.2)'
+                    e.target.style.boxShadow = 'none'
+                  }}
                 />
               </label>
               <div
@@ -81,6 +154,7 @@ export default function SignIn() {
                   display: "flex",
                   justifyContent: "space-between",
                   alignItems: "center",
+                  fontSize: '0.875rem'
                 }}
               >
                 <label
@@ -88,6 +162,7 @@ export default function SignIn() {
                     display: "inline-flex",
                     alignItems: "center",
                     gap: 8,
+                    cursor: 'pointer'
                   }}
                 >
                   <input
@@ -95,21 +170,74 @@ export default function SignIn() {
                     name="remember"
                     checked={form.remember}
                     onChange={onChange}
+                    style={{ cursor: 'pointer' }}
                   />
-                  <span className="muted">Remember me</span>
+                  <span style={{ color: '#cbd5e1' }}>Remember me</span>
                 </label>
-                <a href="#" className="muted">
+                <a href="#" style={{
+                  color: '#3b82f6',
+                  textDecoration: 'none',
+                  fontWeight: '500',
+                  transition: 'color 0.2s ease'
+                }}
+                onMouseOver={(e) => e.currentTarget.style.color = '#2563eb'}
+                onMouseOut={(e) => e.currentTarget.style.color = '#3b82f6'}
+                >
                   Forgot password?
                 </a>
               </div>
-              <div className="helper">Don't have an account? <Link to="/get-started">Get started</Link></div>
               <button
                 type="submit"
-                className="btn btn-primary"
                 disabled={submitting}
+                style={{
+                  padding: '14px 24px',
+                  fontSize: '16px',
+                  fontWeight: '700',
+                  borderRadius: '10px',
+                  border: 'none',
+                  background: submitting
+                    ? 'rgba(59, 130, 246, 0.5)'
+                    : 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                  color: 'white',
+                  cursor: submitting ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.3s ease',
+                  boxShadow: '0 4px 16px rgba(59, 130, 246, 0.3)'
+                }}
+                onMouseOver={(e) => {
+                  if (!submitting) {
+                    e.currentTarget.style.transform = 'translateY(-2px)'
+                    e.currentTarget.style.boxShadow = '0 6px 20px rgba(59, 130, 246, 0.4)'
+                  }
+                }}
+                onMouseOut={(e) => {
+                  if (!submitting) {
+                    e.currentTarget.style.transform = 'translateY(0)'
+                    e.currentTarget.style.boxShadow = '0 4px 16px rgba(59, 130, 246, 0.3)'
+                  }
+                }}
               >
                 {submitting ? "Signing in…" : "Sign in"}
               </button>
+              <div style={{
+                textAlign: 'center',
+                fontSize: '0.875rem',
+                color: '#cbd5e1',
+                paddingTop: '8px',
+                borderTop: '1px solid rgba(255, 255, 255, 0.1)'
+              }}>
+                Don't have an account?{' '}
+                <Link to="/get-started" style={{
+                  color: '#3b82f6',
+                  textDecoration: 'none',
+                  fontWeight: '600',
+                  transition: 'color 0.2s ease'
+                }}
+                onMouseOver={(e) => e.currentTarget.style.color = '#2563eb'}
+                onMouseOut={(e) => e.currentTarget.style.color = '#3b82f6'}
+                >
+                  Get started
+                </Link>
+              </div>
             </div>
           </form>
         </div>

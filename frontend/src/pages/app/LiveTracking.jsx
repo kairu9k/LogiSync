@@ -118,13 +118,21 @@ export default function LiveTracking() {
 
   if (loading) {
     return (
-      <div className="page-container">
-        <div className="page-header">
-          <h1>🗺️ Live Tracking</h1>
-        </div>
-        <div style={{ textAlign: 'center', padding: '3rem' }}>
-          <div className="loading-spinner">🔄</div>
-          <p>Loading active shipments...</p>
+      <div>
+        <h1 style={{
+          marginTop: 0,
+          marginBottom: '24px',
+          fontSize: '28px',
+          fontWeight: '700'
+        }}>🗺️ Live Tracking</h1>
+        <div className="card" style={{
+          borderRadius: '16px',
+          textAlign: 'center',
+          padding: '60px 20px',
+          color: 'var(--text-muted)'
+        }}>
+          <div style={{ fontSize: '48px', marginBottom: '16px' }}>⏳</div>
+          <div style={{ fontSize: '16px', fontWeight: '500' }}>Loading active shipments...</div>
         </div>
       </div>
     )
@@ -132,11 +140,23 @@ export default function LiveTracking() {
 
   if (error) {
     return (
-      <div className="page-container">
-        <div className="page-header">
-          <h1>🗺️ Live Tracking</h1>
+      <div>
+        <h1 style={{
+          marginTop: 0,
+          marginBottom: '24px',
+          fontSize: '28px',
+          fontWeight: '700'
+        }}>🗺️ Live Tracking</h1>
+        <div className="card" style={{
+          borderRadius: '16px',
+          textAlign: 'center',
+          padding: '60px 20px',
+          border: '2px solid var(--danger-300)',
+          background: 'var(--danger-50)'
+        }}>
+          <div style={{ fontSize: '48px', marginBottom: '16px' }}>⚠️</div>
+          <div style={{ fontSize: '16px', fontWeight: '500', color: 'var(--danger-600)' }}>{error}</div>
         </div>
-        <div className="error-message">⚠️ {error}</div>
       </div>
     )
   }
@@ -146,19 +166,38 @@ export default function LiveTracking() {
     .map(s => [s.location.latitude, s.location.longitude])
 
   return (
-    <div className="page-container">
-      <div className="page-header">
-        <h1>🗺️ Live Tracking</h1>
-        <div className="page-subtitle">
-          {shipments.length} active shipment{shipments.length !== 1 ? 's' : ''} with GPS
-        </div>
+    <div>
+      {/* Header Section */}
+      <div style={{ marginBottom: '24px' }}>
+        <h1 style={{
+          marginTop: 0,
+          marginBottom: '8px',
+          fontSize: '28px',
+          fontWeight: '700'
+        }}>🗺️ Live Tracking</h1>
+        <p className="muted" style={{ margin: 0, fontSize: '14px' }}>
+          {shipments.length} active shipment{shipments.length !== 1 ? 's' : ''} with GPS tracking
+        </p>
       </div>
 
       <div className="tracking-layout">
         <div className="tracking-sidebar">
-          <h3>Active Shipments</h3>
+          <h3 style={{
+            margin: 0,
+            marginBottom: '16px',
+            paddingBottom: '12px',
+            fontSize: '18px',
+            fontWeight: '700',
+            borderBottom: '2px solid var(--border)'
+          }}>📍 Active Shipments</h3>
           {shipments.length === 0 ? (
-            <div style={{ padding: '1rem', textAlign: 'center', color: '#666' }}>
+            <div style={{
+              padding: '40px 20px',
+              textAlign: 'center',
+              color: 'var(--text-muted)',
+              fontSize: '14px'
+            }}>
+              <div style={{ fontSize: '48px', marginBottom: '12px' }}>📦</div>
               No active shipments with GPS data
             </div>
           ) : (
@@ -262,76 +301,82 @@ export default function LiveTracking() {
         }
 
         .tracking-sidebar {
-          background: white;
-          border-radius: 8px;
-          padding: 1rem;
+          background: var(--surface);
+          border: 1px solid var(--border);
+          border-radius: 16px;
+          padding: 20px;
           overflow-y: auto;
-          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-
-        .tracking-sidebar h3 {
-          margin: 0 0 1rem 0;
-          padding-bottom: 0.5rem;
-          border-bottom: 2px solid #e5e7eb;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.08);
         }
 
         .shipment-list {
           display: flex;
           flex-direction: column;
-          gap: 0.75rem;
+          gap: 12px;
         }
 
         .shipment-card {
-          padding: 1rem;
-          border: 2px solid #e5e7eb;
-          border-radius: 6px;
-          transition: all 0.2s;
+          padding: 16px;
+          border: 2px solid var(--border);
+          border-radius: 12px;
+          transition: all 0.3s ease;
+          background: var(--surface-50);
         }
 
         .shipment-card:hover {
-          border-color: #2563eb;
-          background: #f9fafb;
+          border-color: var(--primary-500);
+          background: var(--primary-50);
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(0,0,0,0.1);
         }
 
         .shipment-card.selected {
-          border-color: #2563eb;
-          background: #eff6ff;
+          border-color: var(--primary-500);
+          background: var(--primary-50);
+          box-shadow: 0 4px 12px rgba(0,0,0,0.1);
         }
 
         .shipment-header {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          margin-bottom: 0.5rem;
+          margin-bottom: 10px;
+        }
+
+        .shipment-header strong {
+          font-size: 15px;
+          font-weight: 700;
         }
 
         .shipment-info {
-          font-size: 0.875rem;
-          color: #666;
-          line-height: 1.6;
+          font-size: 14px;
+          color: var(--text-muted);
+          line-height: 1.8;
         }
 
         .location-info {
-          margin-top: 0.5rem;
-          padding-top: 0.5rem;
-          border-top: 1px solid #e5e7eb;
-          font-size: 0.75rem;
-          color: #666;
+          margin-top: 10px;
+          padding-top: 10px;
+          border-top: 1px solid var(--border);
+          font-size: 12px;
+          color: var(--text-muted);
         }
 
         .tracking-map {
-          background: white;
-          border-radius: 8px;
+          background: var(--surface);
+          border: 1px solid var(--border);
+          border-radius: 16px;
           overflow: hidden;
-          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+          box-shadow: 0 4px 12px rgba(0,0,0,0.08);
         }
 
         .badge {
-          padding: 0.25rem 0.5rem;
-          border-radius: 4px;
-          font-size: 0.75rem;
-          font-weight: 600;
+          padding: 4px 10px;
+          border-radius: 8px;
+          font-size: 11px;
+          font-weight: 700;
           text-transform: uppercase;
+          letter-spacing: 0.5px;
         }
 
         .badge-in_transit {
