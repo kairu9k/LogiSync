@@ -9,18 +9,8 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call([
-            // Important base data - must run first
+            // Essential data for production
             SubscriptionPlansSeeder::class,
-
-            // Demo/test data
-            UsersTableSeeder::class,
-            SchedulesTableSeeder::class,
-            BudgetsTableSeeder::class,
-            TransportTableSeeder::class,
-            OrdersTableSeeder::class,
-            ShipmentsTableSeeder::class,
-            TrackingHistoryTableSeeder::class,
-            InvoiceSeeder::class,
         ]);
     }
 }
