@@ -1,6 +1,18 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { apiGet, apiPatch, apiPost, apiDelete, getShipment, createShipmentFromOrder, getTransports } from '../../lib/api'
+import { apiGet, apiPatch, apiPost } from '../../lib/api'
+import Toast from '../../components/Toast'
+import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet'
+import 'leaflet/dist/leaflet.css'
+import L from 'leaflet'
+
+// Fix for default marker icons in React-Leaflet
+delete L.Icon.Default.prototype._getIconUrl
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+})
 
 export default function OrderDetail() {
   const { id } = useParams()
@@ -9,9 +21,24 @@ export default function OrderDetail() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [updating, setUpdating] = useState(false)
-  const [shipment, setShipment] = useState(null)
-  const [showCreateShipment, setShowCreateShipment] = useState(false)
-  const [creatingShipment, setCreatingShipment] = useState(false)
+  const [showReceiverForm, setShowReceiverForm] = useState(false)
+  const [receiverInfo, setReceiverInfo] = useState({
+    receiver_name: '',
+    receiver_contact: '',
+    receiver_email: '',
+    receiver_address: ''
+  })
+  const [savingReceiver, setSavingReceiver] = useState(false)
+  const [toast, setToast] = useState(null)
+  const [warehouses, setWarehouses] = useState([])
+  const [showWarehouseWidget, setShowWarehouseWidget] = useState(false)
+  const [assigningWarehouse, setAssigningWarehouse] = useState(false)
+  const [selectedWarehouse, setSelectedWarehouse] = useState('')
+  const [warehouseLocation, setWarehouseLocation] = useState('')
+  const [packageLocation, setPackageLocation] = useState(null)
+  const [showAddressMap, setShowAddressMap] = useState(false)
+  const [mapPosition, setMapPosition] = useState([7.1907, 125.4553]) // Davao City default
+  const [addressCoordinates, setAddressCoordinates] = useState({ lat: null, lng: null })
 
   async function load() {
     setLoading(true)
@@ -20,19 +47,51 @@ export default function OrderDetail() {
       const res = await apiGet(`/api/orders/${id}`)
       setOrder(res?.data)
 
-      // Check if order has a shipment by searching shipments
+      // Populate receiver info if exists
+      if (res?.data) {
+        const hasReceiverInfo = res.data.receiver_name && res.data.receiver_contact && res.data.receiver_address
+        setReceiverInfo({
+          receiver_name: res.data.receiver_name || '',
+          receiver_contact: res.data.receiver_contact || '',
+          receiver_email: res.data.receiver_email || '',
+          receiver_address: res.data.receiver_address || ''
+        })
+
+        // Load existing coordinates if available
+        if (res.data.receiver_lat && res.data.receiver_lng) {
+          setAddressCoordinates({
+            lat: parseFloat(res.data.receiver_lat),
+            lng: parseFloat(res.data.receiver_lng)
+          })
+          setMapPosition([parseFloat(res.data.receiver_lat), parseFloat(res.data.receiver_lng)])
+        }
+
+        // Show form if receiver info is incomplete
+        setShowReceiverForm(!hasReceiverInfo)
+      }
+
+      // Load warehouse location for this order
       try {
-        const poNumber = `PO-${String(id).padStart(5, '0')}`
-        const shipmentsRes = await apiGet(`/api/shipments?q=${poNumber}&limit=1`)
-        if (shipmentsRes?.data?.length > 0) {
-          const shipmentDetail = await getShipment(shipmentsRes.data[0].id)
-          setShipment(shipmentDetail?.data)
+        const inventoryRes = await apiGet(`/api/inventory?limit=200`)
+        const orderInventory = inventoryRes?.data?.find(item => item.order_id === parseInt(id))
+        if (orderInventory) {
+          setPackageLocation({
+            warehouse: orderInventory.warehouse || 'N/A',
+            location: orderInventory.location || 'N/A'
+          })
+          // Hide warehouse widget if package is already assigned
+          setShowWarehouseWidget(false)
         } else {
-          setShipment(null)
+          setPackageLocation(null)
+          // Show warehouse widget if package is not assigned (for processing status)
+          setShowWarehouseWidget(true)
         }
       } catch (e) {
-        setShipment(null)
+        console.error('Failed to load warehouse location:', e)
+        setPackageLocation(null)
+        setShowWarehouseWidget(true)
       }
+
     } catch (e) {
       setError(e.message || 'Failed to load order')
     } finally {
@@ -40,9 +99,104 @@ export default function OrderDetail() {
     }
   }
 
-  useEffect(() => { load() }, [id])
+  useEffect(() => {
+    load()
+    loadWarehouses()
+  }, [id])
+
+  async function loadWarehouses() {
+    try {
+      const res = await apiGet('/api/warehouses')
+      setWarehouses(res?.data || [])
+    } catch (e) {
+      console.error('Failed to load warehouses:', e)
+    }
+  }
+
+  async function assignToWarehouse() {
+    if (!selectedWarehouse) {
+      setToast({ message: 'Please select a warehouse', type: 'warning' })
+      return
+    }
+    if (!warehouseLocation.trim()) {
+      setToast({ message: 'Please enter warehouse location', type: 'warning' })
+      return
+    }
+
+    try {
+      setAssigningWarehouse(true)
+      await apiPost('/api/inventory/assign', {
+        order_id: parseInt(id),
+        warehouse_id: parseInt(selectedWarehouse),
+        location_in_warehouse: warehouseLocation.trim()
+      })
+      setShowWarehouseWidget(false)
+      setSelectedWarehouse('')
+      setWarehouseLocation('')
+      setToast({ message: 'Package assigned to warehouse successfully!', type: 'success' })
+      await load()
+    } catch (e) {
+      setToast({ message: e.message || 'Failed to assign to warehouse', type: 'error' })
+    } finally {
+      setAssigningWarehouse(false)
+    }
+  }
+
+  async function saveReceiverInfo() {
+    // Validation
+    if (!receiverInfo.receiver_name.trim()) {
+      alert('Please enter receiver name')
+      return
+    }
+    if (!receiverInfo.receiver_contact.trim()) {
+      alert('Please enter receiver contact')
+      return
+    }
+    if (!receiverInfo.receiver_address.trim()) {
+      alert('Please enter receiver address')
+      return
+    }
+
+    try {
+      setSavingReceiver(true)
+
+      // Include coordinates if they were captured from map
+      const payload = {
+        ...receiverInfo,
+        receiver_lat: addressCoordinates.lat,
+        receiver_lng: addressCoordinates.lng
+      }
+
+      await apiPatch(`/api/orders/${id}/receiver`, payload)
+      setShowReceiverForm(false)
+      await load()
+      setToast({ message: 'Receiver information saved successfully!', type: 'success' })
+    } catch (e) {
+      setToast({ message: e.message || 'Failed to save receiver information', type: 'error' })
+    } finally {
+      setSavingReceiver(false)
+    }
+  }
 
   async function setStatus(status) {
+    // Validate: Can't mark as "fulfilled" (Ready to Ship) if items not assigned to warehouse
+    if (status === 'fulfilled') {
+      try {
+        const inventoryRes = await apiGet(`/api/inventory?limit=200`)
+        // Filter for this specific order
+        const orderInventory = inventoryRes?.data?.filter(item => item.order_id === parseInt(id)) || []
+
+        if (orderInventory.length === 0) {
+          alert('❌ Cannot mark as Ready to Ship!\n\nPackages must be assigned to a warehouse first.\n\n💡 Go to Inventory page → Assign items to warehouse shelves → Then return here.')
+          return
+        }
+      } catch (e) {
+        console.error('Failed to check inventory:', e)
+        alert('⚠️ Unable to verify warehouse assignment. Please ensure packages are assigned to warehouse first.')
+        return
+      }
+    }
+
     try {
       setUpdating(true)
       await apiPatch(`/api/orders/${id}/status`, { status })
@@ -54,29 +208,6 @@ export default function OrderDetail() {
     }
   }
 
-  async function handleCreateShipment(shipmentData) {
-    try {
-      setCreatingShipment(true)
-      await createShipmentFromOrder(id, shipmentData)
-      setShowCreateShipment(false)
-      // Small delay to ensure shipment is created before reloading
-      await new Promise(resolve => setTimeout(resolve, 500))
-      await load() // Reload to get the new shipment
-    } catch (e) {
-      let errorMessage = e.message || 'Failed to create shipment'
-
-      if (errorMessage.includes('transport_id')) {
-        errorMessage = 'Invalid transport/vehicle selected. Please run database seeders to populate transport data.'
-      } else if (errorMessage.includes('foreign key')) {
-        errorMessage = 'Database constraint error. Please ensure all required data exists in the database.'
-      }
-
-      alert(errorMessage)
-      console.error('Shipment creation error:', e)
-    } finally {
-      setCreatingShipment(false)
-    }
-  }
 
   if (loading) return <div className="card" style={{ padding: 16 }}>Loading…</div>
   if (error) return <div className="card" style={{ padding: 16, color: 'var(--danger-600)' }}>{error}</div>
@@ -93,39 +224,149 @@ export default function OrderDetail() {
     }
   }
 
+  // Map click handler component
+  function MapClickHandler() {
+    useMapEvents({
+      click(e) {
+        const { lat, lng } = e.latlng
+        setAddressCoordinates({ lat, lng })
+        setMapPosition([lat, lng])
+
+        // Reverse geocoding to get address
+        fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`)
+          .then(res => res.json())
+          .then(data => {
+            if (data && data.display_name) {
+              setReceiverInfo({
+                ...receiverInfo,
+                receiver_address: data.display_name
+              })
+            }
+          })
+          .catch(err => {
+            console.error('Geocoding error:', err)
+            // Still allow manual input if geocoding fails
+          })
+      }
+    })
+    return addressCoordinates.lat && addressCoordinates.lng ? (
+      <Marker position={[addressCoordinates.lat, addressCoordinates.lng]} />
+    ) : null
+  }
+
   return (
-    <div className="grid" style={{ gap: 16 }}>
-      <div className="card" style={{ padding: 16 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h2 style={{ marginTop: 0 }}>{order.po}</h2>
-          <button className="btn btn-outline" onClick={() => navigate(-1)}>Back</button>
-        </div>
-        <div className="grid" style={{ gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 12 }}>
-          <div>
-            <div className="label">Customer</div>
-            <div>{order.customer}</div>
-          </div>
-          <div>
-            <div className="label">Status</div>
+    <div className="grid" style={{ gap: 24 }}>
+      {/* Header with Gradient */}
+      <div style={{
+        background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
+        borderRadius: '16px',
+        padding: '32px',
+        boxShadow: '0 10px 30px rgba(59, 130, 246, 0.3)'
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 40 }}>
             <div>
-              <span className={`badge ${
-                order.status === 'fulfilled' ? 'success' :
-                order.status === 'processing' ? 'info' :
-                order.status === 'canceled' ? 'danger' :
-                'warn'
-              }`}>
-                {order.status === 'fulfilled' ? 'Ready to Ship' : order.status}
-              </span>
+              <div style={{ fontSize: '12px', fontWeight: '600', color: 'rgba(255, 255, 255, 0.7)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                Order ID
+              </div>
+              <h2 style={{ margin: 0, color: 'white', fontSize: '28px', fontWeight: '700' }}>
+                {order.po}
+              </h2>
+            </div>
+            <div>
+              <div style={{ fontSize: '12px', fontWeight: '600', color: 'rgba(255, 255, 255, 0.7)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                Status
+              </div>
+              <div>
+                <span className={`badge ${
+                  order.status === 'fulfilled' ? 'success' :
+                  order.status === 'processing' ? 'info' :
+                  order.status === 'canceled' ? 'danger' :
+                  'warn'
+                }`} style={{
+                  padding: '6px 14px',
+                  borderRadius: '6px',
+                  fontSize: '13px',
+                  fontWeight: '600'
+                }}>
+                  {order.status === 'fulfilled' ? 'Ready to Ship' : order.status}
+                </span>
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: '12px', fontWeight: '600', color: 'rgba(255, 255, 255, 0.7)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                Order Date
+              </div>
+              <div style={{ fontSize: '15px', color: 'rgba(255, 255, 255, 0.9)', fontWeight: '600' }}>
+                {String(order.order_date).replace('T', ' ').replace('Z','')}
+              </div>
             </div>
           </div>
-          <div>
-            <div className="label">Order Date</div>
-            <div>{String(order.order_date).replace('T', ' ').replace('Z','')}</div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {order.status !== 'canceled' && (
+              <button
+                disabled={updating}
+                onClick={() => setStatus('canceled')}
+                style={{
+                  padding: '10px 20px',
+                  borderRadius: '10px',
+                  border: '2px solid rgba(239, 68, 68, 0.5)',
+                  background: 'rgba(239, 68, 68, 0.1)',
+                  color: '#ef4444',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  cursor: updating ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.3s ease',
+                  opacity: updating ? 0.6 : 1
+                }}
+                onMouseOver={(e) => {
+                  if (!updating) {
+                    e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)'
+                    e.currentTarget.style.transform = 'translateY(-2px)'
+                  }
+                }}
+                onMouseOut={(e) => {
+                  if (!updating) {
+                    e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)'
+                    e.currentTarget.style.transform = 'translateY(0)'
+                  }
+                }}
+              >
+                Cancel Order
+              </button>
+            )}
+            <button
+              onClick={() => navigate(-1)}
+              style={{
+                padding: '10px 20px',
+                borderRadius: '10px',
+                border: '2px solid rgba(255, 255, 255, 0.3)',
+                background: 'rgba(255, 255, 255, 0.1)',
+                color: 'white',
+                fontSize: '14px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                transition: 'all 0.3s ease'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'
+                e.currentTarget.style.transform = 'translateY(-2px)'
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'
+                e.currentTarget.style.transform = 'translateY(0)'
+              }}
+            >
+              Back
+            </button>
           </div>
         </div>
+      </div>
+
+      <div className="card" style={{ padding: 16 }}>
 
         {/* Workflow Guide */}
-        {order.status !== 'canceled' && !shipment && (
+        {order.status !== 'canceled' && (
           <div style={{
             marginTop: 16,
             padding: 12,
@@ -159,33 +400,378 @@ export default function OrderDetail() {
                 gap: 4,
                 color: order.status === 'fulfilled' ? 'var(--primary-600)' : 'var(--gray-400)'
               }}>
-                {order.status === 'fulfilled' ? '🔵' : '⚪'} Ready to Ship
-              </div>
-              <div>→</div>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 4,
-                color: shipment ? 'var(--success-600)' : 'var(--gray-400)'
-              }}>
-                {shipment ? '✅' : '⚪'} Shipment
+                {order.status === 'fulfilled' ? '🔵' : '⚪'} Ready for Shipment
               </div>
             </div>
 
             {/* Status-specific instructions */}
             {order.status === 'pending' && (
               <div style={{ marginTop: 8, fontSize: '0.875rem', color: 'var(--gray-600)' }}>
-                💡 <strong>Next:</strong> Click "Start Processing" when items arrive at warehouse
+                💡 <strong>Next:</strong> {receiverInfo.receiver_name ? 'Click "Start Processing" when items arrive at warehouse' : 'Fill receiver information below to proceed'}
               </div>
             )}
             {order.status === 'processing' && (
               <div style={{ marginTop: 8, fontSize: '0.875rem', color: 'var(--gray-600)' }}>
-                💡 <strong>Next:</strong> Go to Inventory page → Assign items to warehouse shelves → Return here and click "Ready to Ship"
+                💡 <strong>Next:</strong> Use the Quick Warehouse Assignment below OR go to Inventory page → Assign items to warehouse shelves
               </div>
             )}
-            {order.status === 'fulfilled' && !shipment && (
+            {order.status === 'fulfilled' && (
               <div style={{ marginTop: 8, fontSize: '0.875rem', color: 'var(--gray-600)' }}>
-                💡 <strong>Next:</strong> Items are packed and ready! Click "Create Shipment" below to assign driver and vehicle
+                💡 <strong>Next:</strong> Items are packed and ready! Go to Shipments page to create shipment and assign driver and vehicle
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Inline Receiver Information Form (Pending Status) */}
+        {order.status === 'pending' && (
+          <div style={{
+            marginTop: 16,
+            padding: 16,
+            background: showReceiverForm ? 'rgba(59, 130, 246, 0.1)' : 'rgba(16, 185, 129, 0.1)',
+            border: `2px solid ${showReceiverForm ? 'rgba(59, 130, 246, 0.3)' : 'rgba(16, 185, 129, 0.3)'}`,
+            borderRadius: 12
+          }}>
+            <div style={{ fontSize: '0.9375rem', fontWeight: 600, marginBottom: 12, color: showReceiverForm ? 'var(--primary-600)' : 'var(--success-600)' }}>
+              {showReceiverForm ? '📝 Fill Receiver Information' : '✅ Receiver Information'}
+            </div>
+
+            {!showReceiverForm ? (
+              // Display saved receiver info
+              <div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+                  <div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--gray-600)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Name</div>
+                    <div style={{ fontSize: '0.875rem', fontWeight: 600 }}>{receiverInfo.receiver_name || 'N/A'}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--gray-600)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Contact</div>
+                    <div style={{ fontSize: '0.875rem', fontWeight: 600 }}>{receiverInfo.receiver_contact || 'N/A'}</div>
+                  </div>
+                </div>
+                <div style={{ marginBottom: 12 }}>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--gray-600)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Email</div>
+                  <div style={{ fontSize: '0.875rem', fontWeight: 600 }}>{receiverInfo.receiver_email || 'N/A'}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--gray-600)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Address</div>
+                  <div style={{ fontSize: '0.875rem', fontWeight: 600 }}>{receiverInfo.receiver_address || 'N/A'}</div>
+                </div>
+                <button
+                  onClick={() => setShowReceiverForm(true)}
+                  style={{
+                    marginTop: 12,
+                    padding: '8px 16px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    background: 'rgba(100, 116, 139, 0.2)',
+                    color: 'var(--text)',
+                    fontSize: '0.875rem',
+                    fontWeight: 600,
+                    cursor: 'pointer'
+                  }}
+                >
+                  ✏️ Edit Information
+                </button>
+              </div>
+            ) : (
+              // Receiver info form
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    Receiver Name *
+                  </label>
+                  <input
+                    type="text"
+                    value={receiverInfo.receiver_name}
+                    onChange={(e) => setReceiverInfo({...receiverInfo, receiver_name: e.target.value})}
+                    placeholder="Enter receiver name"
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      borderRadius: '8px',
+                      border: '1px solid var(--gray-200)',
+                      fontSize: '0.875rem'
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    Contact Number *
+                  </label>
+                  <input
+                    type="tel"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    value={receiverInfo.receiver_contact}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/\D/g, '')
+                      setReceiverInfo({...receiverInfo, receiver_contact: value})
+                    }}
+                    placeholder="Enter contact number"
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      borderRadius: '8px',
+                      border: '1px solid var(--gray-200)',
+                      fontSize: '0.875rem'
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    Email Address
+                  </label>
+                  <input
+                    type="email"
+                    value={receiverInfo.receiver_email}
+                    onChange={(e) => setReceiverInfo({...receiverInfo, receiver_email: e.target.value})}
+                    placeholder="Enter email address (optional)"
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      borderRadius: '8px',
+                      border: '1px solid var(--gray-200)',
+                      fontSize: '0.875rem'
+                    }}
+                  />
+                </div>
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                    <label style={{ fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      Delivery Address *
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setShowAddressMap(!showAddressMap)}
+                      style={{
+                        padding: '4px 10px',
+                        borderRadius: '6px',
+                        border: 'none',
+                        background: showAddressMap ? 'rgba(239, 68, 68, 0.1)' : 'rgba(59, 130, 246, 0.1)',
+                        color: showAddressMap ? '#ef4444' : '#3b82f6',
+                        fontSize: '0.75rem',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease'
+                      }}
+                    >
+                      {showAddressMap ? '🗺️ Hide Map' : '📍 Pin on Map'}
+                    </button>
+                  </div>
+                  <textarea
+                    value={receiverInfo.receiver_address}
+                    onChange={(e) => setReceiverInfo({...receiverInfo, receiver_address: e.target.value})}
+                    placeholder="Enter address or click map to pin location"
+                    rows={3}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      borderRadius: '8px',
+                      border: '1px solid var(--gray-200)',
+                      fontSize: '0.875rem',
+                      resize: 'vertical',
+                      marginBottom: showAddressMap ? '12px' : '0'
+                    }}
+                  />
+                  {showAddressMap && (
+                    <div style={{ marginTop: 12 }}>
+                      <MapContainer
+                        center={mapPosition}
+                        zoom={13}
+                        style={{ height: '300px', width: '100%', borderRadius: '8px', border: '1px solid var(--gray-200)' }}
+                      >
+                        <TileLayer
+                          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                        />
+                        <MapClickHandler />
+                      </MapContainer>
+                      {addressCoordinates.lat && addressCoordinates.lng && (
+                        <div style={{
+                          marginTop: 8,
+                          padding: '8px 12px',
+                          background: 'rgba(59, 130, 246, 0.1)',
+                          borderRadius: '6px',
+                          fontSize: '0.75rem',
+                          color: '#3b82f6'
+                        }}>
+                          📍 Coordinates: {addressCoordinates.lat.toFixed(6)}, {addressCoordinates.lng.toFixed(6)}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    type="button"
+                    onClick={saveReceiverInfo}
+                    disabled={savingReceiver}
+                    style={{
+                      padding: '10px 20px',
+                      borderRadius: '8px',
+                      border: 'none',
+                      background: savingReceiver ? 'rgba(16, 185, 129, 0.5)' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                      color: 'white',
+                      fontSize: '0.875rem',
+                      fontWeight: 600,
+                      cursor: savingReceiver ? 'not-allowed' : 'pointer'
+                    }}
+                  >
+                    {savingReceiver ? 'Saving...' : 'Save'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowReceiverForm(false)
+                      // Reload to restore original values if user cancels
+                      load()
+                    }}
+                    disabled={savingReceiver}
+                    style={{
+                      padding: '10px 20px',
+                      borderRadius: '8px',
+                      border: 'none',
+                      background: 'rgba(100, 116, 139, 0.2)',
+                      color: 'var(--text)',
+                      fontSize: '0.875rem',
+                      fontWeight: 600,
+                      cursor: savingReceiver ? 'not-allowed' : 'pointer'
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Inline Warehouse Assignment Widget (Processing Status) */}
+        {order.status === 'processing' && (
+          <div style={{
+            marginTop: 16,
+            padding: 16,
+            background: showWarehouseWidget ? 'rgba(249, 115, 22, 0.1)' : 'rgba(16, 185, 129, 0.1)',
+            border: `2px solid ${showWarehouseWidget ? 'rgba(249, 115, 22, 0.3)' : 'rgba(16, 185, 129, 0.3)'}`,
+            borderRadius: 12
+          }}>
+            <div style={{ fontSize: '0.9375rem', fontWeight: 600, marginBottom: 12, color: showWarehouseWidget ? 'var(--warning-600)' : 'var(--success-600)' }}>
+              {showWarehouseWidget ? '📦 Quick Warehouse Assignment' : '✅ Warehouse Assignment'}
+            </div>
+
+            {!showWarehouseWidget ? (
+              <div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+                  <div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--gray-600)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Warehouse</div>
+                    <div style={{ fontSize: '0.875rem', fontWeight: 600 }}>{packageLocation?.warehouse || 'N/A'}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--gray-600)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Location</div>
+                    <div style={{ fontSize: '0.875rem', fontWeight: 600 }}>{packageLocation?.location || 'N/A'}</div>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowWarehouseWidget(true)}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    background: 'rgba(100, 116, 139, 0.2)',
+                    color: 'var(--text)',
+                    fontSize: '0.875rem',
+                    fontWeight: 600,
+                    cursor: 'pointer'
+                  }}
+                >
+                  ✏️ Edit Assignment
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    Select Warehouse *
+                  </label>
+                  <select
+                    value={selectedWarehouse}
+                    onChange={(e) => setSelectedWarehouse(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      borderRadius: '8px',
+                      border: '1px solid var(--gray-200)',
+                      fontSize: '0.875rem',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <option value="">Choose warehouse...</option>
+                    {warehouses.map(wh => (
+                      <option key={wh.id} value={wh.id}>
+                        {wh.name} - {wh.location} (Capacity: {wh.current_capacity}/{wh.capacity})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    Location in Warehouse *
+                  </label>
+                  <input
+                    type="text"
+                    value={warehouseLocation}
+                    onChange={(e) => setWarehouseLocation(e.target.value)}
+                    placeholder="e.g., Aisle 3, Shelf B2"
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      borderRadius: '8px',
+                      border: '1px solid var(--gray-200)',
+                      fontSize: '0.875rem'
+                    }}
+                  />
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    type="button"
+                    onClick={assignToWarehouse}
+                    disabled={assigningWarehouse}
+                    style={{
+                      padding: '10px 20px',
+                      borderRadius: '8px',
+                      border: 'none',
+                      background: assigningWarehouse ? 'rgba(16, 185, 129, 0.5)' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                      color: 'white',
+                      fontSize: '0.875rem',
+                      fontWeight: 600,
+                      cursor: assigningWarehouse ? 'not-allowed' : 'pointer'
+                    }}
+                  >
+                    {assigningWarehouse ? 'Saving...' : 'Save'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowWarehouseWidget(false)
+                      setSelectedWarehouse('')
+                      setWarehouseLocation('')
+                    }}
+                    disabled={assigningWarehouse}
+                    style={{
+                      padding: '10px 20px',
+                      borderRadius: '8px',
+                      border: 'none',
+                      background: 'rgba(100, 116, 139, 0.2)',
+                      color: 'var(--text)',
+                      fontSize: '0.875rem',
+                      fontWeight: 600,
+                      cursor: assigningWarehouse ? 'not-allowed' : 'pointer'
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -194,68 +780,36 @@ export default function OrderDetail() {
         {/* Context-Aware Action Buttons */}
         <div className="form-actions" style={{ marginTop: 12, display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           {order.status === 'pending' && (
-            <>
-              <button
-                disabled={updating}
-                onClick={() => setStatus('processing')}
-                style={{
-                  padding: '10px 20px',
-                  borderRadius: '8px',
-                  border: 'none',
-                  background: updating ? 'rgba(59, 130, 246, 0.5)' : 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-                  color: 'white',
-                  fontSize: '14px',
-                  fontWeight: '600',
-                  cursor: updating ? 'not-allowed' : 'pointer',
-                  transition: 'all 0.3s ease',
-                  boxShadow: '0 2px 8px rgba(59, 130, 246, 0.3)'
-                }}
-                onMouseOver={(e) => {
-                  if (!updating) {
-                    e.currentTarget.style.transform = 'translateY(-2px)'
-                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.5)'
-                  }
-                }}
-                onMouseOut={(e) => {
-                  if (!updating) {
-                    e.currentTarget.style.transform = 'translateY(0)'
-                    e.currentTarget.style.boxShadow = '0 2px 8px rgba(59, 130, 246, 0.3)'
-                  }
-                }}
-              >
-                📦 Start Processing
-              </button>
-              <button
-                disabled={updating}
-                onClick={() => setStatus('canceled')}
-                style={{
-                  padding: '10px 20px',
-                  borderRadius: '8px',
-                  border: 'none',
-                  background: updating ? 'rgba(239, 68, 68, 0.5)' : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-                  color: 'white',
-                  fontSize: '14px',
-                  fontWeight: '600',
-                  cursor: updating ? 'not-allowed' : 'pointer',
-                  transition: 'all 0.3s ease',
-                  boxShadow: '0 2px 8px rgba(239, 68, 68, 0.3)'
-                }}
-                onMouseOver={(e) => {
-                  if (!updating) {
-                    e.currentTarget.style.transform = 'translateY(-2px)'
-                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(239, 68, 68, 0.5)'
-                  }
-                }}
-                onMouseOut={(e) => {
-                  if (!updating) {
-                    e.currentTarget.style.transform = 'translateY(0)'
-                    e.currentTarget.style.boxShadow = '0 2px 8px rgba(239, 68, 68, 0.3)'
-                  }
-                }}
-              >
-                Cancel Order
-              </button>
-            </>
+            <button
+              disabled={updating || !receiverInfo.receiver_name}
+              onClick={() => setStatus('processing')}
+              style={{
+                padding: '10px 20px',
+                borderRadius: '8px',
+                border: 'none',
+                background: updating ? 'rgba(59, 130, 246, 0.5)' : 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
+                color: 'white',
+                fontSize: '14px',
+                fontWeight: '600',
+                cursor: updating ? 'not-allowed' : 'pointer',
+                transition: 'all 0.3s ease',
+                boxShadow: '0 2px 8px rgba(59, 130, 246, 0.3)'
+              }}
+              onMouseOver={(e) => {
+                if (!updating) {
+                  e.currentTarget.style.transform = 'translateY(-2px)'
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.5)'
+                }
+              }}
+              onMouseOut={(e) => {
+                if (!updating) {
+                  e.currentTarget.style.transform = 'translateY(0)'
+                  e.currentTarget.style.boxShadow = '0 2px 8px rgba(59, 130, 246, 0.3)'
+                }
+              }}
+            >
+              📦 Start Processing
+            </button>
           )}
 
           {order.status === 'processing' && (
@@ -319,101 +873,39 @@ export default function OrderDetail() {
               >
                 ⏮️ Back to Pending
               </button>
-              <button
-                disabled={updating}
-                onClick={() => setStatus('canceled')}
-                style={{
-                  padding: '10px 20px',
-                  borderRadius: '8px',
-                  border: 'none',
-                  background: updating ? 'rgba(239, 68, 68, 0.5)' : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-                  color: 'white',
-                  fontSize: '14px',
-                  fontWeight: '600',
-                  cursor: updating ? 'not-allowed' : 'pointer',
-                  transition: 'all 0.3s ease',
-                  boxShadow: '0 2px 8px rgba(239, 68, 68, 0.3)'
-                }}
-                onMouseOver={(e) => {
-                  if (!updating) {
-                    e.currentTarget.style.transform = 'translateY(-2px)'
-                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(239, 68, 68, 0.5)'
-                  }
-                }}
-                onMouseOut={(e) => {
-                  if (!updating) {
-                    e.currentTarget.style.transform = 'translateY(0)'
-                    e.currentTarget.style.boxShadow = '0 2px 8px rgba(239, 68, 68, 0.3)'
-                  }
-                }}
-              >
-                Cancel Order
-              </button>
             </>
           )}
 
-          {order.status === 'fulfilled' && !shipment && (
-            <>
-              <button
-                disabled={updating}
-                onClick={() => setStatus('processing')}
-                style={{
-                  padding: '10px 20px',
-                  borderRadius: '8px',
-                  border: 'none',
-                  background: updating ? 'rgba(100, 116, 139, 0.5)' : 'rgba(100, 116, 139, 0.2)',
-                  color: 'var(--text)',
-                  fontSize: '14px',
-                  fontWeight: '600',
-                  cursor: updating ? 'not-allowed' : 'pointer',
-                  transition: 'all 0.3s ease'
-                }}
-                onMouseOver={(e) => {
-                  if (!updating) {
-                    e.currentTarget.style.background = 'rgba(100, 116, 139, 0.3)'
-                    e.currentTarget.style.transform = 'translateY(-2px)'
-                  }
-                }}
-                onMouseOut={(e) => {
-                  if (!updating) {
-                    e.currentTarget.style.background = 'rgba(100, 116, 139, 0.2)'
-                    e.currentTarget.style.transform = 'translateY(0)'
-                  }
-                }}
-              >
-                ⏮️ Back to Processing
-              </button>
-              <button
-                disabled={updating}
-                onClick={() => setStatus('canceled')}
-                style={{
-                  padding: '10px 20px',
-                  borderRadius: '8px',
-                  border: 'none',
-                  background: updating ? 'rgba(239, 68, 68, 0.5)' : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-                  color: 'white',
-                  fontSize: '14px',
-                  fontWeight: '600',
-                  cursor: updating ? 'not-allowed' : 'pointer',
-                  transition: 'all 0.3s ease',
-                  boxShadow: '0 2px 8px rgba(239, 68, 68, 0.3)'
-                }}
-                onMouseOver={(e) => {
-                  if (!updating) {
-                    e.currentTarget.style.transform = 'translateY(-2px)'
-                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(239, 68, 68, 0.5)'
-                  }
-                }}
-                onMouseOut={(e) => {
-                  if (!updating) {
-                    e.currentTarget.style.transform = 'translateY(0)'
-                    e.currentTarget.style.boxShadow = '0 2px 8px rgba(239, 68, 68, 0.3)'
-                  }
-                }}
-              >
-                Cancel Order
-              </button>
-            </>
+          {order.status === 'fulfilled' && (
+            <button
+              disabled={updating}
+              onClick={() => setStatus('processing')}
+              style={{
+                padding: '10px 20px',
+                borderRadius: '8px',
+                border: 'none',
+                background: updating ? 'rgba(100, 116, 139, 0.5)' : 'rgba(100, 116, 139, 0.2)',
+                color: 'var(--text)',
+                fontSize: '14px',
+                fontWeight: '600',
+                cursor: updating ? 'not-allowed' : 'pointer',
+                transition: 'all 0.3s ease'
+              }}
+              onMouseOver={(e) => {
+                if (!updating) {
+                  e.currentTarget.style.background = 'rgba(100, 116, 139, 0.3)'
+                  e.currentTarget.style.transform = 'translateY(-2px)'
+                }
+              }}
+              onMouseOut={(e) => {
+                if (!updating) {
+                  e.currentTarget.style.background = 'rgba(100, 116, 139, 0.2)'
+                  e.currentTarget.style.transform = 'translateY(0)'
+                }
+              }}
+            >
+              ⏮️ Back to Processing
+            </button>
           )}
 
           {order.status === 'canceled' && (
@@ -424,7 +916,7 @@ export default function OrderDetail() {
                 padding: '10px 20px',
                 borderRadius: '8px',
                 border: 'none',
-                background: updating ? 'rgba(99, 102, 241, 0.5)' : 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                background: updating ? 'rgba(59, 130, 246, 0.5)' : 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
                 color: 'white',
                 fontSize: '14px',
                 fontWeight: '600',
@@ -451,170 +943,157 @@ export default function OrderDetail() {
         </div>
       </div>
 
-      {/* Shipment Section */}
-      <div className="card" style={{ padding: 16 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h3 style={{ marginTop: 0 }}>Shipment</h3>
-          {order.status === 'fulfilled' && !shipment && (
-            <button
-              onClick={() => setShowCreateShipment(true)}
-              disabled={creatingShipment}
-              style={{
-                padding: '10px 20px',
-                borderRadius: '8px',
-                border: 'none',
-                background: creatingShipment ? 'rgba(59, 130, 246, 0.5)' : 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-                color: 'white',
-                fontSize: '14px',
-                fontWeight: '600',
-                cursor: creatingShipment ? 'not-allowed' : 'pointer',
-                transition: 'all 0.3s ease',
-                boxShadow: '0 2px 8px rgba(59, 130, 246, 0.3)'
-              }}
-              onMouseOver={(e) => {
-                if (!creatingShipment) {
-                  e.currentTarget.style.transform = 'translateY(-2px)'
-                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.5)'
-                }
-              }}
-              onMouseOut={(e) => {
-                if (!creatingShipment) {
-                  e.currentTarget.style.transform = 'translateY(0)'
-                  e.currentTarget.style.boxShadow = '0 2px 8px rgba(59, 130, 246, 0.3)'
-                }
-              }}
-            >
-              🚚 Create Shipment
-            </button>
-          )}
-        </div>
 
-        {shipment ? (
-          <div>
-            <div className="grid" style={{ gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 12 }}>
-              <div>
-                <div className="label">Tracking Number</div>
-                <div style={{ fontFamily: 'monospace', fontSize: '1.1em' }}>{shipment.tracking_number}</div>
+      {/* Package Summary - Only show when order is Ready to Ship (fulfilled) */}
+      {order.status === 'fulfilled' && (
+        <div className="card" style={{ padding: 16 }}>
+          <h3 style={{ marginTop: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+            📦 Package Information
+          </h3>
+
+          {order.quote_id ? (
+          <div className="grid" style={{ gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 16 }}>
+            <div>
+              <div className="label" style={{ fontSize: '12px', fontWeight: '600', color: 'var(--gray-600)', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                👤 Customer Name
               </div>
-              <div>
-                <div className="label">Status</div>
-                <div>
-                  <span className={`badge ${
-                    shipment.status === 'delivered' ? 'success' :
-                    shipment.status === 'in_transit' || shipment.status === 'out_for_delivery' ? 'info' :
-                    shipment.status === 'pending' ? 'warn' : 'danger'
-                  }`}>
-                    {shipment.status}
-                  </span>
-                </div>
-              </div>
-              <div>
-                <div className="label">Driver</div>
-                <div>{shipment.driver}</div>
-              </div>
-              <div>
-                <div className="label">Receiver</div>
-                <div>{shipment.receiver_name}</div>
-              </div>
-              <div>
-                <div className="label">Vehicle</div>
-                <div>{shipment.vehicle} ({shipment.vehicle_type})</div>
-              </div>
-              <div>
-                <div className="label">Departure Date</div>
-                <div>{shipment.departure_date ? new Date(shipment.departure_date).toLocaleDateString() : 'Not set'}</div>
+              <div style={{ fontSize: '16px', fontWeight: '600', color: 'var(--text)' }}>
+                {order.customer || 'N/A'}
               </div>
             </div>
 
-            {shipment.tracking_history?.length > 0 && (
-              <div style={{ marginTop: 16 }}>
-                <div className="label">Recent Tracking Updates</div>
-                <div className="grid" style={{ gap: 8, marginTop: 8 }}>
-                  {shipment.tracking_history.slice(0, 3).map((item, index) => (
-                    <div key={index} style={{
-                      padding: 8,
-                      border: '1px solid var(--gray-200)',
-                      borderRadius: 4,
-                      fontSize: '0.875rem'
-                    }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span className={`badge ${
-                          item.status === 'delivered' ? 'success' :
-                          item.status === 'in_transit' || item.status === 'out_for_delivery' ? 'info' :
-                          item.status === 'pending' ? 'warn' : 'danger'
-                        }`}>
-                          {item.status}
-                        </span>
-                        <span className="muted">{new Date(item.timestamp).toLocaleString()}</span>
-                      </div>
-                      <div style={{ fontWeight: 'bold', marginTop: 4 }}>{item.location}</div>
-                      {item.details && <div className="muted" style={{ marginTop: 2 }}>{item.details}</div>}
-                    </div>
-                  ))}
-                </div>
-                <div style={{ marginTop: 8, textAlign: 'center' }}>
-                  <button
-                    className="btn btn-outline"
-                    onClick={() => navigate('/app/shipments')}
-                  >
-                    View Full Tracking History
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        ) : order.status === 'fulfilled' ? (
-          <div className="muted">No shipment created yet. Click "Create Shipment" to generate shipping labels and tracking.</div>
-        ) : (
-          <div className="muted">Order must be fulfilled before creating a shipment.</div>
-        )}
-
-        {showCreateShipment && (
-          <CreateShipmentForm
-            order={order}
-            onSubmit={handleCreateShipment}
-            onCancel={() => setShowCreateShipment(false)}
-            creating={creatingShipment}
-          />
-        )}
-      </div>
-
-      {/* Package Summary */}
-      <div className="card" style={{ padding: 16 }}>
-        <h3 style={{ marginTop: 0 }}>📦 Package Information</h3>
-
-        {order.quote_id ? (
-          <div className="grid" style={{ gridTemplateColumns: 'repeat(2, minmax(0,1fr))', gap: 16 }}>
             <div>
-              <div className="label">Weight</div>
-              <div style={{ fontSize: '1.1rem', fontWeight: 500 }}>
+              <div className="label" style={{ fontSize: '12px', fontWeight: '600', color: 'var(--gray-600)', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                ⚖️ Weight
+              </div>
+              <div style={{ fontSize: '16px', fontWeight: '600', color: 'var(--text)' }}>
                 {order.weight ? `${order.weight} kg` : 'N/A'}
               </div>
             </div>
 
             <div>
-              <div className="label">Dimensions</div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--muted)', marginBottom: '4px', fontStyle: 'italic' }}>
-                (Length × Width × Height)
+              <div className="label" style={{ fontSize: '12px', fontWeight: '600', color: 'var(--gray-600)', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                📦 Total Items Inside
               </div>
-              <div style={{ fontSize: '1.1rem', fontWeight: 500 }}>
+              <div style={{ fontSize: '16px', fontWeight: '600', color: 'var(--text)' }}>
+                {order.items ? `${order.items} items` : 'N/A'}
+              </div>
+            </div>
+
+            <div>
+              <div className="label" style={{ fontSize: '12px', fontWeight: '600', color: 'var(--gray-600)', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                📏 Dimensions
+              </div>
+              <div style={{ fontSize: '12px', color: 'var(--muted)', marginBottom: '4px' }}>
+                Length × Width × Height
+              </div>
+              <div style={{ fontSize: '16px', fontWeight: '600', color: 'var(--text)' }}>
                 {parseDimensions(order.dimensions)}
               </div>
             </div>
 
             <div>
-              <div className="label">Distance</div>
-              <div style={{ fontSize: '1.1rem', fontWeight: 500 }}>
-                {order.distance ? `${order.distance} km` : 'N/A'}
+              <div className="label" style={{ fontSize: '12px', fontWeight: '600', color: 'var(--gray-600)', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                📍 Delivery Zone
+              </div>
+              <div style={{ fontSize: '16px', fontWeight: '600', color: 'var(--text)', textTransform: 'capitalize' }}>
+                {order.delivery_zone ? order.delivery_zone.replace(/_/g, ' ') : 'N/A'}
               </div>
             </div>
 
             <div>
-              <div className="label">Shipping Cost</div>
-              <div style={{ fontSize: '1.1rem', fontWeight: 500, color: 'var(--primary-600)' }}>
+              <div className="label" style={{ fontSize: '12px', fontWeight: '600', color: 'var(--gray-600)', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                📦 Package Type
+              </div>
+              <div style={{ fontSize: '16px', fontWeight: '600', color: 'var(--text)' }}>
+                {order.package_type || 'Standard'}
+              </div>
+            </div>
+
+            <div>
+              <div className="label" style={{ fontSize: '12px', fontWeight: '600', color: 'var(--gray-600)', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                💵 Shipping Cost
+              </div>
+              <div style={{ fontSize: '18px', fontWeight: '700', color: 'var(--primary-600)' }}>
                 {order.estimated_cost ? `₱${(order.estimated_cost / 100).toFixed(2)}` : 'N/A'}
               </div>
             </div>
+
+            {/* Warehouse Location Column - Only shown if package is assigned */}
+            {packageLocation && (
+              <>
+                <div>
+                  <div className="label" style={{ fontSize: '12px', fontWeight: '600', color: 'var(--gray-600)', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    🏢 Warehouse
+                  </div>
+                  <div style={{ fontSize: '16px', fontWeight: '600', color: 'var(--text)' }}>
+                    {packageLocation.warehouse}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="label" style={{ fontSize: '12px', fontWeight: '600', color: 'var(--gray-600)', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    📍 Shelf Location
+                  </div>
+                  <div style={{ fontSize: '16px', fontWeight: '600', color: 'var(--text)' }}>
+                    {packageLocation.location}
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* Receiver Information Column - Only shown if receiver info exists */}
+            {receiverInfo.receiver_name && (
+              <>
+                <div style={{ gridColumn: '1 / -1', marginTop: 12, marginBottom: 4 }}>
+                  <div style={{
+                    fontSize: '14px',
+                    fontWeight: '700',
+                    color: 'var(--primary-600)',
+                    borderBottom: '2px solid var(--primary-200)',
+                    paddingBottom: 8
+                  }}>
+                    📋 Receiver Information
+                  </div>
+                </div>
+
+                <div>
+                  <div className="label" style={{ fontSize: '12px', fontWeight: '600', color: 'var(--gray-600)', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    👤 Receiver Name
+                  </div>
+                  <div style={{ fontSize: '16px', fontWeight: '600', color: 'var(--text)' }}>
+                    {receiverInfo.receiver_name || 'N/A'}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="label" style={{ fontSize: '12px', fontWeight: '600', color: 'var(--gray-600)', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    📞 Contact Number
+                  </div>
+                  <div style={{ fontSize: '16px', fontWeight: '600', color: 'var(--text)' }}>
+                    {receiverInfo.receiver_contact || 'N/A'}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="label" style={{ fontSize: '12px', fontWeight: '600', color: 'var(--gray-600)', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    📧 Email Address
+                  </div>
+                  <div style={{ fontSize: '16px', fontWeight: '600', color: 'var(--text)' }}>
+                    {receiverInfo.receiver_email || 'N/A'}
+                  </div>
+                </div>
+
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <div className="label" style={{ fontSize: '12px', fontWeight: '600', color: 'var(--gray-600)', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    📍 Delivery Address
+                  </div>
+                  <div style={{ fontSize: '16px', fontWeight: '600', color: 'var(--text)' }}>
+                    {receiverInfo.receiver_address || 'N/A'}
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         ) : (
           <div className="muted" style={{ padding: 16, background: 'var(--gray-50)', borderRadius: 8 }}>
@@ -622,357 +1101,23 @@ export default function OrderDetail() {
           </div>
         )}
 
-        {order.quote_id && (
-          <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--gray-200)' }}>
-            <div className="muted" style={{ fontSize: '0.875rem' }}>
-              📋 Source: Quote Q-{String(order.quote_id).padStart(5, '0')}
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
-function CreateShipmentForm({ order, onSubmit, onCancel, creating }) {
-  const [formData, setFormData] = useState({
-    transport_id: '',
-    receiver_name: order.customer || '',
-    receiver_contact: '',
-    receiver_email: '',
-    receiver_address: '', // Will be same as destination_address
-    origin_name: '',
-    origin_address: '',
-    destination_name: '',
-    destination_address: '',
-    charges: order.estimated_cost ? Math.round(order.estimated_cost / 100) : '',
-    departure_date: ''
-  })
-  const [transports, setTransports] = useState([])
-  const [loadingTransports, setLoadingTransports] = useState(true)
-  const [inventory, setInventory] = useState(null)
-
-  useEffect(() => {
-    async function loadData() {
-      const orderId = order?.id || order?.order_id
-      if (!orderId) return
-
-      try {
-        // Load transports
-        const res = await getTransports()
-        setTransports(res?.data || [])
-
-        // Load inventory to get warehouse info
-        try {
-          const poNumber = `PO-${String(orderId).padStart(5, '0')}`
-          const invRes = await apiGet(`/api/inventory?search=${poNumber}`)
-
-          if (invRes?.data?.length > 0) {
-            const inv = invRes.data[0]
-            setInventory(inv)
-
-            // Auto-populate origin from warehouse
-            const newOriginName = inv.warehouse || ''
-            const newOriginAddress = inv.warehouse && inv.location ? `${inv.warehouse} - ${inv.location}` : ''
-
-            setFormData(prev => ({
-              ...prev,
-              origin_name: newOriginName,
-              origin_address: newOriginAddress
-            }))
-          }
-        } catch (e) {
-          console.error('Failed to load inventory:', e)
-        }
-      } catch (e) {
-        console.error('Failed to load transports:', e)
-      } finally {
-        setLoadingTransports(false)
-      }
-    }
-    loadData()
-  }, [order?.id, order?.order_id])
-
-  const handleSubmit = (e) => {
-    e.preventDefault()
-
-    // Basic validation
-    if (!formData.transport_id || !formData.receiver_name || !formData.charges || !formData.destination_address) {
-      alert('Please fill in all required fields')
-      return
-    }
-
-    // Capacity validation
-    const selectedTransport = transports.find(t => t.id === parseInt(formData.transport_id))
-    const packageWeight = order.weight || 0
-
-    if (selectedTransport && packageWeight > 0) {
-      const newLoad = selectedTransport.current_load + packageWeight
-      const utilAfter = Math.round((newLoad / selectedTransport.capacity) * 100)
-
-      // Block if would exceed capacity
-      if (packageWeight > selectedTransport.available_capacity) {
-        alert(`Cannot create shipment: Package weight (${packageWeight}kg) exceeds available vehicle capacity (${selectedTransport.available_capacity}kg).\n\nVehicle: ${selectedTransport.vehicle_id}\nCurrent load: ${selectedTransport.current_load}kg / ${selectedTransport.capacity}kg`)
-        return
-      }
-
-      // Warn if would be over 90% capacity
-      if (utilAfter >= 90) {
-        if (!confirm(`Warning: This will load the vehicle to ${utilAfter}% capacity.\n\nVehicle: ${selectedTransport.vehicle_id}\nCurrent: ${selectedTransport.current_load}kg → After: ${newLoad}kg\nCapacity: ${selectedTransport.capacity}kg\n\nContinue anyway?`)) {
-          return
-        }
-      }
-    }
-
-    // Validate departure date is not in the past
-    if (formData.departure_date) {
-      const selectedDate = new Date(formData.departure_date)
-      const today = new Date()
-      today.setHours(0, 0, 0, 0)
-      if (selectedDate < today) {
-        alert('Departure date cannot be in the past')
-        return
-      }
-    }
-
-    // Warn if charges differ significantly from estimated cost
-    if (order.estimated_cost) {
-      const estimatedCharges = Math.round(order.estimated_cost / 100)
-      const actualCharges = parseInt(formData.charges, 10)
-      const difference = Math.abs(actualCharges - estimatedCharges)
-      const percentDiff = (difference / estimatedCharges) * 100
-
-      if (percentDiff > 20) {
-        if (!confirm(`Warning: Shipping charges (₱${actualCharges}) differ significantly from estimated cost (₱${estimatedCharges}). Continue anyway?`)) {
-          return
-        }
-      }
-    }
-
-    // Set receiver_address same as destination_address (they're the same thing)
-    // Extract destination name from address (first line or "Delivery Address")
-    const destinationName = formData.destination_address.split('\n')[0].split(',')[0] || 'Delivery Address'
-
-    onSubmit({
-      ...formData,
-      receiver_address: formData.destination_address,
-      destination_name: destinationName,
-      charges: parseInt(formData.charges, 10)
-    })
-  }
-
-  const handleInputChange = (field, value) => {
-    setFormData(prev => ({ ...prev, [field]: value }))
-  }
-
-  return (
-    <div style={{ marginTop: 16, padding: 16, border: '1px solid var(--gray-200)', borderRadius: 8, background: 'var(--gray-50)' }}>
-      <h4 style={{ marginTop: 0 }}>Create New Shipment</h4>
-
-      <form onSubmit={handleSubmit} className="grid" style={{ gap: 16 }}>
-        {/* Section 1: Transport & Timing */}
-        <div style={{ background: 'var(--gray-100)', padding: 12, borderRadius: 6, border: '1px solid var(--gray-200)' }}>
-          <div style={{ fontSize: '0.875rem', fontWeight: 600, marginBottom: 12, color: 'var(--gray-700)' }}>
-            🚚 Transport & Schedule
-          </div>
-          <div className="form-row">
-            <label>
-              <div className="label">Select Vehicle & Driver *</div>
-              {loadingTransports ? (
-                <div className="input" style={{ color: 'var(--gray-500)' }}>Loading vehicles...</div>
-              ) : transports.length === 0 ? (
-                <div>
-                  <div className="input" style={{ color: 'var(--danger-600)' }}>No vehicles available</div>
-                  <div style={{ fontSize: '0.875rem', color: 'var(--danger-600)', marginTop: 4 }}>
-                    Please run database seeders: <code>php artisan db:seed</code>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  <select
-                    className="input"
-                    value={formData.transport_id}
-                    onChange={(e) => handleInputChange('transport_id', e.target.value)}
-                    required
-                  >
-                    <option value="">Select a vehicle...</option>
-                    {transports
-                      .sort((a, b) => (b.available_capacity || 0) - (a.available_capacity || 0))
-                      .map(transport => {
-                        const packageWeight = order.weight || 0
-                        const wouldExceed = packageWeight > (transport.available_capacity || 0)
-                        const utilAfterAdd = transport.capacity > 0
-                          ? Math.round(((transport.current_load + packageWeight) / transport.capacity) * 100)
-                          : 0
-
-                        return (
-                          <option
-                            key={transport.id}
-                            value={transport.id}
-                            disabled={wouldExceed}
-                          >
-                            {transport.vehicle_id} ({transport.registration_number}) - {transport.driver_name} |
-                            {transport.current_load}kg / {transport.capacity}kg ({transport.utilization_percent}%)
-                            {wouldExceed ? ' - OVERLOAD!' : ` → ${utilAfterAdd}% after`}
-                          </option>
-                        )
-                      })}
-                  </select>
-                  {formData.transport_id && (
-                    <div style={{ fontSize: '0.75rem', marginTop: 4 }}>
-                      {(() => {
-                        const selected = transports.find(t => t.id === parseInt(formData.transport_id))
-                        if (!selected) return null
-                        const packageWeight = order.weight || 0
-                        const utilAfter = selected.capacity > 0
-                          ? Math.round(((selected.current_load + packageWeight) / selected.capacity) * 100)
-                          : 0
-                        const color = utilAfter >= 90 ? 'var(--danger-600)' :
-                                     utilAfter >= 70 ? 'var(--warning-600)' :
-                                     'var(--success-600)'
-                        return (
-                          <div style={{ color }}>
-                            📊 Vehicle will be at {utilAfter}% capacity after adding this package ({packageWeight}kg)
-                          </div>
-                        )
-                      })()}
-                    </div>
-                  )}
-                </>
-              )}
-            </label>
-            <label>
-              <div className="label">Departure Date</div>
-              <input
-                className="input"
-                type="date"
-                min={new Date().toISOString().split('T')[0]}
-                value={formData.departure_date}
-                onChange={(e) => handleInputChange('departure_date', e.target.value)}
-              />
-              <div style={{ fontSize: '0.75rem', color: 'var(--gray-600)', marginTop: 4 }}>
-                📅 Earliest: Today
+          {order.quote_id && (
+            <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--gray-200)' }}>
+              <div className="muted" style={{ fontSize: '0.875rem' }}>
+                📋 Source: Quote Q-{String(order.quote_id).padStart(5, '0')}
               </div>
-            </label>
-          </div>
-        </div>
-
-        {/* Section 2: Delivery Details */}
-        <div style={{ background: 'var(--gray-100)', padding: 12, borderRadius: 6, border: '1px solid var(--gray-200)' }}>
-          <div style={{ fontSize: '0.875rem', fontWeight: 600, marginBottom: 12, color: 'var(--gray-700)' }}>
-            📍 Delivery Details
-          </div>
-
-          <label>
-            <div className="label">Receiver Name *</div>
-            <input
-              className="input"
-              placeholder="e.g. Juan Dela Cruz"
-              value={formData.receiver_name}
-              onChange={(e) => handleInputChange('receiver_name', e.target.value)}
-              required
-            />
-          </label>
-
-          <label style={{ marginTop: 12 }}>
-            <div className="label">Contact Number *</div>
-            <input
-              className="input"
-              type="tel"
-              placeholder="e.g. +63 912 345 6789"
-              value={formData.receiver_contact}
-              onChange={(e) => handleInputChange('receiver_contact', e.target.value)}
-              required
-            />
-            <div style={{ fontSize: '0.75rem', color: 'var(--gray-600)', marginTop: 4 }}>
-              📞 Used for SMS notifications and driver contact (e.g., 09171234567)
             </div>
-          </label>
-
-          <label style={{ marginTop: 12 }}>
-            <div className="label">Email Address (Optional)</div>
-            <input
-              className="input"
-              type="email"
-              placeholder="e.g. customer@email.com"
-              value={formData.receiver_email}
-              onChange={(e) => handleInputChange('receiver_email', e.target.value)}
-            />
-            <div style={{ fontSize: '0.75rem', color: 'var(--gray-600)', marginTop: 4 }}>
-              📧 Customer will receive tracking number via email & SMS
-            </div>
-          </label>
-
-          <label style={{ marginTop: 12 }}>
-            <div className="label">Origin (Pickup Location)</div>
-            <input
-              className="input"
-              value={formData.origin_name}
-              onChange={(e) => handleInputChange('origin_name', e.target.value)}
-              placeholder="Warehouse name"
-            />
-            {inventory && (
-              <div style={{ fontSize: '0.75rem', color: 'var(--success-600)', marginTop: 4 }}>
-                📦 Package stored at: {inventory.warehouse}
-              </div>
-            )}
-          </label>
-
-          <label style={{ marginTop: 12 }}>
-            <div className="label">Destination Address *</div>
-            <textarea
-              className="input"
-              placeholder="Full delivery address (street, city, postal code)"
-              value={formData.destination_address}
-              onChange={(e) => handleInputChange('destination_address', e.target.value)}
-              required
-              rows="3"
-            />
-          </label>
+          )}
         </div>
+      )}
 
-        {/* Section 3: Pricing */}
-        <div style={{ background: 'var(--gray-100)', padding: 12, borderRadius: 6, border: '1px solid var(--gray-200)' }}>
-          <div style={{ fontSize: '0.875rem', fontWeight: 600, marginBottom: 12, color: 'var(--gray-700)' }}>
-            💰 Shipping Charges
-          </div>
-          <label>
-            <div className="label">Charges (PHP) *</div>
-            <input
-              className="input"
-              type="number"
-              min="0"
-              placeholder="e.g. 1500"
-              value={formData.charges}
-              onChange={(e) => handleInputChange('charges', e.target.value)}
-              required
-            />
-            {order.estimated_cost && (
-              <div style={{ fontSize: '0.75rem', color: 'var(--gray-600)', marginTop: 4 }}>
-                💡 Estimated from quote: ₱{Math.round(order.estimated_cost / 100)}
-              </div>
-            )}
-          </label>
-        </div>
-
-        <div className="form-actions">
-          <button
-            className="btn btn-primary"
-            type="submit"
-            disabled={creating}
-          >
-            {creating ? 'Creating Shipment...' : 'Create Shipment'}
-          </button>
-          <button
-            className="btn btn-outline"
-            type="button"
-            onClick={onCancel}
-            disabled={creating}
-          >
-            Cancel
-          </button>
-        </div>
-      </form>
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
     </div>
   )
 }

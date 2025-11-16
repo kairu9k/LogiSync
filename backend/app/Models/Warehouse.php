@@ -14,7 +14,10 @@ class Warehouse extends Model
     protected $fillable = [
         'warehouse_name',
         'location',
+        'capacity',
         'organization_id',
+        'latitude',
+        'longitude',
     ];
 
     public function inventory(): HasMany
@@ -26,7 +29,7 @@ class Warehouse extends Model
     {
         // Calculate available space based on total capacity minus current inventory
         $currentItems = $this->inventory()->count();
-        $maxCapacity = 1000; // Default capacity per warehouse
+        $maxCapacity = $this->capacity ?? 1000; // Use warehouse capacity or default to 1000
         return max(0, $maxCapacity - $currentItems);
     }
 
@@ -46,12 +49,15 @@ class Warehouse extends Model
 
         $warehouses = $query->get();
 
+        $utilizations = $warehouses->map(function($w) {
+            $capacity = $w->capacity ?? 1000;
+            return $w->inventory_count > 0 ? ($w->inventory_count / $capacity) * 100 : 0;
+        });
+
         return [
             'total_warehouses' => $warehouses->count(),
             'total_items' => $warehouses->sum(fn($w) => $w->inventory_count),
-            'average_utilization' => $warehouses->avg(fn($w) =>
-                $w->inventory_count > 0 ? ($w->inventory_count / 1000) * 100 : 0
-            ),
+            'average_utilization' => $utilizations->average(),
             'warehouses_at_capacity' => $warehouses->filter(fn($w) => $w->available_space <= 50)->count(),
         ];
     }

@@ -71,10 +71,10 @@ export default function Reports() {
     <div className="grid" style={{ gap: 24 }}>
       {/* Header Section with Gradient */}
       <div style={{
-        background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+        background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
         borderRadius: '16px',
         padding: '32px',
-        boxShadow: '0 10px 30px rgba(245, 158, 11, 0.2)'
+        boxShadow: '0 10px 30px rgba(59, 130, 246, 0.3)'
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
@@ -94,7 +94,7 @@ export default function Reports() {
                 fontSize: '14px',
                 fontWeight: '600',
                 background: 'white',
-                color: '#f59e0b',
+                color: '#3b82f6',
                 border: 'none',
                 borderRadius: '10px',
                 boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
@@ -187,16 +187,16 @@ export default function Reports() {
                 borderRadius: '10px',
                 border: 'none',
                 background: activeTab === tab.id
-                  ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)'
+                  ? 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)'
                   : 'rgba(255, 255, 255, 0.05)',
                 color: activeTab === tab.id ? 'white' : 'var(--text)',
                 cursor: 'pointer',
                 transition: 'all 0.3s ease',
-                boxShadow: activeTab === tab.id ? '0 4px 12px rgba(245, 158, 11, 0.3)' : 'none'
+                boxShadow: activeTab === tab.id ? '0 4px 12px rgba(59, 130, 246, 0.3)' : 'none'
               }}
               onMouseOver={(e) => {
                 if (activeTab !== tab.id) {
-                  e.currentTarget.style.background = 'rgba(245, 158, 11, 0.1)'
+                  e.currentTarget.style.background = 'rgba(59, 130, 246, 0.1)'
                 }
                 e.currentTarget.style.transform = 'translateY(-2px)'
               }}
@@ -238,28 +238,6 @@ function OverviewReport({ data }) {
       {/* Key Metrics */}
       <div className="grid" style={{ gridTemplateColumns: 'repeat(4, minmax(0,1fr))', gap: 12 }}>
         <div style={{
-          background: 'rgba(245, 158, 11, 0.1)',
-          backdropFilter: 'blur(10px)',
-          borderRadius: '12px',
-          padding: '20px',
-          textAlign: 'center',
-          border: '1px solid rgba(245, 158, 11, 0.2)',
-          transition: 'all 0.3s ease'
-        }}
-        onMouseOver={(e) => {
-          e.currentTarget.style.transform = 'translateY(-4px)'
-          e.currentTarget.style.boxShadow = '0 8px 20px rgba(245, 158, 11, 0.2)'
-        }}
-        onMouseOut={(e) => {
-          e.currentTarget.style.transform = 'translateY(0)'
-          e.currentTarget.style.boxShadow = 'none'
-        }}>
-          <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#f59e0b', marginBottom: '8px' }}>
-            {data.formatted_revenue}
-          </div>
-          <div style={{ color: 'var(--muted)', fontSize: '14px' }}>Total Revenue</div>
-        </div>
-        <div style={{
           background: 'rgba(59, 130, 246, 0.1)',
           backdropFilter: 'blur(10px)',
           borderRadius: '12px',
@@ -277,6 +255,28 @@ function OverviewReport({ data }) {
           e.currentTarget.style.boxShadow = 'none'
         }}>
           <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#3b82f6', marginBottom: '8px' }}>
+            {data.formatted_revenue}
+          </div>
+          <div style={{ color: 'var(--muted)', fontSize: '14px' }}>Total Revenue</div>
+        </div>
+        <div style={{
+          background: 'rgba(139, 92, 246, 0.1)',
+          backdropFilter: 'blur(10px)',
+          borderRadius: '12px',
+          padding: '20px',
+          textAlign: 'center',
+          border: '1px solid rgba(139, 92, 246, 0.2)',
+          transition: 'all 0.3s ease'
+        }}
+        onMouseOver={(e) => {
+          e.currentTarget.style.transform = 'translateY(-4px)'
+          e.currentTarget.style.boxShadow = '0 8px 20px rgba(139, 92, 246, 0.2)'
+        }}
+        onMouseOut={(e) => {
+          e.currentTarget.style.transform = 'translateY(0)'
+          e.currentTarget.style.boxShadow = 'none'
+        }}>
+          <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#8b5cf6', marginBottom: '8px' }}>
             {data.total_orders}
           </div>
           <div style={{ color: 'var(--muted)', fontSize: '14px' }}>Total Orders</div>
@@ -304,23 +304,23 @@ function OverviewReport({ data }) {
           <div style={{ color: 'var(--muted)', fontSize: '14px' }}>Fulfillment Rate</div>
         </div>
         <div style={{
-          background: 'rgba(245, 158, 11, 0.1)',
+          background: 'rgba(59, 130, 246, 0.1)',
           backdropFilter: 'blur(10px)',
           borderRadius: '12px',
           padding: '20px',
           textAlign: 'center',
-          border: '1px solid rgba(245, 158, 11, 0.2)',
+          border: '1px solid rgba(59, 130, 246, 0.2)',
           transition: 'all 0.3s ease'
         }}
         onMouseOver={(e) => {
           e.currentTarget.style.transform = 'translateY(-4px)'
-          e.currentTarget.style.boxShadow = '0 8px 20px rgba(245, 158, 11, 0.2)'
+          e.currentTarget.style.boxShadow = '0 8px 20px rgba(59, 130, 246, 0.2)'
         }}
         onMouseOut={(e) => {
           e.currentTarget.style.transform = 'translateY(0)'
           e.currentTarget.style.boxShadow = 'none'
         }}>
-          <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#f59e0b', marginBottom: '8px' }}>
+          <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#3b82f6', marginBottom: '8px' }}>
             {data.avg_delivery_days}
           </div>
           <div style={{ color: 'var(--muted)', fontSize: '14px' }}>Avg Delivery Days</div>

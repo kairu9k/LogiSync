@@ -47,10 +47,10 @@ export default function Orders() {
     <div className="grid" style={{ gap: 24 }}>
       {/* Header Section with Gradient */}
       <div style={{
-        background: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)',
+        background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
         borderRadius: '16px',
         padding: '32px',
-        boxShadow: '0 10px 30px rgba(6, 182, 212, 0.2)'
+        boxShadow: '0 10px 30px rgba(59, 130, 246, 0.3)'
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
@@ -58,36 +58,24 @@ export default function Orders() {
               🛒 Order Management
             </h2>
             <p style={{ margin: 0, color: 'rgba(255,255,255,0.9)', fontSize: '15px' }}>
-              Manage and track all customer orders
+              View and manage all customer orders
             </p>
           </div>
-          {can.manageOrders() && (
-            <button
-              onClick={() => navigate('/app/orders/new')}
-              style={{
-                padding: '12px 24px',
-                borderRadius: '10px',
-                border: 'none',
-                background: 'white',
-                color: '#0891b2',
-                fontSize: '15px',
-                fontWeight: '600',
-                cursor: 'pointer',
-                transition: 'all 0.3s ease',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.transform = 'translateY(-2px)'
-                e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.2)'
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.transform = 'translateY(0)'
-                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)'
-              }}
-            >
-              + New Order
-            </button>
-          )}
+          <div style={{
+            background: 'rgba(255, 255, 255, 0.2)',
+            backdropFilter: 'blur(10px)',
+            borderRadius: '12px',
+            padding: '16px 24px',
+            textAlign: 'center',
+            border: '1px solid rgba(255, 255, 255, 0.3)'
+          }}>
+            <div style={{ fontSize: '14px', color: 'rgba(255, 255, 255, 0.8)', marginBottom: '4px', fontWeight: '500' }}>
+              All Orders
+            </div>
+            <div style={{ fontSize: '32px', fontWeight: '700', color: 'white' }}>
+              {orders.length}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -117,7 +105,7 @@ export default function Orders() {
               transition: 'all 0.3s ease'
             }}
             onFocus={(e) => {
-              e.target.style.borderColor = '#06b6d4'
+              e.target.style.borderColor = '#3b82f6'
               e.target.style.boxShadow = '0 0 0 3px rgba(6, 182, 212, 0.1)'
             }}
             onBlur={(e) => {
@@ -138,7 +126,7 @@ export default function Orders() {
             transition: 'all 0.3s ease'
           }}
           onFocus={(e) => {
-            e.target.style.borderColor = '#06b6d4'
+            e.target.style.borderColor = '#3b82f6'
             e.target.style.boxShadow = '0 0 0 3px rgba(6, 182, 212, 0.1)'
           }}
           onBlur={(e) => {
@@ -207,7 +195,6 @@ export default function Orders() {
                   borderRadius: '16px',
                   padding: '20px',
                   textAlign: 'left',
-                  opacity: o.status === 'fulfilled' ? 0.7 : 1,
                   position: 'relative',
                   overflow: 'hidden',
                   border: '1px solid rgba(255, 255, 255, 0.1)',
@@ -216,39 +203,16 @@ export default function Orders() {
                 }}
                 onClick={() => navigate(`/app/orders/${o.id}`)}
                 onMouseOver={(e) => {
-                  if (o.status !== 'fulfilled') {
-                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'
-                    e.currentTarget.style.transform = 'translateY(-4px)'
-                    e.currentTarget.style.boxShadow = '0 8px 20px rgba(0,0,0,0.3)'
-                  }
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'
+                  e.currentTarget.style.transform = 'translateY(-4px)'
+                  e.currentTarget.style.boxShadow = '0 8px 20px rgba(0,0,0,0.3)'
                 }}
                 onMouseOut={(e) => {
-                  if (o.status !== 'fulfilled') {
-                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'
-                    e.currentTarget.style.transform = 'translateY(0)'
-                    e.currentTarget.style.boxShadow = 'none'
-                  }
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'
+                  e.currentTarget.style.transform = 'translateY(0)'
+                  e.currentTarget.style.boxShadow = 'none'
                 }}
               >
-                {o.status === 'fulfilled' && (
-                  <div style={{
-                    position: 'absolute',
-                    top: '50%',
-                    left: '50%',
-                    transform: 'translate(-50%, -50%) rotate(-25deg)',
-                    fontSize: '24px',
-                    fontWeight: 'bold',
-                    color: '#10b981',
-                    opacity: 0.3,
-                    pointerEvents: 'none',
-                    zIndex: 1,
-                    userSelect: 'none',
-                    textShadow: '0 2px 10px rgba(16, 185, 129, 0.3)'
-                  }}>
-                    ✓ FULFILLED
-                  </div>
-                )}
-
                 <div style={{ marginBottom: '12px' }}>
                   <div style={{
                     fontSize: '12px',
@@ -261,7 +225,7 @@ export default function Orders() {
                   <div style={{
                     fontSize: '16px',
                     fontWeight: '600',
-                    color: '#06b6d4',
+                    color: '#3b82f6',
                     fontFamily: 'monospace'
                   }}>
                     {o.po}
@@ -285,18 +249,77 @@ export default function Orders() {
                   </div>
                 </div>
 
+                {/* Order Details Section */}
                 <div style={{
                   marginTop: '12px',
                   paddingTop: '12px',
                   borderTop: '1px solid rgba(255, 255, 255, 0.1)',
-                  fontSize: '14px',
-                  color: 'rgba(255, 255, 255, 0.8)',
-                  marginBottom: '12px'
+                  fontSize: '12px',
+                  color: 'rgba(255, 255, 255, 0.7)',
+                  marginBottom: '12px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px'
                 }}>
-                  📦 Items: <span style={{ fontWeight: '600', color: 'rgba(255, 255, 255, 0.95)' }}>{o.items}</span>
+                  {/* Row 1: Items, Weight, Package Type */}
+                  <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <span>📦</span>
+                      <span style={{ fontWeight: '600', color: 'rgba(255, 255, 255, 0.95)' }}>{o.items || 'N/A'}</span>
+                      <span style={{ color: 'rgba(255, 255, 255, 0.5)' }}>items</span>
+                    </div>
+                    {o.weight && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <span>⚖️</span>
+                        <span style={{ fontWeight: '600', color: 'rgba(255, 255, 255, 0.95)' }}>{o.weight}kg</span>
+                      </div>
+                    )}
+                    {o.package_type && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <span>📦</span>
+                        <span style={{ fontWeight: '600', color: 'rgba(255, 255, 255, 0.95)' }}>{o.package_type}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Row 2: Delivery Zone */}
+                  {o.delivery_zone && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <span>📍</span>
+                      <span style={{ fontWeight: '600', color: 'rgba(255, 255, 255, 0.95)', textTransform: 'capitalize' }}>
+                        {o.delivery_zone.replace(/_/g, ' ')}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Row 3: Receiver Name (if filled) */}
+                  {o.receiver_name && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <span>👤</span>
+                      <span style={{ fontWeight: '600', color: 'rgba(255, 255, 255, 0.95)' }}>
+                        To: {o.receiver_name}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Row 4: Warehouse Location (if assigned) */}
+                  {o.warehouse && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <span>🏢</span>
+                      <span style={{ fontWeight: '600', color: 'rgba(255, 255, 255, 0.95)' }}>
+                        {o.warehouse}
+                      </span>
+                      {o.warehouse_location && (
+                        <span style={{ color: 'rgba(255, 255, 255, 0.5)' }}>
+                          • {o.warehouse_location}
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
 
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                {/* Status and Next Action Section */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   <span style={{
                     padding: '6px 12px',
                     borderRadius: '8px',
@@ -304,24 +327,38 @@ export default function Orders() {
                     fontWeight: '600',
                     background: statusColors.bg,
                     color: statusColors.color,
-                    textTransform: 'uppercase'
+                    textTransform: 'uppercase',
+                    textAlign: 'center'
                   }}>
-                    {o.status}
+                    {o.status === 'fulfilled' ? 'Ready to Ship' : o.status}
                   </span>
-                  {!o.has_shipment && o.status !== 'canceled' && (
-                    <span style={{
+
+                  {/* Next Action Indicator */}
+                  {o.status === 'pending' && !o.receiver_name && (
+                    <div style={{
                       padding: '6px 10px',
                       borderRadius: '8px',
                       fontSize: '11px',
                       fontWeight: '600',
-                      background: 'rgba(239, 68, 68, 0.2)',
-                      color: '#ef4444',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px'
+                      background: 'rgba(59, 130, 246, 0.2)',
+                      color: '#3b82f6',
+                      textAlign: 'center'
                     }}>
-                      ⚠ No Shipment
-                    </span>
+                      📝 Fill receiver info →
+                    </div>
+                  )}
+                  {o.status === 'processing' && !o.warehouse && (
+                    <div style={{
+                      padding: '6px 10px',
+                      borderRadius: '8px',
+                      fontSize: '11px',
+                      fontWeight: '600',
+                      background: 'rgba(249, 115, 22, 0.2)',
+                      color: '#f59e0b',
+                      textAlign: 'center'
+                    }}>
+                      📦 Assign to warehouse →
+                    </div>
                   )}
                 </div>
               </button>

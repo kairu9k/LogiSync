@@ -87,14 +87,14 @@ export default function SignIn() {
                   fontWeight: '600',
                   color: '#e2e8f0',
                   fontSize: '0.875rem'
-                }}>Email</div>
+                }}>Email or Username</div>
                 <input
-                  type="email"
+                  type="text"
                   name="email"
                   required
                   value={form.email}
                   onChange={onChange}
-                  placeholder="you@company.com"
+                  placeholder="you@company.com or username"
                   className="input"
                   style={{
                     padding: '12px 16px',

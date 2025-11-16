@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { apiGet, apiPost, apiPatch } from '../../lib/api'
+import Toast from '../../components/Toast'
 
 export default function Inventory() {
   const [inventoryItems, setInventoryItems] = useState([])
@@ -14,6 +15,9 @@ export default function Inventory() {
   const [showAssignForm, setShowAssignForm] = useState(false)
   const [selectedItem, setSelectedItem] = useState(null)
   const [assigning, setAssigning] = useState(false)
+  const [editingLocationId, setEditingLocationId] = useState(null)
+  const [newLocation, setNewLocation] = useState('')
+  const [toast, setToast] = useState({ show: false, message: '', type: 'success' })
   const navigate = useNavigate()
 
   const parseDimensions = (dimStr) => {
@@ -59,25 +63,39 @@ export default function Inventory() {
     try {
       setAssigning(true)
       await apiPost('/api/inventory/assign', formData)
+      setToast({ show: true, message: 'Package assigned to warehouse successfully', type: 'success' })
       await fetchInventory()
       setShowAssignForm(false)
       setSelectedItem(null)
     } catch (e) {
-      alert(e.message || 'Failed to assign item')
+      setToast({ show: true, message: e.message || 'Failed to assign item', type: 'error' })
     } finally {
       setAssigning(false)
     }
   }
 
-  const handleUpdateLocation = async (inventoryId, newLocation) => {
+  const handleUpdateLocation = async (inventoryId, newLocationValue) => {
     try {
       await apiPatch(`/api/inventory/${inventoryId}`, {
-        location_in_warehouse: newLocation
+        location_in_warehouse: newLocationValue
       })
+      setToast({ show: true, message: 'Storage location updated successfully', type: 'success' })
+      setEditingLocationId(null)
+      setNewLocation('')
       await fetchInventory()
     } catch (e) {
-      alert(e.message || 'Failed to update location')
+      setToast({ show: true, message: e.message || 'Failed to update location', type: 'error' })
     }
+  }
+
+  const startEditingLocation = (inventoryId, currentLocation) => {
+    setEditingLocationId(inventoryId)
+    setNewLocation(currentLocation)
+  }
+
+  const cancelEditingLocation = () => {
+    setEditingLocationId(null)
+    setNewLocation('')
   }
 
   function getStatusBadgeClass(status) {
@@ -94,10 +112,10 @@ export default function Inventory() {
     <div className="grid" style={{ gap: 24 }}>
         {/* Header Section with Gradient */}
         <div style={{
-          background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+          background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
           borderRadius: '16px',
           padding: '32px',
-          boxShadow: '0 10px 30px rgba(16, 185, 129, 0.2)'
+          boxShadow: '0 10px 30px rgba(59, 130, 246, 0.3)'
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
@@ -252,7 +270,7 @@ export default function Inventory() {
                 style={{
                   padding: '12px 24px',
                   fontSize: '15px',
-                  background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                  background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
                   color: 'white',
                   border: 'none',
                   borderRadius: '10px',
@@ -374,7 +392,7 @@ export default function Inventory() {
                       flex: 1,
                       padding: '12px 20px',
                       fontSize: '14px',
-                      background: assigning ? 'rgba(16, 185, 129, 0.5)' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                      background: assigning ? 'rgba(59, 130, 246, 0.5)' : 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
                       color: 'white',
                       border: 'none',
                       borderRadius: '8px',
@@ -473,7 +491,7 @@ export default function Inventory() {
                     fontSize: '13px',
                     background: selectedItem?.order_id === item.order_id
                       ? 'rgba(245, 158, 11, 0.5)'
-                      : 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                      : 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
                     color: 'white',
                     border: 'none',
                     borderRadius: '8px',
@@ -590,19 +608,131 @@ export default function Inventory() {
               </div>
 
               <div style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.6)', marginBottom: '6px', fontWeight: '500' }}>Storage Location</div>
                 <div style={{
-                  padding: '10px 12px',
-                  background: 'rgba(16, 185, 129, 0.1)',
-                  border: '1px solid rgba(16, 185, 129, 0.3)',
-                  borderRadius: '8px',
-                  fontFamily: 'monospace',
-                  fontSize: '13px',
-                  color: '#10b981',
-                  fontWeight: '600'
+                  fontSize: '12px',
+                  color: 'rgba(255, 255, 255, 0.6)',
+                  marginBottom: '6px',
+                  fontWeight: '500',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
                 }}>
-                  📍 {item.location}
+                  📍 Storage Location
+                  {editingLocationId !== item.inventory_id && (
+                    <span style={{
+                      fontSize: '10px',
+                      color: 'rgba(16, 185, 129, 0.6)',
+                      fontStyle: 'italic',
+                      fontWeight: '400'
+                    }}>
+                      (click to edit)
+                    </span>
+                  )}
                 </div>
+                {editingLocationId === item.inventory_id ? (
+                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                    <input
+                      type="text"
+                      value={newLocation}
+                      onChange={(e) => setNewLocation(e.target.value)}
+                      autoFocus
+                      style={{
+                        flex: 1,
+                        padding: '10px 12px',
+                        background: 'rgba(16, 185, 129, 0.15)',
+                        border: '2px solid rgba(16, 185, 129, 0.6)',
+                        borderRadius: '8px',
+                        fontFamily: 'monospace',
+                        fontSize: '13px',
+                        color: '#10b981',
+                        fontWeight: '600',
+                        outline: 'none'
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && newLocation.trim()) {
+                          handleUpdateLocation(item.inventory_id, newLocation)
+                        } else if (e.key === 'Escape') {
+                          cancelEditingLocation()
+                        }
+                      }}
+                    />
+                    <button
+                      onClick={() => handleUpdateLocation(item.inventory_id, newLocation)}
+                      disabled={!newLocation.trim()}
+                      style={{
+                        padding: '10px 14px',
+                        background: newLocation.trim() ? 'rgba(16, 185, 129, 0.3)' : 'rgba(107, 114, 128, 0.2)',
+                        border: 'none',
+                        borderRadius: '8px',
+                        color: newLocation.trim() ? '#10b981' : 'rgba(255, 255, 255, 0.4)',
+                        fontSize: '14px',
+                        cursor: newLocation.trim() ? 'pointer' : 'not-allowed',
+                        fontWeight: '600'
+                      }}
+                    >
+                      ✓
+                    </button>
+                    <button
+                      onClick={cancelEditingLocation}
+                      style={{
+                        padding: '10px 14px',
+                        background: 'rgba(239, 68, 68, 0.2)',
+                        border: 'none',
+                        borderRadius: '8px',
+                        color: '#ef4444',
+                        fontSize: '14px',
+                        cursor: 'pointer',
+                        fontWeight: '600'
+                      }}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ) : (
+                  <div
+                    onClick={() => startEditingLocation(item.inventory_id, item.location)}
+                    style={{
+                      padding: '10px 12px',
+                      background: 'rgba(16, 185, 129, 0.1)',
+                      border: '1px solid rgba(16, 185, 129, 0.3)',
+                      borderRadius: '8px',
+                      fontFamily: 'monospace',
+                      fontSize: '13px',
+                      color: '#10b981',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px'
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.background = 'rgba(16, 185, 129, 0.2)'
+                      e.currentTarget.style.borderColor = 'rgba(16, 185, 129, 0.5)'
+                      const icon = e.currentTarget.querySelector('.edit-icon')
+                      if (icon) icon.style.opacity = '1'
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.background = 'rgba(16, 185, 129, 0.1)'
+                      e.currentTarget.style.borderColor = 'rgba(16, 185, 129, 0.3)'
+                      const icon = e.currentTarget.querySelector('.edit-icon')
+                      if (icon) icon.style.opacity = '0'
+                    }}
+                  >
+                    <span>📍 {item.location}</span>
+                    <span
+                      className="edit-icon"
+                      style={{
+                        fontSize: '11px',
+                        opacity: '0',
+                        transition: 'opacity 0.2s ease'
+                      }}
+                    >
+                      ✏️
+                    </span>
+                  </div>
+                )}
               </div>
 
               <div className="grid" style={{ gridTemplateColumns: 'repeat(2, minmax(0,1fr))', gap: 10, marginBottom: 16 }}>
@@ -630,41 +760,9 @@ export default function Inventory() {
                 </div>
               </div>
 
-              <div style={{ fontSize: '12px', marginBottom: 14, color: 'rgba(255, 255, 255, 0.6)' }}>
+              <div style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.6)' }}>
                 📅 Order Date: {new Date(item.order_date).toLocaleDateString()}
               </div>
-
-              <button
-                className="btn btn-outline"
-                onClick={() => {
-                  const newLocation = prompt('Enter new storage location:', item.location)
-                  if (newLocation && newLocation !== item.location) {
-                    handleUpdateLocation(item.inventory_id, newLocation)
-                  }
-                }}
-                style={{
-                  width: '100%',
-                  fontSize: '13px',
-                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  fontWeight: '600',
-                  padding: '10px',
-                  boxShadow: '0 2px 8px rgba(16, 185, 129, 0.3)',
-                  transition: 'all 0.2s ease'
-                }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-2px)'
-                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.4)'
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)'
-                  e.currentTarget.style.boxShadow = '0 2px 8px rgba(16, 185, 129, 0.3)'
-                }}
-              >
-                📝 Update Location
-              </button>
             </div>
           ))}
 
@@ -686,6 +784,14 @@ export default function Inventory() {
         </div>
       )}
 
+      {/* Toast Notification */}
+      {toast.show && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast({ show: false, message: '', type: 'success' })}
+        />
+      )}
     </div>
   )
 }

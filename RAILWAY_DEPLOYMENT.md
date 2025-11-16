@@ -1,195 +1,150 @@
-# LogiSync Railway Deployment Guide
+# Railway Deployment Guide for LogiSync
 
-## Step-by-Step Deployment Instructions
+## Prerequisites
+- Railway account (https://railway.app)
+- GitHub account (to connect repository)
+- Your project pushed to GitHub
 
-### Prerequisites
-- [ ] GitHub account
-- [ ] Railway account (sign up at https://railway.app)
-- [ ] Code pushed to GitHub
-
----
-
-## 1️⃣ Push Code to GitHub
+## Step 1: Push to GitHub
 
 ```bash
 git add .
-git commit -m "Ready for Railway deployment"
+git commit -m "Prepare for Railway deployment"
 git push origin main
 ```
 
----
+## Step 2: Create Railway Project
 
-## 2️⃣ Create Railway Project
+1. Go to https://railway.app/new
+2. Click "Deploy from GitHub repo"
+3. Select your LogiSync repository
+4. Railway will auto-detect it as a PHP/Laravel project
 
-1. Go to https://railway.app
-2. Click **"Login"** → Sign in with GitHub
-3. Click **"New Project"**
-4. Select **"Deploy from GitHub repo"**
-5. Choose **"LogiSync-Warp"** repository
-6. Railway will ask which service to deploy first
+## Step 3: Add MySQL Database
 
----
+1. In your Railway project, click "New" → "Database" → "MySQL"
+2. Railway will automatically create the database and connection variables
 
-## 3️⃣ Deploy Backend (Laravel)
+## Step 4: Set Environment Variables
 
-1. When Railway asks "Which service?", select **"backend"** folder
-2. Railway will auto-detect Laravel and start building
-3. Wait for deployment to complete (~3-5 minutes)
-4. Copy the backend URL (something like `https://logisync-backend-production.up.railway.app`)
+In Railway project settings → Variables, add these:
 
----
-
-## 4️⃣ Add MySQL Database
-
-1. In your Railway project dashboard, click **"+ New"**
-2. Select **"Database"** → **"Add MySQL"**
-3. Railway automatically creates the database and connects it to your backend
-4. No manual configuration needed!
-
----
-
-## 5️⃣ Configure Backend Environment Variables
-
-1. Click on your **backend service**
-2. Go to **"Variables"** tab
-3. Add these variables:
-
-```env
+### Required Variables:
+```
 APP_NAME=LogiSync
 APP_ENV=production
+APP_KEY=base64:R6LGvVtrGQ7gZ5z7tOdvM8szNqDH81jYhViOcKqPRao=
 APP_DEBUG=false
-APP_URL=<your-backend-url>
+APP_URL=https://your-app.railway.app
 
-FRONTEND_URL=<your-frontend-url-will-add-later>
+# Database (Railway auto-fills these)
+DB_CONNECTION=mysql
+MYSQL_HOST=${{MYSQL.MYSQL_HOST}}
+MYSQL_PORT=${{MYSQL.MYSQL_PORT}}
+MYSQL_DATABASE=${{MYSQL.MYSQL_DATABASE}}
+MYSQL_USER=${{MYSQL.MYSQL_USER}}
+MYSQL_PASSWORD=${{MYSQL.MYSQL_PASSWORD}}
 
+# Use Railway MySQL variables
+DB_HOST=${{MYSQL.MYSQL_HOST}}
+DB_PORT=${{MYSQL.MYSQL_PORT}}
+DB_DATABASE=${{MYSQL.MYSQL_DATABASE}}
+DB_USERNAME=${{MYSQL.MYSQL_USER}}
+DB_PASSWORD=${{MYSQL.MYSQL_PASSWORD}}
+
+# Email (Gmail SMTP - Add your own credentials)
 MAIL_MAILER=smtp
 MAIL_HOST=smtp.gmail.com
 MAIL_PORT=587
-MAIL_USERNAME=your-email@gmail.com
-MAIL_PASSWORD=your-gmail-app-password
+MAIL_USERNAME=your_email@gmail.com
+MAIL_PASSWORD=your_app_password
 MAIL_ENCRYPTION=tls
-MAIL_FROM_ADDRESS=your-email@gmail.com
+MAIL_FROM_ADDRESS=your_email@gmail.com
 MAIL_FROM_NAME=LogiSync
 
-PAYMONGO_PUBLIC_KEY=your-paymongo-public-key
-PAYMONGO_SECRET_KEY=your-paymongo-secret-key
+# PayMongo (Add your own keys from PayMongo dashboard)
+PAYMONGO_PUBLIC_KEY=your_paymongo_public_key
+PAYMONGO_SECRET_KEY=your_paymongo_secret_key
 
-ABLY_KEY=your-ably-api-key
+# Ably (for real-time tracking - Add your own key from Ably dashboard)
+ABLY_KEY=your_ably_api_key
 BROADCAST_CONNECTION=ably
+
+# Frontend URL (update after deployment)
+FRONTEND_URL=https://your-app.railway.app
 ```
 
-4. Railway automatically adds database variables (MYSQLHOST, MYSQLPORT, etc.)
+## Step 5: Deploy
 
----
+1. Railway will automatically deploy when you push to GitHub
+2. Wait for build to complete (~5-10 minutes)
+3. Railway will run migrations automatically
+4. Access your app at the provided URL
 
-## 6️⃣ Run Database Migrations
+## Step 6: Seed Subscription Plans
 
-1. In backend service, go to **"Settings"** → **"Deploy"**
-2. The nixpacks.toml will automatically run migrations on deploy
-3. Or manually run in Railway terminal:
-   ```bash
-   php artisan migrate --force
-   ```
+After first deployment, run this command in Railway terminal:
 
----
+```bash
+php artisan db:seed --class=SubscriptionPlansSeeder
+```
 
-## 7️⃣ Deploy Frontend (React)
+## Step 7: Update Frontend API URL
 
-1. In Railway project, click **"+ New"** → **"GitHub Repo"**
-2. Select **LogiSync-Warp** again
-3. This time choose **"frontend"** folder
-4. Railway will auto-detect Vite/React
-5. Wait for build to complete (~2-3 minutes)
-6. Copy the frontend URL
+Update `frontend/.env` to use your Railway backend URL:
 
----
+```
+VITE_API_URL=https://your-app.railway.app/api
+```
 
-## 8️⃣ Update Frontend Environment Variable
+Then redeploy.
 
-1. Click on **frontend service**
-2. Go to **"Variables"** tab
-3. Add:
-   ```env
-   VITE_API_URL=<your-backend-url>
-   ```
-4. Redeploy frontend (it will auto-redeploy after variable change)
+## Testing Live Tracking
 
----
+Once deployed:
+1. Register an account
+2. Create orders
+3. Create shipment with packages
+4. Assign to driver
+5. Driver can update location in real-time
+6. Track on map with live updates via Ably
 
-## 9️⃣ Update Backend CORS Settings
+## Troubleshooting
 
-1. Go back to **backend service** → **"Variables"**
-2. Update:
-   ```env
-   FRONTEND_URL=<your-frontend-url>
-   ```
-3. Redeploy backend
+### Build Fails
+- Check Railway build logs
+- Ensure all dependencies in `composer.json` are correct
+- Check PHP version compatibility
 
----
+### Database Connection Error
+- Verify DATABASE_URL is set correctly
+- Check MySQL service is running in Railway
 
-## 🎉 Done! Your App is Live!
+### Migrations Fail
+- Manually run: `php artisan migrate:fresh --force --seed`
+- Check database permissions
 
-### Your URLs:
-- **Frontend:** `https://logisync-production.up.railway.app`
-- **Backend API:** `https://logisync-backend-production.up.railway.app`
-- **Database:** Managed by Railway (automatically connected)
+### App Key Error
+Generate new key: `php artisan key:generate --show`
+Copy output to `APP_KEY` in Railway variables
 
----
+## Important Notes
 
-## 📊 Import Your Database (Optional)
+- Railway provides a free tier with limitations
+- Database persists between deployments
+- Use environment variables, not hardcoded values
+- Monitor usage to avoid overages
+- Set up custom domain if needed (Settings → Domains)
 
-If you want to import your local XAMPP data:
+## Post-Deployment
 
-1. Export from phpMyAdmin:
-   - Open http://localhost/phpmyadmin
-   - Select `logisync` database
-   - Click "Export" → "Go"
-   - Download the SQL file
+1. Test all features (registration, orders, shipments)
+2. Test live tracking with driver app
+3. Test email notifications
+4. Test PayMongo payments
+5. Monitor logs for errors
 
-2. Import to Railway:
-   - In Railway, click on MySQL database
-   - Click "Connect" → Copy connection details
-   - Use MySQL Workbench or command line to import the SQL file
+## Support
 
----
-
-## 🔧 Troubleshooting
-
-### Backend not starting?
-- Check logs in Railway dashboard
-- Ensure all environment variables are set
-- Run migrations manually if needed
-
-### Frontend can't connect to backend?
-- Check VITE_API_URL is correct
-- Ensure CORS is configured (FRONTEND_URL in backend)
-- Check browser console for errors
-
-### Database connection error?
-- Railway auto-connects MySQL, but check Variables tab
-- Ensure MYSQL* variables are present
-
----
-
-## 💰 Costs
-
-- **Free Tier:** $5 credit per month
-- **Usage:** ~$5-10/month for small app
-- **Database:** Included in usage costs
-
----
-
-## 📝 Post-Deployment Checklist
-
-- [ ] Backend is running
-- [ ] Frontend is running
-- [ ] Database is connected
-- [ ] Migrations ran successfully
-- [ ] Can register/login
-- [ ] Can create orders/shipments
-- [ ] Real-time notifications work
-- [ ] Email sending works
-
----
-
-Good luck with your deployment! 🚀
+Railway Docs: https://docs.railway.app
+Railway Discord: https://discord.gg/railway

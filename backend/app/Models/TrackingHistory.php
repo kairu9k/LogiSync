@@ -13,6 +13,7 @@ class TrackingHistory extends Model
 
     protected $fillable = [
         'shipment_id',
+        'tracking_id',
         'location',
         'status',
         'details',
@@ -25,5 +26,10 @@ class TrackingHistory extends Model
     public function shipment(): BelongsTo
     {
         return $this->belongsTo(Shipment::class, 'shipment_id', 'shipment_id');
+    }
+
+    public function package(): BelongsTo
+    {
+        return $this->belongsTo(ShipmentDetail::class, 'tracking_id', 'tracking_id');
     }
 }

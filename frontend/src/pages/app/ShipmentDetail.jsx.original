@@ -1,0 +1,703 @@
+import { useEffect, useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
+import { getShipment, apiGet, apiPatch, apiPost, apiDelete } from '../../lib/api'
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet'
+import 'leaflet/dist/leaflet.css'
+import L from 'leaflet'
+import Toast from '../../components/Toast'
+
+// Fix default marker icon issue with Leaflet
+delete L.Icon.Default.prototype._getIconUrl
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+})
+
+// Custom truck icon
+const truckIcon = new L.Icon({
+  iconUrl: 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(`
+    <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">
+      <circle cx="20" cy="20" r="18" fill="#2563eb" stroke="white" stroke-width="3"/>
+      <text x="20" y="28" font-size="20" text-anchor="middle" fill="white">🚛</text>
+    </svg>
+  `),
+  iconSize: [40, 40],
+  iconAnchor: [20, 40],
+  popupAnchor: [0, -40],
+})
+
+export default function ShipmentDetail() {
+  const { id } = useParams()
+  const navigate = useNavigate()
+  const [shipment, setShipment] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [gpsLocation, setGpsLocation] = useState(null)
+  const [gpsLoading, setGpsLoading] = useState(false)
+  const [toast, setToast] = useState({ show: false, message: '', type: 'success' })
+  const [showAddPackageModal, setShowAddPackageModal] = useState(false)
+  const [availableOrders, setAvailableOrders] = useState([])
+  const [selectedOrderToAdd, setSelectedOrderToAdd] = useState(null)
+  const [removingPackage, setRemovingPackage] = useState(null)
+
+  async function load() {
+    setLoading(true)
+    setError('')
+    try {
+      const res = await getShipment(id)
+      setShipment(res?.data)
+    } catch (e) {
+      setError(e.message || 'Failed to load shipment')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    load()
+    loadGPSLocation()
+  }, [id])
+
+  // Refresh GPS location every 15 seconds for active shipments
+  useEffect(() => {
+    if (shipment && (shipment.status === 'in_transit' || shipment.status === 'out_for_delivery')) {
+      const interval = setInterval(loadGPSLocation, 15000)
+      return () => clearInterval(interval)
+    }
+  }, [shipment?.status])
+
+  async function loadGPSLocation() {
+    try {
+      setGpsLoading(true)
+      const response = await apiGet(`/api/shipments/${id}/location`)
+      setGpsLocation(response?.location || null)
+    } catch (e) {
+      console.error('Failed to load GPS location:', e)
+      setGpsLocation(null)
+    } finally {
+      setGpsLoading(false)
+    }
+  }
+
+  async function loadAvailableOrders() {
+    try {
+      const response = await apiGet('/api/orders?status=confirmed&without_shipment=true')
+      setAvailableOrders(response?.data || [])
+    } catch (e) {
+      console.error('Failed to load available orders:', e)
+      setToast({ show: true, message: 'Failed to load available orders', type: 'error' })
+    }
+  }
+
+  async function handleAddPackage() {
+    setShowAddPackageModal(true)
+    await loadAvailableOrders()
+  }
+
+  async function handleConfirmAddPackage() {
+    if (!selectedOrderToAdd) {
+      setToast({ show: true, message: 'Please select an order to add', type: 'warning' })
+      return
+    }
+
+    try {
+      await apiPost(`/api/shipments/${id}/packages`, { order_id: selectedOrderToAdd })
+      setToast({ show: true, message: 'Package added successfully', type: 'success' })
+      setShowAddPackageModal(false)
+      setSelectedOrderToAdd(null)
+      await load() // Reload shipment data
+    } catch (e) {
+      setToast({ show: true, message: e.message || 'Failed to add package', type: 'error' })
+    }
+  }
+
+  async function handleRemovePackage(orderId) {
+    if (!confirm('Are you sure you want to remove this package from the shipment?')) {
+      return
+    }
+
+    setRemovingPackage(orderId)
+    try {
+      await apiDelete(`/api/shipments/${id}/packages/${orderId}`)
+      setToast({ show: true, message: 'Package removed successfully', type: 'success' })
+      await load() // Reload shipment data
+    } catch (e) {
+      setToast({ show: true, message: e.message || 'Failed to remove package', type: 'error' })
+    } finally {
+      setRemovingPackage(null)
+    }
+  }
+
+  function getStatusBadgeClass(status) {
+    switch (status) {
+      case 'delivered': return 'badge success'
+      case 'in_transit': case 'out_for_delivery': return 'badge info'
+      case 'pending': return 'badge warn'
+      case 'cancelled': return 'badge danger'
+      default: return 'badge'
+    }
+  }
+
+  if (loading) return <div className="card" style={{ padding: 16 }}>Loading…</div>
+  if (error) return <div className="card" style={{ padding: 16, color: 'var(--danger-600)' }}>{error}</div>
+  if (!shipment) return null
+
+  return (
+    <div className="grid" style={{ gap: 24 }}>
+      {/* Header with Gradient */}
+      <div style={{
+        background: 'linear-gradient(135deg, #3b82f6 0%, #ea580c 100%)',
+        borderRadius: '16px',
+        padding: '32px',
+        boxShadow: '0 10px 30px rgba(59, 130, 246, 0.2)'
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 20 }}>
+          <div>
+            <h2 style={{ margin: 0, color: 'white', fontSize: '28px', fontWeight: '700', marginBottom: '8px' }}>
+              📦 Shipment Details
+            </h2>
+            <p style={{ margin: 0, color: 'rgba(255,255,255,0.9)', fontSize: '15px', fontFamily: 'monospace' }}>
+              {shipment.tracking_number}
+            </p>
+          </div>
+          <button
+            className="btn"
+            onClick={() => navigate(-1)}
+            style={{
+              padding: '12px 24px',
+              borderRadius: '10px',
+              border: '2px solid rgba(255, 255, 255, 0.3)',
+              background: 'rgba(255, 255, 255, 0.15)',
+              backdropFilter: 'blur(10px)',
+              color: 'white',
+              fontSize: '14px',
+              fontWeight: '600',
+              cursor: 'pointer',
+              transition: 'all 0.3s ease'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.25)'
+              e.currentTarget.style.transform = 'translateY(-2px)'
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)'
+              e.currentTarget.style.transform = 'translateY(0)'
+            }}
+          >
+            ← Back
+          </button>
+        </div>
+      </div>
+
+      {/* Shipment Information Card */}
+      <div style={{
+        background: 'rgba(255, 255, 255, 0.05)',
+        backdropFilter: 'blur(10px)',
+        borderRadius: '16px',
+        padding: '28px',
+        border: '2px solid rgba(255, 255, 255, 0.1)'
+      }}>
+        <h3 style={{ margin: '0 0 24px 0', fontSize: '20px', fontWeight: '700', color: 'white' }}>
+          📋 Shipment Information
+        </h3>
+        <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 20 }}>
+<div>
+            <div style={{ fontSize: '12px', fontWeight: '600', color: '#3b82f6', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              Driver
+            </div>
+            <div style={{ fontSize: '15px', color: 'rgba(255, 255, 255, 0.9)' }}>
+              {shipment.driver}
+            </div>
+          </div>
+<div>
+            <div style={{ fontSize: '12px', fontWeight: '600', color: '#3b82f6', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              Departure Date
+            </div>
+            <div style={{ fontSize: '15px', color: 'rgba(255, 255, 255, 0.9)' }}>
+              {shipment.departure_date ? new Date(shipment.departure_date).toLocaleDateString() : 'Not set'}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Addresses Card */}
+      <div style={{
+        background: 'rgba(255, 255, 255, 0.05)',
+        backdropFilter: 'blur(10px)',
+        borderRadius: '16px',
+        padding: '28px',
+        border: '2px solid rgba(255, 255, 255, 0.1)'
+      }}>
+        <h3 style={{ margin: '0 0 24px 0', fontSize: '20px', fontWeight: '700', color: 'white' }}>
+          📍 Addresses
+        </h3>
+        <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 24 }}>
+          <div style={{
+            background: 'rgba(59, 130, 246, 0.1)',
+            padding: '20px',
+            borderRadius: '12px',
+            border: '2px solid rgba(59, 130, 246, 0.3)'
+          }}>
+            <div style={{ fontSize: '12px', fontWeight: '600', color: '#3b82f6', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              📤 Origin
+            </div>
+            <div style={{ fontSize: '16px', fontWeight: '700', color: 'white', marginBottom: '8px' }}>
+              {shipment.origin_name}
+            </div>
+            <div style={{ fontSize: '14px', color: 'rgba(255, 255, 255, 0.7)', lineHeight: '1.6' }}>
+              {shipment.origin_address}
+            </div>
+          </div>
+          <div style={{
+            background: 'rgba(16, 185, 129, 0.1)',
+            padding: '20px',
+            borderRadius: '12px',
+            border: '2px solid rgba(16, 185, 129, 0.3)'
+          }}>
+            <div style={{ fontSize: '12px', fontWeight: '600', color: '#10b981', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              📥 Receiver Address
+            </div>
+            <div style={{ fontSize: '16px', fontWeight: '700', color: 'white', marginBottom: '8px' }}>
+              {shipment.receiver_name}
+            </div>
+            <div style={{ fontSize: '14px', color: 'rgba(255, 255, 255, 0.7)', lineHeight: '1.6' }}>
+              {shipment.receiver_address}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Packages List */}
+      {shipment.packages && shipment.packages.length > 0 && (
+        <div style={{
+          background: 'rgba(255, 255, 255, 0.05)',
+          backdropFilter: 'blur(10px)',
+          borderRadius: '16px',
+          padding: '28px',
+          border: '2px solid rgba(255, 255, 255, 0.1)'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+            <h3 style={{ margin: 0, fontSize: '20px', fontWeight: '700', color: 'white' }}>
+              📦 Packages in This Shipment
+            </h3>
+            <button
+              onClick={handleAddPackage}
+              style={{
+                padding: '8px 16px',
+                fontSize: '13px',
+                background: 'rgba(16, 185, 129, 0.2)',
+                border: '1px solid rgba(16, 185, 129, 0.4)',
+                borderRadius: '8px',
+                color: '#10b981',
+                cursor: 'pointer',
+                fontWeight: '600',
+                transition: 'all 0.2s',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+            >
+              + Add Package
+            </button>
+          </div>
+          <div className="grid" style={{ gap: 16 }}>
+            {shipment.packages.map((pkg) => {
+              const getPackageIcon = (type) => {
+                switch(type?.toLowerCase()) {
+                  case 'document': return '📄'
+                  case 'perishable': return '🧊'
+                  case 'fragile': return '📦'
+                  case 'hazardous': return '⚠️'
+                  default: return '📦'
+                }
+              }
+
+              return (
+                <div
+                  key={pkg.order_id}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.03)',
+                    padding: '20px',
+                    borderRadius: '12px',
+                    border: '2px solid rgba(59, 130, 246, 0.2)',
+                    transition: 'all 0.3s ease',
+                    position: 'relative'
+                  }}
+                >
+                  <button
+                    onClick={() => handleRemovePackage(pkg.order_id)}
+                    disabled={removingPackage === pkg.order_id}
+                    style={{
+                      position: 'absolute',
+                      top: '12px',
+                      right: '12px',
+                      padding: '6px',
+                      fontSize: '14px',
+                      background: 'rgba(239, 68, 68, 0.2)',
+                      border: '1px solid rgba(239, 68, 68, 0.4)',
+                      borderRadius: '6px',
+                      color: '#ef4444',
+                      cursor: removingPackage === pkg.order_id ? 'not-allowed' : 'pointer',
+                      fontWeight: '700',
+                      opacity: removingPackage === pkg.order_id ? 0.5 : 1
+                    }}
+                  >
+                    ✕
+                  </button>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, paddingRight: '32px' }}>
+                    <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                      <div style={{ fontSize: '32px' }}>{getPackageIcon(pkg.package_type)}</div>
+                      <div>
+                        <div style={{ fontSize: '14px', fontWeight: '700', color: 'white', marginBottom: '4px' }}>
+                          {pkg.order_number}
+                        </div>
+                        <div style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.6)' }}>
+                          {pkg.package_type || 'Standard'}
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: '16px', fontWeight: '700', color: '#10b981' }}>
+                        {pkg.weight}kg
+                      </div>
+                      {pkg.volume > 0 && (
+                        <div style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.6)' }}>
+                          {pkg.volume.toFixed(2)}m³
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
+                    <div>
+                      <div style={{ fontSize: '11px', fontWeight: '600', color: '#3b82f6', marginBottom: '4px', textTransform: 'uppercase' }}>
+                        Customer
+                      </div>
+                      <div style={{ fontSize: '13px', color: 'rgba(255, 255, 255, 0.9)' }}>
+                        {pkg.customer_name}
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '11px', fontWeight: '600', color: '#3b82f6', marginBottom: '4px', textTransform: 'uppercase' }}>
+                        Warehouse
+                      </div>
+                      <div style={{ fontSize: '13px', color: 'rgba(255, 255, 255, 0.9)' }}>
+                        {pkg.warehouse_name || 'N/A'}
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '11px', fontWeight: '600', color: '#3b82f6', marginBottom: '4px', textTransform: 'uppercase' }}>
+                        Storage Location
+                      </div>
+                      <div style={{ fontSize: '13px', color: 'rgba(255, 255, 255, 0.9)' }}>
+                        {pkg.storage_location || 'N/A'}
+                      </div>
+                    </div>
+                    {pkg.delivery_zone && (
+                      <div>
+                        <div style={{ fontSize: '11px', fontWeight: '600', color: '#3b82f6', marginBottom: '4px', textTransform: 'uppercase' }}>
+                          Delivery Zone
+                        </div>
+                        <div style={{ fontSize: '13px', color: 'rgba(255, 255, 255, 0.9)' }}>
+                          {pkg.delivery_zone}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* GPS Live Location Map */}
+      {gpsLocation && (
+        <div style={{
+          background: 'rgba(255, 255, 255, 0.05)',
+          backdropFilter: 'blur(10px)',
+          borderRadius: '16px',
+          padding: '28px',
+          border: '2px solid rgba(255, 255, 255, 0.1)'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+            <h3 style={{ margin: 0, fontSize: '20px', fontWeight: '700', color: 'white' }}>📍 Live GPS Location</h3>
+            {gpsLoading && <span style={{ fontSize: '14px', color: '#3b82f6', fontWeight: '600' }}>Updating...</span>}
+          </div>
+
+          <div style={{ height: '400px', borderRadius: '8px', overflow: 'hidden', marginBottom: 12 }}>
+            <MapContainer
+              center={[gpsLocation.latitude, gpsLocation.longitude]}
+              zoom={15}
+              style={{ height: '100%', width: '100%' }}
+            >
+              <TileLayer
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+              />
+              <Marker
+                position={[gpsLocation.latitude, gpsLocation.longitude]}
+                icon={truckIcon}
+              >
+                <Popup>
+                  <div style={{ minWidth: '200px' }}>
+                    <strong>{shipment.tracking_number}</strong>
+                    <div style={{ marginTop: '0.5rem' }}>
+                      <div>🚚 Driver: {shipment.driver}</div>
+                      <div>🚛 Vehicle: {shipment.vehicle}</div>
+                      <div>⏰ {new Date(gpsLocation.recorded_at).toLocaleString()}</div>
+                      {gpsLocation.speed > 0 && (
+                        <div>🚀 Speed: {gpsLocation.speed.toFixed(1)} km/h</div>
+                      )}
+                    </div>
+                  </div>
+                </Popup>
+              </Marker>
+            </MapContainer>
+          </div>
+
+          <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 16 }}>
+            <div style={{
+              background: 'rgba(59, 130, 246, 0.1)',
+              padding: '16px',
+              borderRadius: '10px',
+              border: '1px solid rgba(59, 130, 246, 0.2)'
+            }}>
+              <div style={{ fontSize: '12px', fontWeight: '600', color: '#3b82f6', marginBottom: '8px', textTransform: 'uppercase' }}>
+                Latitude
+              </div>
+              <div style={{ fontFamily: 'monospace', fontSize: '14px', color: 'white', fontWeight: '600' }}>
+                {gpsLocation.latitude.toFixed(6)}
+              </div>
+            </div>
+            <div style={{
+              background: 'rgba(59, 130, 246, 0.1)',
+              padding: '16px',
+              borderRadius: '10px',
+              border: '1px solid rgba(59, 130, 246, 0.2)'
+            }}>
+              <div style={{ fontSize: '12px', fontWeight: '600', color: '#3b82f6', marginBottom: '8px', textTransform: 'uppercase' }}>
+                Longitude
+              </div>
+              <div style={{ fontFamily: 'monospace', fontSize: '14px', color: 'white', fontWeight: '600' }}>
+                {gpsLocation.longitude.toFixed(6)}
+              </div>
+            </div>
+            <div style={{
+              background: 'rgba(59, 130, 246, 0.1)',
+              padding: '16px',
+              borderRadius: '10px',
+              border: '1px solid rgba(59, 130, 246, 0.2)'
+            }}>
+              <div style={{ fontSize: '12px', fontWeight: '600', color: '#3b82f6', marginBottom: '8px', textTransform: 'uppercase' }}>
+                Accuracy
+              </div>
+              <div style={{ fontSize: '14px', color: 'white', fontWeight: '600' }}>
+                {gpsLocation.accuracy.toFixed(0)}m
+              </div>
+            </div>
+            <div style={{
+              background: 'rgba(59, 130, 246, 0.1)',
+              padding: '16px',
+              borderRadius: '10px',
+              border: '1px solid rgba(59, 130, 246, 0.2)'
+            }}>
+              <div style={{ fontSize: '12px', fontWeight: '600', color: '#3b82f6', marginBottom: '8px', textTransform: 'uppercase' }}>
+                Last Update
+              </div>
+              <div style={{ fontSize: '14px', color: 'white', fontWeight: '600' }}>
+                {new Date(gpsLocation.recorded_at).toLocaleTimeString()}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Show message if no GPS data for active shipment */}
+      {!gpsLocation && (shipment.status === 'in_transit' || shipment.status === 'out_for_delivery') && (
+        <div style={{
+          background: 'rgba(255, 171, 0, 0.1)',
+          border: '2px solid rgba(255, 171, 0, 0.3)',
+          padding: '24px',
+          borderRadius: '12px',
+          textAlign: 'center'
+        }}>
+          <div style={{ fontSize: '48px', marginBottom: '12px' }}>📍</div>
+          <div style={{ color: '#ffab00', fontWeight: '600', fontSize: '15px' }}>
+            No GPS data available yet. The driver needs to start GPS tracking from their mobile app.
+          </div>
+        </div>
+      )}
+
+      {shipment.tracking_history?.length > 0 && (
+        <div style={{
+          background: 'rgba(255, 255, 255, 0.05)',
+          backdropFilter: 'blur(10px)',
+          borderRadius: '16px',
+          padding: '28px',
+          border: '2px solid rgba(255, 255, 255, 0.1)'
+        }}>
+          <h3 style={{ margin: '0 0 24px 0', fontSize: '20px', fontWeight: '700', color: 'white' }}>
+            📜 Tracking History
+          </h3>
+          <div className="grid" style={{ gap: 16 }}>
+            {shipment.tracking_history.map((item, index) => (
+              <div
+                key={item.id}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.03)',
+                  padding: '20px',
+                  borderRadius: '12px',
+                  borderLeft: `4px solid ${
+                    item.status === 'delivered' ? '#10b981' :
+                    item.status === 'in_transit' || item.status === 'out_for_delivery' ? '#3b82f6' :
+                    item.status === 'pending' ? '#f59e0b' : '#ef4444'
+                  }`,
+                  transition: 'all 0.3s ease'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'
+                  e.currentTarget.style.transform = 'translateX(4px)'
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)'
+                  e.currentTarget.style.transform = 'translateX(0)'
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+                  <div>
+                    <span className={getStatusBadgeClass(item.status)} style={{ fontSize: '12px', padding: '6px 12px', fontWeight: '700' }}>
+                      {item.status.replace('_', ' ').toUpperCase()}
+                    </span>
+                    <div style={{ fontWeight: '700', marginTop: 8, fontSize: '15px', color: 'white' }}>{item.location}</div>
+                  </div>
+                  <div style={{ fontSize: '13px', textAlign: 'right', color: 'rgba(255, 255, 255, 0.6)' }}>
+                    {new Date(item.timestamp).toLocaleDateString()}<br />
+                    {new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </div>
+                </div>
+                {item.details && (
+                  <div style={{ fontSize: '14px', color: 'rgba(255, 255, 255, 0.7)', lineHeight: '1.6' }}>
+                    {item.details}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Toast Notification */}
+      {toast.show && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast({ ...toast, show: false })}
+        />
+      )}
+
+      {/* Add Package Modal */}
+      {showAddPackageModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.8)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            background: 'rgba(26, 26, 26, 0.98)',
+            borderRadius: '16px',
+            padding: '32px',
+            maxWidth: '600px',
+            width: '90%',
+            maxHeight: '80vh',
+            overflow: 'auto',
+            border: '2px solid rgba(59, 130, 246, 0.3)'
+          }}>
+            <h3 style={{ margin: '0 0 24px 0', fontSize: '24px', fontWeight: '700', color: 'white' }}>
+              Add Package to Shipment
+            </h3>
+
+            <div style={{ marginBottom: '24px' }}>
+              <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#3b82f6', marginBottom: '12px' }}>
+                Select Order
+              </label>
+              <select
+                value={selectedOrderToAdd || ''}
+                onChange={(e) => setSelectedOrderToAdd(e.target.value ? parseInt(e.target.value) : null)}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  fontSize: '14px',
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  border: '2px solid rgba(59, 130, 246, 0.4)',
+                  borderRadius: '8px',
+                  color: 'white',
+                  cursor: 'pointer',
+                  outline: 'none'
+                }}
+              >
+                <option value="" style={{ background: '#1a1a1a', color: 'white' }}>Select an order...</option>
+                {availableOrders.map((order) => (
+                  <option key={order.order_id} value={order.order_id} style={{ background: '#1a1a1a', color: 'white' }}>
+                    {order.order_number} - {order.customer_name} ({order.package_type || 'Standard'})
+                  </option>
+                ))}
+              </select>
+              {availableOrders.length === 0 && (
+                <div style={{ marginTop: '12px', padding: '12px', background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: '8px', color: '#f59e0b', fontSize: '13px' }}>
+                  No available orders found. All orders are either already shipped or not confirmed yet.
+                </div>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => {
+                  setShowAddPackageModal(false)
+                  setSelectedOrderToAdd(null)
+                }}
+                style={{
+                  padding: '10px 20px',
+                  fontSize: '14px',
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  borderRadius: '8px',
+                  color: 'white',
+                  cursor: 'pointer',
+                  fontWeight: '600'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmAddPackage}
+                disabled={!selectedOrderToAdd}
+                style={{
+                  padding: '10px 20px',
+                  fontSize: '14px',
+                  background: selectedOrderToAdd ? 'rgba(16, 185, 129, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(16, 185, 129, 0.4)',
+                  borderRadius: '8px',
+                  color: selectedOrderToAdd ? '#10b981' : 'rgba(255, 255, 255, 0.3)',
+                  cursor: selectedOrderToAdd ? 'pointer' : 'not-allowed',
+                  fontWeight: '600'
+                }}
+              >
+                Add Package
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}

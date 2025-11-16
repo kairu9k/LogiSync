@@ -121,11 +121,11 @@ export default function Schedules() {
     <div>
       {/* Header Section with Gradient */}
       <div style={{
-        background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+        background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
         borderRadius: '16px',
         padding: '32px',
         marginBottom: '24px',
-        boxShadow: '0 10px 30px rgba(240, 147, 251, 0.2)'
+        boxShadow: '0 10px 30px rgba(59, 130, 246, 0.3)'
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
@@ -142,7 +142,7 @@ export default function Schedules() {
               onClick={openCreateModal}
               style={{
                 background: 'white',
-                color: '#f5576c',
+                color: '#3b82f6',
                 border: 'none',
                 padding: '12px 24px',
                 fontSize: '15px',
@@ -193,8 +193,8 @@ export default function Schedules() {
               transition: 'all 0.3s ease'
             }}
             onFocus={(e) => {
-              e.target.style.borderColor = '#f5576c'
-              e.target.style.boxShadow = '0 0 0 3px rgba(245, 87, 108, 0.1)'
+              e.target.style.borderColor = '#3b82f6'
+              e.target.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)'
             }}
             onBlur={(e) => {
               e.target.style.borderColor = 'var(--gray-200)'
@@ -309,7 +309,7 @@ export default function Schedules() {
                     <td style={{
                       padding: '20px',
                       fontWeight: '700',
-                      color: '#f5576c',
+                      color: '#3b82f6',
                       fontSize: '15px'
                     }}>
                       <span style={{
@@ -389,10 +389,10 @@ export default function Schedules() {
                         borderRadius: '10px',
                         fontSize: '13px',
                         fontWeight: '700',
-                        background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+                        background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
                         color: 'white',
                         border: 'none',
-                        boxShadow: '0 2px 8px rgba(240, 147, 251, 0.3)'
+                        boxShadow: '0 2px 8px rgba(59, 130, 246, 0.3)'
                       }}>
                         ⏱️ {calculateDuration(schedule.start_time, schedule.end_time)}
                       </span>
@@ -427,23 +427,23 @@ export default function Schedules() {
                           className="btn btn-sm"
                           onClick={() => openEditModal(schedule)}
                           style={{
-                            background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+                            background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
                             color: 'white',
                             border: 'none',
                             padding: '8px 16px',
                             fontSize: '13px',
                             fontWeight: '600',
                             borderRadius: '8px',
-                            boxShadow: '0 2px 8px rgba(240, 147, 251, 0.3)',
+                            boxShadow: '0 2px 8px rgba(59, 130, 246, 0.3)',
                             transition: 'all 0.2s ease'
                           }}
                           onMouseOver={(e) => {
                             e.currentTarget.style.transform = 'translateY(-2px)'
-                            e.currentTarget.style.boxShadow = '0 4px 12px rgba(240, 147, 251, 0.4)'
+                            e.currentTarget.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.4)'
                           }}
                           onMouseOut={(e) => {
                             e.currentTarget.style.transform = 'translateY(0)'
-                            e.currentTarget.style.boxShadow = '0 2px 8px rgba(240, 147, 251, 0.3)'
+                            e.currentTarget.style.boxShadow = '0 2px 8px rgba(59, 130, 246, 0.3)'
                           }}
                         >
                           ✏️ Edit
@@ -505,72 +505,227 @@ export default function Schedules() {
             }
           }}
         >
-          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxHeight: '85vh', overflowY: 'auto', overflowX: 'hidden', margin: 'auto', width: '100%', maxWidth: '500px' }}>
-            <h3 style={{ marginTop: 0 }}>{editingId ? 'Edit Schedule' : 'Add New Schedule'}</h3>
-            <form onSubmit={handleSubmit} style={{ display: 'grid', gap: 12 }}>
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              maxHeight: '85vh',
+              overflowY: 'auto',
+              overflowX: 'hidden',
+              margin: 'auto',
+              width: '100%',
+              maxWidth: '550px',
+              background: 'rgba(255, 255, 255, 0.05)',
+              backdropFilter: 'blur(20px)',
+              borderRadius: '20px',
+              padding: '32px',
+              border: '2px solid rgba(255, 255, 255, 0.1)',
+              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5)'
+            }}
+          >
+            {/* Modal Header with Gradient */}
+            <div style={{
+              background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
+              borderRadius: '12px',
+              padding: '20px 24px',
+              marginBottom: '28px',
+              boxShadow: '0 4px 16px rgba(59, 130, 246, 0.3)'
+            }}>
+              <h3 style={{
+                margin: 0,
+                color: 'white',
+                fontSize: '22px',
+                fontWeight: '700',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px'
+              }}>
+                {editingId ? '✏️ Edit Schedule' : '➕ Add New Schedule'}
+              </h3>
+            </div>
+
+            <form onSubmit={handleSubmit} style={{ display: 'grid', gap: 20 }}>
               <label>
-                <div className="label">Schedule Name *</div>
+                <div style={{
+                  fontSize: '13px',
+                  fontWeight: '700',
+                  color: '#3b82f6',
+                  marginBottom: '10px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px'
+                }}>
+                  Schedule Name *
+                </div>
                 <input
                   className="input"
                   value={formData.schedule_name}
                   onChange={(e) => setFormData({ ...formData, schedule_name: e.target.value })}
                   placeholder="e.g. Davao-Cebu Route"
                   required
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '2px solid rgba(255, 255, 255, 0.1)',
+                    borderRadius: '10px',
+                    padding: '14px 16px',
+                    color: 'white',
+                    fontSize: '15px'
+                  }}
                 />
               </label>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                 <label>
-                  <div className="label">Start Time *</div>
+                  <div style={{
+                    fontSize: '13px',
+                    fontWeight: '700',
+                    color: '#3b82f6',
+                    marginBottom: '10px',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}>
+                    Start Time *
+                  </div>
                   <input
                     type="datetime-local"
                     className="input"
                     value={formData.start_time}
                     onChange={(e) => setFormData({ ...formData, start_time: e.target.value })}
+                    min={new Date().toISOString().slice(0, 16)}
                     required
-                    style={{ borderRadius: '8px' }}
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      border: '2px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: '10px',
+                      padding: '14px 16px',
+                      color: 'white',
+                      fontSize: '14px'
+                    }}
                   />
                 </label>
                 <label>
-                  <div className="label">End Time *</div>
+                  <div style={{
+                    fontSize: '13px',
+                    fontWeight: '700',
+                    color: '#3b82f6',
+                    marginBottom: '10px',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}>
+                    End Time *
+                  </div>
                   <input
                     type="datetime-local"
                     className="input"
                     value={formData.end_time}
                     onChange={(e) => setFormData({ ...formData, end_time: e.target.value })}
+                    min={formData.start_time || new Date().toISOString().slice(0, 16)}
                     required
-                    style={{ borderRadius: '8px' }}
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      border: '2px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: '10px',
+                      padding: '14px 16px',
+                      color: 'white',
+                      fontSize: '14px'
+                    }}
                   />
                 </label>
               </div>
 
               <label>
-                <div className="label">Route Details</div>
+                <div style={{
+                  fontSize: '13px',
+                  fontWeight: '700',
+                  color: '#3b82f6',
+                  marginBottom: '10px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px'
+                }}>
+                  Route Details
+                </div>
                 <textarea
                   className="input"
                   value={formData.route_details}
                   onChange={(e) => setFormData({ ...formData, route_details: e.target.value })}
                   placeholder="e.g. Main highway route via Surigao"
                   rows={3}
-                  style={{ resize: 'vertical', borderRadius: '8px' }}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '2px solid rgba(255, 255, 255, 0.1)',
+                    borderRadius: '10px',
+                    padding: '14px 16px',
+                    color: 'white',
+                    fontSize: '15px',
+                    resize: 'vertical',
+                    fontFamily: 'inherit'
+                  }}
                 />
               </label>
 
-              <div className="form-actions" style={{ marginTop: 8 }}>
-                <button
-                  type="submit"
-                  className="btn btn-primary"
-                  disabled={submitting}
-                >
-                  {submitting ? 'Saving...' : editingId ? 'Update' : 'Create'}
-                </button>
+              <div style={{
+                display: 'flex',
+                gap: 12,
+                marginTop: 8,
+                justifyContent: 'flex-end'
+              }}>
                 <button
                   type="button"
-                  className="btn btn-outline"
                   onClick={() => setShowModal(false)}
                   disabled={submitting}
+                  style={{
+                    padding: '12px 24px',
+                    borderRadius: '10px',
+                    border: '2px solid rgba(255, 255, 255, 0.2)',
+                    background: 'transparent',
+                    color: 'rgba(255, 255, 255, 0.8)',
+                    fontSize: '15px',
+                    fontWeight: '600',
+                    cursor: submitting ? 'not-allowed' : 'pointer',
+                    transition: 'all 0.3s ease'
+                  }}
+                  onMouseOver={(e) => {
+                    if (!submitting) {
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'
+                      e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)'
+                    }
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.background = 'transparent'
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)'
+                  }}
                 >
                   Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  style={{
+                    padding: '12px 32px',
+                    borderRadius: '10px',
+                    border: 'none',
+                    background: submitting
+                      ? 'rgba(59, 130, 246, 0.5)'
+                      : 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
+                    color: 'white',
+                    fontSize: '15px',
+                    fontWeight: '700',
+                    cursor: submitting ? 'not-allowed' : 'pointer',
+                    transition: 'all 0.3s ease',
+                    boxShadow: submitting ? 'none' : '0 4px 16px rgba(59, 130, 246, 0.4)'
+                  }}
+                  onMouseOver={(e) => {
+                    if (!submitting) {
+                      e.currentTarget.style.transform = 'translateY(-2px)'
+                      e.currentTarget.style.boxShadow = '0 6px 20px rgba(59, 130, 246, 0.6)'
+                    }
+                  }}
+                  onMouseOut={(e) => {
+                    if (!submitting) {
+                      e.currentTarget.style.transform = 'translateY(0)'
+                      e.currentTarget.style.boxShadow = '0 4px 16px rgba(59, 130, 246, 0.4)'
+                    }
+                  }}
+                >
+                  {submitting ? '⏳ Saving...' : editingId ? '✓ Update Schedule' : '✓ Create Schedule'}
                 </button>
               </div>
             </form>

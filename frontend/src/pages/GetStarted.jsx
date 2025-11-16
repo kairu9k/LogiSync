@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Header, Footer } from "../components";
+import Toast from "../components/Toast";
 import { Link, useNavigate } from "react-router-dom";
 
 export default function GetStarted() {
@@ -16,6 +17,7 @@ export default function GetStarted() {
   const [submitting, setSubmitting] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [resending, setResending] = useState(false);
+  const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
 
   const onChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -35,7 +37,7 @@ export default function GetStarted() {
       })
       setStep(2) // Move to verification step
     } catch (err) {
-      alert(err.message || 'Signup failed')
+      setToast({ show: true, message: err.message || 'Signup failed', type: 'error' })
     } finally {
       setSubmitting(false)
     }
@@ -44,7 +46,7 @@ export default function GetStarted() {
   const onVerify = async (e) => {
     e.preventDefault()
     if (verificationCode.length !== 6) {
-      alert('Please enter a 6-digit code')
+      setToast({ show: true, message: 'Please enter a 6-digit code', type: 'warning' })
       return
     }
     setVerifying(true)
@@ -54,10 +56,10 @@ export default function GetStarted() {
         email: form.email,
         code: verificationCode
       })
-      alert('Email verified successfully! You can now sign in.')
-      navigate('/signin')
+      setToast({ show: true, message: 'Email verified successfully! You can now sign in.', type: 'success' })
+      setTimeout(() => navigate('/signin'), 2000)
     } catch (err) {
-      alert(err.message || 'Verification failed')
+      setToast({ show: true, message: err.message || 'Verification failed', type: 'error' })
     } finally {
       setVerifying(false)
     }
@@ -68,9 +70,9 @@ export default function GetStarted() {
     try {
       const { apiPost } = await import('../lib/api')
       await apiPost('/api/auth/resend-verification', { email: form.email })
-      alert('Verification code resent! Check your email.')
+      setToast({ show: true, message: 'Verification code resent! Check your email.', type: 'success' })
     } catch (err) {
-      alert(err.message || 'Failed to resend code')
+      setToast({ show: true, message: err.message || 'Failed to resend code', type: 'error' })
     } finally {
       setResending(false)
     }
@@ -480,6 +482,13 @@ export default function GetStarted() {
         </div>
       </main>
       <Footer />
+      {toast.show && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast({ show: false, message: '', type: 'success' })}
+        />
+      )}
     </div>
   );
 }

@@ -19,9 +19,6 @@ class TransportController extends Controller
 
         $orgUserId = UserHelper::getOrganizationUserId($userId);
         $query = DB::table('transport as t')
-            ->join('users as d', 't.driver_id', '=', 'd.user_id')
-            ->leftJoin('budgets as b', 't.budget_id', '=', 'b.budget_id')
-            ->leftJoin('schedules as s', 't.schedule_id', '=', 's.schedule_id')
             ->where('t.organization_id', $orgUserId)
             ->select(
                 't.transport_id',
@@ -29,41 +26,75 @@ class TransportController extends Controller
                 't.vehicle_type',
                 't.registration_number',
                 't.capacity',
-                't.safety_compliance_details',
-                'd.user_id as driver_id',
-                'd.username as driver_name',
-                'd.email as driver_email',
-                'b.budget_name',
-                's.schedule_name'
+                't.volume_capacity',
+                't.safety_compliance_details'
             );
 
         // Search by registration number or vehicle type
         if ($search = $request->query('q')) {
             $query->where(function ($q) use ($search) {
                 $q->where('t.registration_number', 'like', "%{$search}%")
-                    ->orWhere('t.vehicle_type', 'like', "%{$search}%")
-                    ->orWhere('d.username', 'like', "%{$search}%");
+                    ->orWhere('t.vehicle_type', 'like', "%{$search}%");
+            });
+        }
+
+        // If exclude_assigned parameter is true, exclude vehicles assigned to active shipments
+        if ($request->query('exclude_assigned') === 'true') {
+            $query->whereNotIn('t.transport_id', function($subquery) {
+                $subquery->select('transport_id')
+                    ->from('shipments')
+                    ->whereNotNull('transport_id')
+                    ->whereIn('status', ['pending', 'in_transit', 'out_for_delivery']);
             });
         }
 
         $transports = $query->orderBy('t.transport_id', 'desc')->get();
 
-        // Calculate current load for each vehicle
+        // Calculate current load for each vehicle (both weight and volume)
         $data = $transports->map(function ($t) {
-            // Get total weight of active shipments for this vehicle
-            $currentLoad = DB::table('shipments as s')
-                ->join('orders as o', 's.order_id', '=', 'o.order_id')
+            // Get total weight and volume of active shipments for this vehicle
+            $shipmentData = DB::table('shipments as s')
+                ->join('shipment_details as sd', 's.shipment_id', '=', 'sd.shipment_id')
+                ->join('orders as o', 'sd.order_id', '=', 'o.order_id')
                 ->join('quotes as q', 'o.quote_id', '=', 'q.quote_id')
                 ->where('s.transport_id', $t->transport_id)
-                ->whereIn('s.status', ['pending', 'in_transit', 'out_for_delivery'])
-                ->sum('q.weight');
+                ->whereIn('s.status', ['pending', 'picked_up', 'in_transit', 'out_for_delivery'])
+                ->selectRaw('
+                    COALESCE(SUM(q.weight), 0) as total_weight,
+                    COALESCE(SUM(
+                        CASE
+                            WHEN q.dimensions IS NOT NULL AND q.dimensions != ""
+                            THEN (
+                                CAST(SUBSTRING_INDEX(q.dimensions, "x", 1) AS DECIMAL(10,2)) *
+                                CAST(SUBSTRING_INDEX(SUBSTRING_INDEX(q.dimensions, "x", 2), "x", -1) AS DECIMAL(10,2)) *
+                                CAST(SUBSTRING_INDEX(q.dimensions, "x", -1) AS DECIMAL(10,2))
+                            ) / 1000000
+                            ELSE 0
+                        END
+                    ), 0) as total_volume
+                ')
+                ->first();
 
-            $currentLoad = $currentLoad ?? 0;
-            $capacity = (float) $t->capacity;
-            $availableCapacity = $capacity - $currentLoad;
-            $utilizationPercent = $capacity > 0 ? round(($currentLoad / $capacity) * 100, 1) : 0;
+            $currentWeightLoad = $shipmentData->total_weight ?? 0;
+            $currentVolumeLoad = $shipmentData->total_volume ?? 0;
 
-            // Check if driver is currently on an active delivery
+            $weightCapacity = (float) $t->capacity;
+            $volumeCapacity = (float) ($t->volume_capacity ?? 0);
+
+            $availableWeightCapacity = $weightCapacity - $currentWeightLoad;
+            $availableVolumeCapacity = $volumeCapacity > 0 ? $volumeCapacity - $currentVolumeLoad : null;
+
+            $weightUtilizationPercent = $weightCapacity > 0 ? round(($currentWeightLoad / $weightCapacity) * 100, 1) : 0;
+            $volumeUtilizationPercent = $volumeCapacity > 0 ? round(($currentVolumeLoad / $volumeCapacity) * 100, 1) : 0;
+
+            // Check if driver is currently on an active delivery and get driver info
+            $activeShipment = DB::table('shipments as s')
+                ->join('users as d', 's.driver_id', '=', 'd.user_id')
+                ->where('s.transport_id', $t->transport_id)
+                ->whereIn('s.status', ['in_transit', 'out_for_delivery'])
+                ->select('d.username as driver_name', 'd.user_id as driver_id')
+                ->first();
+
             $activeDeliveryCount = DB::table('shipments')
                 ->where('transport_id', $t->transport_id)
                 ->whereIn('status', ['in_transit', 'out_for_delivery'])
@@ -76,19 +107,23 @@ class TransportController extends Controller
                 'vehicle_id' => $t->vehicle_id,
                 'vehicle_type' => $t->vehicle_type,
                 'registration_number' => $t->registration_number,
-                'capacity' => $capacity,
-                'current_load' => round($currentLoad, 1),
-                'available_capacity' => round($availableCapacity, 1),
-                'utilization_percent' => $utilizationPercent,
+                // Weight capacity data
+                'capacity' => $weightCapacity,
+                'current_load' => round($currentWeightLoad, 1),
+                'available_capacity' => round($availableWeightCapacity, 1),
+                'utilization_percent' => $weightUtilizationPercent,
+                // Volume capacity data
+                'volume_capacity' => $volumeCapacity,
+                'current_volume_load' => round($currentVolumeLoad, 2),
+                'available_volume_capacity' => $availableVolumeCapacity !== null ? round($availableVolumeCapacity, 2) : null,
+                'volume_utilization_percent' => $volumeUtilizationPercent,
+                // Other data
                 'safety_compliance' => $t->safety_compliance_details,
-                'driver_id' => (int) $t->driver_id,
-                'driver_name' => $t->driver_name,
-                'driver_email' => $t->driver_email,
-                'budget_name' => $t->budget_name ?? 'N/A',
-                'schedule_name' => $t->schedule_name ?? 'N/A',
                 'is_on_active_delivery' => $isOnActiveDelivery,
                 'active_delivery_count' => $activeDeliveryCount,
-                'label' => "{$t->vehicle_id} ({$t->registration_number}) - {$t->vehicle_type} [{$currentLoad}kg / {$capacity}kg]"
+                'driver_name' => $activeShipment ? $activeShipment->driver_name : null,
+                'driver_id' => $activeShipment ? (int) $activeShipment->driver_id : null,
+                'label' => "{$t->vehicle_id} ({$t->registration_number}) - {$t->vehicle_type} [{$currentWeightLoad}kg / {$weightCapacity}kg]"
             ];
         });
 
@@ -105,9 +140,6 @@ class TransportController extends Controller
 
         $orgUserId = UserHelper::getOrganizationUserId($userId);
         $transport = DB::table('transport as t')
-            ->join('users as d', 't.driver_id', '=', 'd.user_id')
-            ->leftJoin('budgets as b', 't.budget_id', '=', 'b.budget_id')
-            ->leftJoin('schedules as s', 't.schedule_id', '=', 's.schedule_id')
             ->where('t.transport_id', $id)
             ->where('t.organization_id', $orgUserId)
             ->select(
@@ -116,13 +148,8 @@ class TransportController extends Controller
                 't.vehicle_type',
                 't.registration_number',
                 't.capacity',
-                't.safety_compliance_details',
-                't.driver_id',
-                't.budget_id',
-                't.schedule_id',
-                'd.username as driver_name',
-                'b.budget_name',
-                's.schedule_name'
+                't.volume_capacity',
+                't.safety_compliance_details'
             )
             ->first();
 
@@ -137,15 +164,8 @@ class TransportController extends Controller
             'vehicle_type' => $transport->vehicle_type,
             'registration_number' => $transport->registration_number,
             'capacity' => $transport->capacity,
-            'safety_compliance' => $transport->safety_compliance_details,
-            'driver_id' => (int) $transport->driver_id,
-            'driver_name' => $transport->driver_name,
-            'budget_id' => (int) $transport->budget_id,
-            'schedule_id' => (int) $transport->schedule_id,
-            'budget_name' => $transport->budget_name ?? 'N/A',
-            'schedule_name' => $transport->schedule_name ?? 'N/A',
-                'is_on_active_delivery' => $isOnActiveDelivery,
-                'active_delivery_count' => $activeDeliveryCount,
+            'volume_capacity' => $transport->volume_capacity,
+            'safety_compliance' => $transport->safety_compliance_details
         ]])->header('Access-Control-Allow-Origin', '*');
     }
 
@@ -161,11 +181,9 @@ class TransportController extends Controller
             'vehicle_id' => 'required|string|max:255',
             'vehicle_type' => 'required|string|max:255',
             'registration_number' => 'required|string|max:255|unique:transport,registration_number',
-            'capacity' => 'required|string|max:255',
+            'capacity' => 'required|numeric|min:0',
+            'volume_capacity' => 'required|numeric|min:0',
             'safety_compliance' => 'nullable|boolean',
-            'driver_id' => 'required|integer|exists:users,user_id',
-            'budget_id' => 'required|integer|exists:budgets,budget_id',
-            'schedule_id' => 'required|integer|exists:schedules,schedule_id',
         ]);
 
         if ($validator->fails()) {
@@ -181,10 +199,8 @@ class TransportController extends Controller
             'vehicle_type' => $request->vehicle_type,
             'registration_number' => $request->registration_number,
             'capacity' => $request->capacity,
+            'volume_capacity' => $request->volume_capacity,
             'safety_compliance_details' => $safetyCompliance,
-            'driver_id' => $request->driver_id,
-            'budget_id' => $request->budget_id,
-            'schedule_id' => $request->schedule_id,
             'organization_id' => $orgUserId,
         ]);
 
@@ -206,11 +222,9 @@ class TransportController extends Controller
             'vehicle_id' => 'required|string|max:255',
             'vehicle_type' => 'required|string|max:255',
             'registration_number' => 'required|string|max:255|unique:transport,registration_number,' . $id . ',transport_id',
-            'capacity' => 'required|string|max:255',
+            'capacity' => 'required|numeric|min:0',
+            'volume_capacity' => 'required|numeric|min:0',
             'safety_compliance' => 'nullable|boolean',
-            'driver_id' => 'required|integer|exists:users,user_id',
-            'budget_id' => 'required|integer|exists:budgets,budget_id',
-            'schedule_id' => 'required|integer|exists:schedules,schedule_id',
         ]);
 
         if ($validator->fails()) {
@@ -229,10 +243,8 @@ class TransportController extends Controller
             'vehicle_type' => $request->vehicle_type,
             'registration_number' => $request->registration_number,
             'capacity' => $request->capacity,
+            'volume_capacity' => $request->volume_capacity,
             'safety_compliance_details' => $safetyCompliance,
-            'driver_id' => $request->driver_id,
-            'budget_id' => $request->budget_id,
-            'schedule_id' => $request->schedule_id,
         ]);
 
         if (!$updated) {

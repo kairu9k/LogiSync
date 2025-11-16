@@ -15,6 +15,7 @@ class Inventory extends Model
         'warehouse_id',
         'location_in_warehouse',
         'order_id',
+        'organization_id',
     ];
 
     public function warehouse(): BelongsTo
@@ -46,10 +47,17 @@ class Inventory extends Model
 
     public static function assignToWarehouse(int $orderId, int $warehouseId, string $location): self
     {
+        // Get organization_id from the order
+        $order = Order::find($orderId);
+        if (!$order) {
+            throw new \Exception('Order not found');
+        }
+
         return self::create([
             'warehouse_id' => $warehouseId,
             'location_in_warehouse' => $location,
             'order_id' => $orderId,
+            'organization_id' => $order->organization_id,
         ]);
     }
 

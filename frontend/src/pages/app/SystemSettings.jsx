@@ -65,10 +65,10 @@ export default function SystemSettings() {
     <div className="grid" style={{ gap: 24 }}>
       {/* Header with Gradient */}
       <div style={{
-        background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+        background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
         borderRadius: '16px',
         padding: '32px',
-        boxShadow: '0 10px 30px rgba(139, 92, 246, 0.2)'
+        boxShadow: '0 10px 30px rgba(59, 130, 246, 0.3)'
       }}>
         <h1 style={{
           margin: 0,
@@ -115,7 +115,7 @@ export default function SystemSettings() {
                 <div style={{
                   fontSize: '12px',
                   fontWeight: '600',
-                  color: '#8b5cf6',
+                  color: '#3b82f6',
                   marginBottom: '8px',
                   textTransform: 'uppercase',
                   letterSpacing: '0.5px'
@@ -163,7 +163,7 @@ export default function SystemSettings() {
                   <div style={{
                     fontSize: '12px',
                     fontWeight: '600',
-                    color: '#8b5cf6',
+                    color: '#3b82f6',
                     marginBottom: '8px',
                     textTransform: 'uppercase',
                     letterSpacing: '0.5px'
@@ -362,7 +362,7 @@ export default function SystemSettings() {
             display: 'block',
             fontSize: '12px',
             fontWeight: '600',
-            color: '#8b5cf6',
+            color: '#3b82f6',
             marginBottom: '8px',
             textTransform: 'uppercase',
             letterSpacing: '0.5px'
@@ -394,7 +394,7 @@ export default function SystemSettings() {
             display: 'block',
             fontSize: '12px',
             fontWeight: '600',
-            color: '#8b5cf6',
+            color: '#3b82f6',
             marginBottom: '8px',
             textTransform: 'uppercase',
             letterSpacing: '0.5px'
@@ -426,7 +426,7 @@ export default function SystemSettings() {
             display: 'block',
             fontSize: '12px',
             fontWeight: '600',
-            color: '#8b5cf6',
+            color: '#3b82f6',
             marginBottom: '8px',
             textTransform: 'uppercase',
             letterSpacing: '0.5px'

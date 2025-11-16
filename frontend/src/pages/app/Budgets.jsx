@@ -12,8 +12,6 @@ export default function Budgets() {
 
   const [formData, setFormData] = useState({
     budget_name: '',
-    start_date: '',
-    end_date: '',
     total_budget: ''
   })
 
@@ -40,8 +38,6 @@ export default function Budgets() {
     setEditingId(null)
     setFormData({
       budget_name: '',
-      start_date: '',
-      end_date: '',
       total_budget: ''
     })
     setShowModal(true)
@@ -51,8 +47,6 @@ export default function Budgets() {
     setEditingId(budget.id)
     setFormData({
       budget_name: budget.budget_name,
-      start_date: budget.start_date,
-      end_date: budget.end_date,
       total_budget: budget.total_budget
     })
     setShowModal(true)
@@ -63,9 +57,17 @@ export default function Budgets() {
     setSubmitting(true)
 
     try {
+      // Get current date and date 1 year from now as defaults
+      const today = new Date().toISOString().split('T')[0]
+      const oneYearLater = new Date()
+      oneYearLater.setFullYear(oneYearLater.getFullYear() + 1)
+      const endDate = oneYearLater.toISOString().split('T')[0]
+
       const payload = {
         ...formData,
-        total_budget: parseInt(formData.total_budget)
+        total_budget: parseInt(formData.total_budget),
+        start_date: today,
+        end_date: endDate
       }
 
       if (editingId) {
@@ -103,11 +105,11 @@ export default function Budgets() {
     <div>
       {/* Header Section with Gradient */}
       <div style={{
-        background: 'linear-gradient(135deg, #92400e 0%, #78350f 100%)',
+        background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
         borderRadius: '16px',
         padding: '32px',
         marginBottom: '24px',
-        boxShadow: '0 10px 30px rgba(146, 64, 14, 0.2)'
+        boxShadow: '0 10px 30px rgba(59, 130, 246, 0.3)'
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
@@ -126,7 +128,7 @@ export default function Budgets() {
                 fontSize: '14px',
                 fontWeight: '600',
                 background: 'white',
-                color: '#92400e',
+                color: '#3b82f6',
                 border: 'none',
                 borderRadius: '10px',
                 boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
@@ -175,8 +177,8 @@ export default function Budgets() {
               transition: 'all 0.3s ease'
             }}
             onFocus={(e) => {
-              e.target.style.borderColor = '#92400e'
-              e.target.style.boxShadow = '0 0 0 3px rgba(146, 64, 14, 0.1)'
+              e.target.style.borderColor = '#3b82f6'
+              e.target.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)'
             }}
             onBlur={(e) => {
               e.target.style.borderColor = 'var(--gray-200)'
@@ -186,14 +188,10 @@ export default function Budgets() {
         </div>
       </div>
 
-      {/* Modern Card Table - Dark Theme */}
+      {/* Budget Cards Container */}
       <div style={{
-        background: 'rgba(255, 255, 255, 0.05)',
-        backdropFilter: 'blur(10px)',
         borderRadius: '16px',
-        boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
-        overflow: 'hidden',
-        border: '1px solid rgba(255, 255, 255, 0.1)'
+        overflow: 'hidden'
       }}>
         {filteredBudgets.length === 0 ? (
           <div style={{
@@ -206,150 +204,147 @@ export default function Budgets() {
             <div style={{ fontSize: '14px', marginTop: '8px' }}>Try adjusting your search or add a new budget.</div>
           </div>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0 }}>
-              <thead>
-                <tr style={{
-                  background: 'rgba(255, 255, 255, 0.08)',
-                  borderBottom: '2px solid rgba(255, 255, 255, 0.1)'
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+            gap: '20px',
+            padding: '8px'
+          }}>
+            {filteredBudgets.map((budget) => (
+              <div
+                key={budget.id}
+                style={{
+                  background: 'var(--surface)',
+                  backdropFilter: 'blur(10px)',
+                  border: '1px solid var(--border)',
+                  borderRadius: '16px',
+                  padding: '24px',
+                  transition: 'all 0.3s ease',
+                  cursor: 'pointer',
+                  position: 'relative',
+                  overflow: 'hidden',
+                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-4px)'
+                  e.currentTarget.style.boxShadow = '0 12px 30px rgba(59, 130, 246, 0.15)'
+                  e.currentTarget.style.borderColor = '#3b82f6'
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)'
+                  e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.05)'
+                  e.currentTarget.style.borderColor = 'var(--border)'
+                }}
+              >
+                {/* Budget Icon */}
+                <div style={{
+                  position: 'absolute',
+                  top: '-20px',
+                  right: '-20px',
+                  fontSize: '120px',
+                  opacity: '0.05',
+                  transform: 'rotate(-15deg)'
+                }}>💰</div>
+
+                {/* Budget Name */}
+                <div style={{
+                  fontSize: '18px',
+                  fontWeight: '700',
+                  color: 'var(--text)',
+                  marginBottom: '16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
                 }}>
-                  <th style={{
-                    padding: '18px 20px',
-                    textAlign: 'left',
-                    fontWeight: '700',
-                    fontSize: '13px',
-                    color: 'rgba(255, 255, 255, 0.7)',
+                  <span style={{ fontSize: '20px' }}>💼</span>
+                  {budget.budget_name}
+                </div>
+
+                {/* Total Budget */}
+                <div style={{
+                  background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(139, 92, 246, 0.08) 100%)',
+                  borderRadius: '12px',
+                  padding: '16px',
+                  marginBottom: '16px',
+                  border: '1px solid rgba(59, 130, 246, 0.15)'
+                }}>
+                  <div style={{
+                    fontSize: '12px',
+                    color: 'var(--text-muted)',
+                    marginBottom: '6px',
                     textTransform: 'uppercase',
-                    letterSpacing: '0.5px'
-                  }}>Budget Name</th>
-                  <th style={{
-                    padding: '18px 20px',
-                    textAlign: 'left',
-                    fontWeight: '700',
-                    fontSize: '13px',
-                    color: 'rgba(255, 255, 255, 0.7)',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.5px'
-                  }}>Period</th>
-                  <th style={{
-                    padding: '18px 20px',
-                    textAlign: 'right',
-                    fontWeight: '700',
-                    fontSize: '13px',
-                    color: 'rgba(255, 255, 255, 0.7)',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.5px'
-                  }}>Total Budget</th>
-                  {can.manageWarehouses() && (
-                    <th style={{
-                      padding: '18px 20px',
-                      textAlign: 'right',
-                      fontWeight: '700',
-                      fontSize: '13px',
-                      color: 'rgba(255, 255, 255, 0.7)',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.5px'
-                    }}>Actions</th>
-                  )}
-                </tr>
-              </thead>
-              <tbody>
-                {filteredBudgets.map((budget, index) => (
-                  <tr
-                    key={budget.id}
-                    style={{
-                      borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
-                      background: index % 2 === 0 ? 'rgba(255, 255, 255, 0.02)' : 'rgba(255, 255, 255, 0.05)',
-                      transition: 'all 0.3s ease'
-                    }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.background = 'rgba(146, 64, 14, 0.1)'
-                      e.currentTarget.style.transform = 'scale(1.01)'
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.background = index % 2 === 0 ? 'rgba(255, 255, 255, 0.02)' : 'rgba(255, 255, 255, 0.05)'
-                      e.currentTarget.style.transform = 'scale(1)'
-                    }}
-                  >
-                    <td style={{
-                      padding: '18px 20px',
-                      fontSize: '15px',
-                      fontWeight: '600',
-                      color: 'rgba(255, 255, 255, 0.9)'
-                    }}>{budget.budget_name}</td>
-                    <td style={{
-                      padding: '18px 20px',
-                      fontSize: '14px',
-                      color: 'rgba(255, 255, 255, 0.6)'
-                    }}>
-                      {new Date(budget.start_date).toLocaleDateString()} - {new Date(budget.end_date).toLocaleDateString()}
-                    </td>
-                    <td style={{
-                      padding: '18px 20px',
-                      textAlign: 'right',
-                      fontWeight: 700,
-                      fontSize: '16px',
-                      color: '#d97706'
-                    }}>
-                      ₱{budget.total_budget.toLocaleString()}
-                    </td>
-                    {can.manageWarehouses() && (
-                      <td style={{ padding: '16px 20px', textAlign: 'right' }}>
-                        <button
-                          onClick={() => openEditModal(budget)}
-                          style={{
-                            padding: '6px 14px',
-                            fontSize: '13px',
-                            fontWeight: '600',
-                            background: 'linear-gradient(135deg, #92400e 0%, #78350f 100%)',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '8px',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s ease',
-                            marginRight: '8px'
-                          }}
-                          onMouseOver={(e) => {
-                            e.currentTarget.style.transform = 'translateY(-1px)'
-                            e.currentTarget.style.boxShadow = '0 4px 12px rgba(146, 64, 14, 0.3)'
-                          }}
-                          onMouseOut={(e) => {
-                            e.currentTarget.style.transform = 'translateY(0)'
-                            e.currentTarget.style.boxShadow = 'none'
-                          }}
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => handleDelete(budget.id)}
-                          style={{
-                            padding: '6px 14px',
-                            fontSize: '13px',
-                            fontWeight: '600',
-                            background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '8px',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s ease'
-                          }}
-                          onMouseOver={(e) => {
-                            e.currentTarget.style.transform = 'translateY(-1px)'
-                            e.currentTarget.style.boxShadow = '0 4px 12px rgba(239, 68, 68, 0.3)'
-                          }}
-                          onMouseOut={(e) => {
-                            e.currentTarget.style.transform = 'translateY(0)'
-                            e.currentTarget.style.boxShadow = 'none'
-                          }}
-                        >
-                          Delete
-                        </button>
-                      </td>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    letterSpacing: '0.5px',
+                    fontWeight: '600'
+                  }}>Total Budget</div>
+                  <div style={{
+                    fontSize: '28px',
+                    fontWeight: '800',
+                    color: '#3b82f6',
+                    fontFamily: 'monospace'
+                  }}>
+                    ₱{budget.total_budget.toLocaleString()}
+                  </div>
+                </div>
+
+                {/* Actions */}
+                {can.manageWarehouses() && (
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button
+                      onClick={() => openEditModal(budget)}
+                      style={{
+                        flex: 1,
+                        padding: '10px 16px',
+                        fontSize: '13px',
+                        fontWeight: '600',
+                        background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '10px',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        boxShadow: '0 2px 8px rgba(59, 130, 246, 0.3)'
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.transform = 'translateY(-2px)'
+                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.5)'
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.transform = 'translateY(0)'
+                        e.currentTarget.style.boxShadow = '0 2px 8px rgba(59, 130, 246, 0.3)'
+                      }}
+                    >
+                      ✏️ Edit
+                    </button>
+                    <button
+                      onClick={() => handleDelete(budget.id)}
+                      style={{
+                        flex: 1,
+                        padding: '10px 16px',
+                        fontSize: '13px',
+                        fontWeight: '600',
+                        background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '10px',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        boxShadow: '0 2px 8px rgba(239, 68, 68, 0.3)'
+                      }}
+                      onMouseOver={(e) => {
+                        e.currentTarget.style.transform = 'translateY(-2px)'
+                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(239, 68, 68, 0.5)'
+                      }}
+                      onMouseOut={(e) => {
+                        e.currentTarget.style.transform = 'translateY(0)'
+                        e.currentTarget.style.boxShadow = '0 2px 8px rgba(239, 68, 68, 0.3)'
+                      }}
+                    >
+                      🗑️ Delete
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         )}
       </div>
@@ -380,7 +375,6 @@ export default function Budgets() {
           }}
         >
           <div
-            className="modal"
             onClick={(e) => e.stopPropagation()}
             style={{
               maxHeight: '85vh',
@@ -388,35 +382,48 @@ export default function Budgets() {
               overflowX: 'hidden',
               margin: 'auto',
               width: '100%',
-              maxWidth: '500px',
-              background: 'white',
+              maxWidth: '550px',
+              background: 'rgba(255, 255, 255, 0.05)',
+              backdropFilter: 'blur(20px)',
               borderRadius: '20px',
               padding: '32px',
-              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
-              animation: 'slideUp 0.3s ease'
+              border: '2px solid rgba(255, 255, 255, 0.1)',
+              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5)'
             }}
           >
-            <h3 style={{
-              marginTop: 0,
-              marginBottom: '24px',
-              fontSize: '24px',
-              fontWeight: '700',
-              color: '#1f2937',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px'
+            {/* Modal Header with Gradient */}
+            <div style={{
+              background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
+              borderRadius: '12px',
+              padding: '20px 24px',
+              marginBottom: '28px',
+              boxShadow: '0 4px 16px rgba(59, 130, 246, 0.3)'
             }}>
-              <span>💰</span>
-              {editingId ? 'Edit Budget' : 'Add New Budget'}
-            </h3>
-            <form onSubmit={handleSubmit} style={{ display: 'grid', gap: 16 }}>
+              <h3 style={{
+                margin: 0,
+                color: 'white',
+                fontSize: '22px',
+                fontWeight: '700',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px'
+              }}>
+                {editingId ? '✏️ Edit Budget' : '➕ Add New Budget'}
+              </h3>
+            </div>
+
+            <form onSubmit={handleSubmit} style={{ display: 'grid', gap: 20 }}>
               <label>
                 <div style={{
                   fontSize: '13px',
-                  fontWeight: '600',
-                  color: '#374151',
-                  marginBottom: '8px'
-                }}>Budget Name *</div>
+                  fontWeight: '700',
+                  color: '#3b82f6',
+                  marginBottom: '10px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px'
+                }}>
+                  Budget Name *
+                </div>
                 <input
                   className="input"
                   value={formData.budget_name}
@@ -424,69 +431,27 @@ export default function Budgets() {
                   placeholder="e.g. Q1 2025 Transportation Budget"
                   required
                   style={{
-                    padding: '10px 14px',
-                    fontSize: '14px',
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '2px solid rgba(255, 255, 255, 0.1)',
                     borderRadius: '10px',
-                    border: '2px solid #e5e7eb',
-                    transition: 'all 0.2s ease'
+                    padding: '14px 16px',
+                    color: 'white',
+                    fontSize: '15px'
                   }}
                 />
               </label>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                <label>
-                  <div style={{
-                    fontSize: '13px',
-                    fontWeight: '600',
-                    color: '#374151',
-                    marginBottom: '8px'
-                  }}>Start Date *</div>
-                  <input
-                    type="date"
-                    className="input"
-                    value={formData.start_date}
-                    onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
-                    required
-                    style={{
-                      padding: '10px 14px',
-                      fontSize: '14px',
-                      borderRadius: '10px',
-                      border: '2px solid #e5e7eb',
-                      transition: 'all 0.2s ease'
-                    }}
-                  />
-                </label>
-                <label>
-                  <div style={{
-                    fontSize: '13px',
-                    fontWeight: '600',
-                    color: '#374151',
-                    marginBottom: '8px'
-                  }}>End Date *</div>
-                  <input
-                    type="date"
-                    className="input"
-                    value={formData.end_date}
-                    onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
-                    required
-                    style={{
-                      padding: '10px 14px',
-                      fontSize: '14px',
-                      borderRadius: '10px',
-                      border: '2px solid #e5e7eb',
-                      transition: 'all 0.2s ease'
-                    }}
-                  />
-                </label>
-              </div>
-
               <label>
                 <div style={{
                   fontSize: '13px',
-                  fontWeight: '600',
-                  color: '#374151',
-                  marginBottom: '8px'
-                }}>Total Budget (₱) *</div>
+                  fontWeight: '700',
+                  color: '#3b82f6',
+                  marginBottom: '10px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px'
+                }}>
+                  Total Budget (₱) *
+                </div>
                 <input
                   type="number"
                   className="input"
@@ -496,80 +461,81 @@ export default function Budgets() {
                   min="0"
                   required
                   style={{
-                    padding: '10px 14px',
-                    fontSize: '14px',
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '2px solid rgba(255, 255, 255, 0.1)',
                     borderRadius: '10px',
-                    border: '2px solid #e5e7eb',
-                    transition: 'all 0.2s ease'
+                    padding: '14px 16px',
+                    color: 'white',
+                    fontSize: '15px'
                   }}
                 />
               </label>
 
-              <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  style={{
-                    flex: 1,
-                    padding: '12px 24px',
-                    fontSize: '14px',
-                    fontWeight: '600',
-                    background: submitting
-                      ? '#cbd5e1'
-                      : 'linear-gradient(135deg, #92400e 0%, #78350f 100%)',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '10px',
-                    cursor: submitting ? 'not-allowed' : 'pointer',
-                    transition: 'all 0.2s ease',
-                    boxShadow: submitting ? 'none' : '0 4px 12px rgba(146, 64, 14, 0.3)'
-                  }}
-                  onMouseOver={(e) => {
-                    if (!submitting) {
-                      e.currentTarget.style.transform = 'translateY(-1px)'
-                      e.currentTarget.style.boxShadow = '0 6px 20px rgba(146, 64, 14, 0.4)'
-                    }
-                  }}
-                  onMouseOut={(e) => {
-                    if (!submitting) {
-                      e.currentTarget.style.transform = 'translateY(0)'
-                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(146, 64, 14, 0.3)'
-                    }
-                  }}
-                >
-                  {submitting ? 'Saving...' : editingId ? 'Update Budget' : 'Create Budget'}
-                </button>
+              <div style={{
+                display: 'flex',
+                gap: 12,
+                marginTop: 8,
+                justifyContent: 'flex-end'
+              }}>
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
                   disabled={submitting}
                   style={{
-                    flex: 1,
                     padding: '12px 24px',
-                    fontSize: '14px',
-                    fontWeight: '600',
-                    background: 'white',
-                    color: '#6b7280',
-                    border: '2px solid #e5e7eb',
                     borderRadius: '10px',
+                    border: '2px solid rgba(255, 255, 255, 0.2)',
+                    background: 'transparent',
+                    color: 'rgba(255, 255, 255, 0.8)',
+                    fontSize: '15px',
+                    fontWeight: '600',
                     cursor: submitting ? 'not-allowed' : 'pointer',
-                    transition: 'all 0.2s ease',
-                    opacity: submitting ? 0.5 : 1
+                    transition: 'all 0.3s ease'
                   }}
                   onMouseOver={(e) => {
                     if (!submitting) {
-                      e.currentTarget.style.borderColor = '#cbd5e1'
-                      e.currentTarget.style.background = '#f9fafb'
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'
+                      e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)'
+                    }
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.background = 'transparent'
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)'
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  style={{
+                    padding: '12px 32px',
+                    borderRadius: '10px',
+                    border: 'none',
+                    background: submitting
+                      ? 'rgba(59, 130, 246, 0.5)'
+                      : 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
+                    color: 'white',
+                    fontSize: '15px',
+                    fontWeight: '700',
+                    cursor: submitting ? 'not-allowed' : 'pointer',
+                    transition: 'all 0.3s ease',
+                    boxShadow: submitting ? 'none' : '0 4px 16px rgba(59, 130, 246, 0.4)'
+                  }}
+                  onMouseOver={(e) => {
+                    if (!submitting) {
+                      e.currentTarget.style.transform = 'translateY(-2px)'
+                      e.currentTarget.style.boxShadow = '0 6px 20px rgba(59, 130, 246, 0.6)'
                     }
                   }}
                   onMouseOut={(e) => {
                     if (!submitting) {
-                      e.currentTarget.style.borderColor = '#e5e7eb'
-                      e.currentTarget.style.background = 'white'
+                      e.currentTarget.style.transform = 'translateY(0)'
+                      e.currentTarget.style.boxShadow = '0 4px 16px rgba(59, 130, 246, 0.4)'
                     }
                   }}
                 >
-                  Cancel
+                  {submitting ? '⏳ Saving...' : editingId ? '✓ Update Budget' : '✓ Create Budget'}
                 </button>
               </div>
             </form>

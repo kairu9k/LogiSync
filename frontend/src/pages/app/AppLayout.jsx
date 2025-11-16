@@ -11,8 +11,6 @@ export default function AppLayout() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [overdueCount, setOverdueCount] = useState(0)
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const [warehousesOpen, setWarehousesOpen] = useState(false)
-  const [transportationOpen, setTransportationOpen] = useState(false)
 
   // Get user info from localStorage
   const user = useMemo(() => {
@@ -88,7 +86,7 @@ export default function AppLayout() {
               end
               aria-label="Dashboard"
               style={({ isActive }) => ({
-                background: isActive ? 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)' : 'transparent',
+                background: isActive ? 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)' : 'transparent',
                 borderRadius: '10px',
                 margin: '4px 8px',
                 transition: 'all 0.3s ease',
@@ -105,11 +103,11 @@ export default function AppLayout() {
               to="/app/quotes"
               aria-label="Quotes"
               style={({ isActive }) => ({
-                background: isActive ? 'linear-gradient(135deg, #ec4899 0%, #db2777 100%)' : 'transparent',
+                background: isActive ? 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)' : 'transparent',
                 borderRadius: '10px',
                 margin: '4px 8px',
                 transition: 'all 0.3s ease',
-                boxShadow: isActive ? '0 4px 12px rgba(236, 72, 153, 0.3)' : 'none'
+                boxShadow: isActive ? '0 4px 12px rgba(59, 130, 246, 0.3)' : 'none'
               })}
             >
               <span className="nav-icon">🧾</span>
@@ -122,11 +120,11 @@ export default function AppLayout() {
               to="/app/orders"
               aria-label="Orders"
               style={({ isActive }) => ({
-                background: isActive ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' : 'transparent',
+                background: isActive ? 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)' : 'transparent',
                 borderRadius: '10px',
                 margin: '4px 8px',
                 transition: 'all 0.3s ease',
-                boxShadow: isActive ? '0 4px 12px rgba(245, 158, 11, 0.3)' : 'none'
+                boxShadow: isActive ? '0 4px 12px rgba(59, 130, 246, 0.3)' : 'none'
               })}
             >
               <span className="nav-icon">📦</span>
@@ -139,11 +137,11 @@ export default function AppLayout() {
               to="/app/shipments"
               aria-label="Shipments"
               style={({ isActive }) => ({
-                background: isActive ? 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)' : 'transparent',
+                background: isActive ? 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)' : 'transparent',
                 borderRadius: '10px',
                 margin: '4px 8px',
                 transition: 'all 0.3s ease',
-                boxShadow: isActive ? '0 4px 12px rgba(6, 182, 212, 0.3)' : 'none'
+                boxShadow: isActive ? '0 4px 12px rgba(59, 130, 246, 0.3)' : 'none'
               })}
             >
               <span className="nav-icon">🚚</span>
@@ -157,11 +155,11 @@ export default function AppLayout() {
               aria-label="Invoices"
               style={({ isActive }) => ({
                 position: 'relative',
-                background: isActive ? 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)' : 'transparent',
+                background: isActive ? 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)' : 'transparent',
                 borderRadius: '10px',
                 margin: '4px 8px',
                 transition: 'all 0.3s ease',
-                boxShadow: isActive ? '0 4px 12px rgba(139, 92, 246, 0.3)' : 'none'
+                boxShadow: isActive ? '0 4px 12px rgba(59, 130, 246, 0.3)' : 'none'
               })}
             >
               <span className="nav-icon">💳</span>
@@ -189,188 +187,47 @@ export default function AppLayout() {
             </NavLink>
           )}
 
-          {/* Warehouses & Inventory Dropdown */}
+          {/* Warehouses & Inventory (Combined) */}
           {(can.viewWarehouses() || can.viewInventory()) && (
-            <>
-              <div
-                onClick={() => setWarehousesOpen(!warehousesOpen)}
-                aria-label="Warehouses"
-                role="button"
-                onMouseEnter={(e) => {
-                  const arrow = e.currentTarget.querySelector('.dropdown-arrow')
-                  if (arrow) arrow.style.opacity = '1'
-                }}
-                onMouseLeave={(e) => {
-                  const arrow = e.currentTarget.querySelector('.dropdown-arrow')
-                  if (arrow) arrow.style.opacity = '0'
-                }}
-                style={{
-                  background: warehousesOpen ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : 'transparent',
-                  borderRadius: '10px',
-                  margin: '4px 8px',
-                  transition: 'all 0.3s ease',
-                  boxShadow: warehousesOpen ? '0 4px 12px rgba(16, 185, 129, 0.3)' : 'none',
-                  padding: '12px 14px',
-                  color: 'var(--text)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '12px',
-                  fontSize: '15px',
-                  cursor: 'pointer'
-                }}
-              >
-                <span className="nav-icon">🏪</span>
-                <span className="nav-label">Warehouses</span>
-                <span
-                  className="dropdown-arrow"
-                  style={{
-                    marginLeft: 'auto',
-                    fontSize: '10px',
-                    transition: 'transform 0.2s, opacity 0.3s',
-                    transform: warehousesOpen ? 'rotate(180deg)' : 'rotate(0deg)',
-                    opacity: 0
-                  }}
-                >▼</span>
-              </div>
-
-              {warehousesOpen && (
-                <div className="settings-dropdown" style={{
-                  background: 'var(--surface-100)',
-                  borderRadius: '8px',
-                  marginTop: '4px',
-                  marginLeft: '8px',
-                  marginRight: '8px',
-                  overflow: 'hidden',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
-                }}>
-                  {can.viewWarehouses() && (
-                    <NavLink
-                      to="/app/warehouses"
-                      aria-label="Warehouse Locations"
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        padding: '10px 16px',
-                        fontSize: '14px',
-                        textDecoration: 'none',
-                        color: 'inherit'
-                      }}
-                    >
-                      <span style={{ marginRight: '8px' }}>📍</span>
-                      <span className="nav-label">Locations</span>
-                    </NavLink>
-                  )}
-
-                  {can.viewInventory() && (
-                    <NavLink
-                      to="/app/warehouses/inventory"
-                      aria-label="Warehouse Inventory"
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        padding: '10px 16px',
-                        fontSize: '14px',
-                        textDecoration: 'none',
-                        color: 'inherit'
-                      }}
-                    >
-                      <span style={{ marginRight: '8px' }}>📋</span>
-                      <span className="nav-label">Inventory</span>
-                    </NavLink>
-                  )}
-                </div>
-              )}
-            </>
+            <NavLink
+              to="/app/warehouses"
+              aria-label="Warehouses"
+              style={({ isActive }) => ({
+                background: isActive ? 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)' : 'transparent',
+                borderRadius: '10px',
+                margin: '4px 8px',
+                transition: 'all 0.3s ease',
+                boxShadow: isActive ? '0 4px 12px rgba(59, 130, 246, 0.3)' : 'none'
+              })}
+            >
+              <span className="nav-icon">🏪</span>
+              <span className="nav-label">Warehouses</span>
+            </NavLink>
           )}
 
-          {/* Transportation & Schedules Dropdown */}
+          {/* Transportation */}
           {can.viewTransportation() && (
-            <>
-              <div
-                onClick={() => setTransportationOpen(!transportationOpen)}
-                aria-label="Transportation"
-                role="button"
-                onMouseEnter={(e) => {
-                  const arrow = e.currentTarget.querySelector('.dropdown-arrow')
-                  if (arrow) arrow.style.opacity = '1'
-                }}
-                onMouseLeave={(e) => {
-                  const arrow = e.currentTarget.querySelector('.dropdown-arrow')
-                  if (arrow) arrow.style.opacity = '0'
-                }}
-                style={{
-                  background: transportationOpen ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)' : 'transparent',
-                  borderRadius: '10px',
-                  margin: '4px 8px',
-                  transition: 'all 0.3s ease',
-                  boxShadow: transportationOpen ? '0 4px 12px rgba(239, 68, 68, 0.3)' : 'none',
-                  padding: '12px 14px',
-                  color: 'var(--text)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '12px',
-                  fontSize: '15px',
-                  cursor: 'pointer'
-                }}
-              >
-                <span className="nav-icon">🚛</span>
-                <span className="nav-label">Transportation</span>
-                <span
-                  className="dropdown-arrow"
-                  style={{
-                    marginLeft: 'auto',
-                    fontSize: '10px',
-                    transition: 'transform 0.2s, opacity 0.3s',
-                    transform: transportationOpen ? 'rotate(180deg)' : 'rotate(0deg)',
-                    opacity: 0
-                  }}
-                >▼</span>
-              </div>
-
-              {transportationOpen && (
-                <div className="settings-dropdown" style={{
-                  background: 'var(--surface-100)',
-                  borderRadius: '8px',
-                  marginTop: '4px',
-                  marginLeft: '8px',
-                  marginRight: '8px',
-                  overflow: 'hidden',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
-                }}>
-                  <NavLink
-                    to="/app/transportation"
-                    aria-label="Vehicles"
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      padding: '10px 16px',
-                      fontSize: '14px',
-                      textDecoration: 'none',
-                      color: 'inherit'
-                    }}
-                  >
-                    <span style={{ marginRight: '8px' }}>🚗</span>
-                    <span className="nav-label">Vehicles</span>
-                  </NavLink>
-
-                  <NavLink
-                    to="/app/schedules"
-                    aria-label="Schedules"
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      padding: '10px 16px',
-                      fontSize: '14px',
-                      textDecoration: 'none',
-                      color: 'inherit'
-                    }}
-                  >
-                    <span style={{ marginRight: '8px' }}>📅</span>
-                    <span className="nav-label">Schedules</span>
-                  </NavLink>
-                </div>
-              )}
-            </>
+            <NavLink
+              to="/app/transportation"
+              aria-label="Transportation"
+              style={({ isActive }) => ({
+                background: isActive ? 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)' : 'transparent',
+                borderRadius: '10px',
+                margin: '4px 8px',
+                transition: 'all 0.3s ease',
+                boxShadow: isActive ? '0 4px 12px rgba(59, 130, 246, 0.3)' : 'none',
+                padding: '12px 14px',
+                color: 'var(--text)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                fontSize: '15px',
+                textDecoration: 'none'
+              })}
+            >
+              <span className="nav-icon">🚛</span>
+              <span className="nav-label">Transportation</span>
+            </NavLink>
           )}
 
           {can.viewReports() && (
@@ -378,11 +235,11 @@ export default function AppLayout() {
               to="/app/reports"
               aria-label="Reports"
               style={({ isActive }) => ({
-                background: isActive ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' : 'transparent',
+                background: isActive ? 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)' : 'transparent',
                 borderRadius: '10px',
                 margin: '4px 8px',
                 transition: 'all 0.3s ease',
-                boxShadow: isActive ? '0 4px 12px rgba(245, 158, 11, 0.3)' : 'none'
+                boxShadow: isActive ? '0 4px 12px rgba(59, 130, 246, 0.3)' : 'none'
               })}
             >
               <span className="nav-icon">📈</span>
@@ -406,11 +263,11 @@ export default function AppLayout() {
               if (arrow) arrow.style.opacity = '0'
             }}
             style={{
-              background: settingsOpen ? 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)' : 'transparent',
+              background: settingsOpen ? 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)' : 'transparent',
               borderRadius: '10px',
               margin: '4px 8px',
               transition: 'all 0.3s ease',
-              boxShadow: settingsOpen ? '0 4px 12px rgba(99, 102, 241, 0.3)' : 'none',
+              boxShadow: settingsOpen ? '0 4px 12px rgba(59, 130, 246, 0.3)' : 'none',
               padding: '12px 14px',
               color: 'var(--text)',
               display: 'flex',

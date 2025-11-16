@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { apiGet, apiPost, apiPatch, apiDelete } from '../../lib/api'
 import { can } from '../../lib/permissions'
+import Toast from '../../components/Toast'
 
 export default function Transportation() {
   const [transports, setTransports] = useState([])
@@ -9,26 +10,19 @@ export default function Transportation() {
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [submitting, setSubmitting] = useState(false)
-
-  // Dropdown data
-  const [drivers, setDrivers] = useState([])
-  const [budgets, setBudgets] = useState([])
-  const [schedules, setSchedules] = useState([])
+  const [toast, setToast] = useState(null)
 
   const [formData, setFormData] = useState({
     vehicle_id: '',
     vehicle_type: '',
     registration_number: '',
     capacity: '',
-    safety_compliance: false,
-    driver_id: '',
-    budget_id: '',
-    schedule_id: ''
+    volume_capacity: '',
+    safety_compliance: false
   })
 
   useEffect(() => {
     loadTransports()
-    loadHelperData()
   }, [])
 
   async function loadTransports() {
@@ -39,24 +33,6 @@ export default function Transportation() {
       console.error('Failed to load transports:', e)
     } finally {
       setLoading(false)
-    }
-  }
-
-  async function loadHelperData() {
-    try {
-      const [driversRes, budgetsRes, schedulesRes] = await Promise.all([
-        apiGet('/api/transport/helpers/drivers'),
-        apiGet('/api/transport/helpers/budgets'),
-        apiGet('/api/transport/helpers/schedules')
-      ])
-      console.log('Loaded drivers:', driversRes?.data)
-      console.log('Loaded budgets:', budgetsRes?.data)
-      console.log('Loaded schedules:', schedulesRes?.data)
-      setDrivers(driversRes?.data || [])
-      setBudgets(budgetsRes?.data || [])
-      setSchedules(schedulesRes?.data || [])
-    } catch (e) {
-      console.error('Failed to load helper data:', e)
     }
   }
 
@@ -73,12 +49,9 @@ export default function Transportation() {
       vehicle_type: '',
       registration_number: '',
       capacity: '',
-      safety_compliance: false,
-      driver_id: '',
-      budget_id: '',
-      schedule_id: ''
+      volume_capacity: '',
+      safety_compliance: false
     })
-    console.log('Opening create modal. Drivers available:', drivers.length, 'Budgets available:', budgets.length, 'Schedules available:', schedules.length)
     setShowModal(true)
   }
 
@@ -89,43 +62,30 @@ export default function Transportation() {
       vehicle_type: transport.vehicle_type,
       registration_number: transport.registration_number,
       capacity: transport.capacity,
-      safety_compliance: Boolean(transport.safety_compliance),
-      driver_id: String(transport.driver_id),
-      budget_id: String(transport.budget_id || ''),
-      schedule_id: String(transport.schedule_id || '')
+      volume_capacity: transport.volume_capacity || '',
+      safety_compliance: Boolean(transport.safety_compliance)
     })
     setShowModal(true)
   }
 
   const handleSubmit = async (e) => {
-    console.log('handleSubmit called!')
     e.preventDefault()
-    console.log('Form data before submit:', formData)
     setSubmitting(true)
 
     try {
-      const payload = {
-        ...formData,
-        driver_id: parseInt(formData.driver_id),
-        budget_id: parseInt(formData.budget_id),
-        schedule_id: parseInt(formData.schedule_id)
-      }
-
-      console.log('Submitting transport payload:', payload)
-
       if (editingId) {
-        const result = await apiPatch(`/api/transport/${editingId}`, payload)
-        console.log('Update result:', result)
+        await apiPatch(`/api/transport/${editingId}`, formData)
+        setToast({ message: 'Vehicle updated successfully!', type: 'success' })
       } else {
-        const result = await apiPost('/api/transport', payload)
-        console.log('Create result:', result)
+        await apiPost('/api/transport', formData)
+        setToast({ message: 'Vehicle created successfully!', type: 'success' })
       }
 
       setShowModal(false)
       await loadTransports()
     } catch (err) {
       console.error('Transport save error:', err)
-      alert(err.message || 'Failed to save transport')
+      setToast({ message: err.message || 'Failed to save vehicle', type: 'error' })
     } finally {
       setSubmitting(false)
     }
@@ -136,9 +96,10 @@ export default function Transportation() {
 
     try {
       await apiDelete(`/api/transport/${id}`)
+      setToast({ message: 'Vehicle deleted successfully!', type: 'success' })
       await loadTransports()
     } catch (err) {
-      alert(err.message || 'Failed to delete transport')
+      setToast({ message: err.message || 'Failed to delete vehicle', type: 'error' })
     }
   }
 
@@ -161,11 +122,11 @@ export default function Transportation() {
     <div>
       {/* Header Section with Gradient */}
       <div style={{
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
         borderRadius: '16px',
         padding: '32px',
         marginBottom: '24px',
-        boxShadow: '0 10px 30px rgba(102, 126, 234, 0.2)'
+        boxShadow: '0 10px 30px rgba(59, 130, 246, 0.3)'
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
@@ -182,7 +143,7 @@ export default function Transportation() {
               onClick={openCreateModal}
               style={{
                 background: 'white',
-                color: '#667eea',
+                color: '#3b82f6',
                 border: 'none',
                 padding: '12px 24px',
                 fontSize: '15px',
@@ -233,8 +194,8 @@ export default function Transportation() {
               transition: 'all 0.3s ease'
             }}
             onFocus={(e) => {
-              e.target.style.borderColor = '#667eea'
-              e.target.style.boxShadow = '0 0 0 3px rgba(102, 126, 234, 0.1)'
+              e.target.style.borderColor = '#3b82f6'
+              e.target.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)'
             }}
             onBlur={(e) => {
               e.target.style.borderColor = 'var(--gray-200)'
@@ -306,7 +267,16 @@ export default function Transportation() {
                     color: 'rgba(255, 255, 255, 0.7)',
                     textTransform: 'uppercase',
                     letterSpacing: '0.5px'
-                  }}>Capacity</th>
+                  }}>Weight Capacity</th>
+                  <th style={{
+                    padding: '18px 20px',
+                    textAlign: 'left',
+                    fontWeight: '700',
+                    fontSize: '13px',
+                    color: 'rgba(255, 255, 255, 0.7)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}>Volume Capacity</th>
                   <th style={{
                     padding: '18px 20px',
                     textAlign: 'left',
@@ -325,24 +295,6 @@ export default function Transportation() {
                     textTransform: 'uppercase',
                     letterSpacing: '0.5px'
                   }}>Status</th>
-                  <th style={{
-                    padding: '18px 20px',
-                    textAlign: 'left',
-                    fontWeight: '700',
-                    fontSize: '13px',
-                    color: 'rgba(255, 255, 255, 0.7)',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.5px'
-                  }}>Budget</th>
-                  <th style={{
-                    padding: '18px 20px',
-                    textAlign: 'left',
-                    fontWeight: '700',
-                    fontSize: '13px',
-                    color: 'rgba(255, 255, 255, 0.7)',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.5px'
-                  }}>Schedule</th>
                   {can.manageShipments() && (
                     <th style={{
                       padding: '18px 20px',
@@ -376,7 +328,7 @@ export default function Transportation() {
                     <td style={{
                       padding: '20px',
                       fontWeight: '600',
-                      color: '#667eea',
+                      color: '#3b82f6',
                       fontSize: '14px'
                     }}>{transport.vehicle_id}</td>
                     <td style={{
@@ -403,10 +355,10 @@ export default function Transportation() {
                         borderRadius: '8px',
                         fontSize: '13px',
                         fontWeight: '600',
-                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                        background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
                         color: 'white',
                         border: 'none',
-                        boxShadow: '0 2px 8px rgba(102, 126, 234, 0.25)'
+                        boxShadow: '0 2px 8px rgba(59, 130, 246, 0.25)'
                       }}>
                         {transport.registration_number}
                       </span>
@@ -417,20 +369,42 @@ export default function Transportation() {
                       fontWeight: '600',
                       color: 'rgba(255, 255, 255, 0.9)'
                     }}>
-                      {transport.capacity}
+                      {transport.capacity} kg
+                    </td>
+                    <td style={{
+                      padding: '20px',
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      color: 'rgba(255, 255, 255, 0.9)'
+                    }}>
+                      {transport.volume_capacity ? `${transport.volume_capacity} m³` : 'N/A'}
                     </td>
                     <td style={{
                       padding: '20px',
                       fontSize: '14px',
                       color: 'rgba(255, 255, 255, 0.9)'
                     }}>
-                      <span style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '8px'
-                      }}>
-                        👤 {transport.driver_name}
-                      </span>
+                      {transport.driver_name ? (
+                        <span style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          padding: '6px 12px',
+                          borderRadius: '8px',
+                          fontSize: '13px',
+                          fontWeight: '600',
+                          background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%)',
+                          border: '1px solid rgba(59, 130, 246, 0.3)',
+                          color: 'rgba(255, 255, 255, 0.95)'
+                        }}>
+                          <span>👤</span>
+                          <span>{transport.driver_name}</span>
+                        </span>
+                      ) : (
+                        <span style={{ color: 'rgba(255, 255, 255, 0.4)', fontStyle: 'italic' }}>
+                          No driver assigned
+                        </span>
+                      )}
                     </td>
                     <td style={{ padding: '20px' }}>
                       {transport.is_on_active_delivery ? (
@@ -469,20 +443,6 @@ export default function Transportation() {
                         </span>
                       )}
                     </td>
-                    <td style={{
-                      padding: '20px',
-                      fontSize: '14px',
-                      color: 'rgba(255, 255, 255, 0.7)'
-                    }}>
-                      {transport.budget_name}
-                    </td>
-                    <td style={{
-                      padding: '20px',
-                      fontSize: '14px',
-                      color: 'rgba(255, 255, 255, 0.7)'
-                    }}>
-                      {transport.schedule_name}
-                    </td>
                     {can.manageShipments() && (
                       <td style={{
                         padding: '20px',
@@ -495,19 +455,19 @@ export default function Transportation() {
                           className="btn btn-sm"
                           onClick={() => openEditModal(transport)}
                           style={{
-                            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                            background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
                             color: 'white',
                             border: 'none',
                             padding: '8px 16px',
                             fontSize: '13px',
                             fontWeight: '600',
                             borderRadius: '8px',
-                            boxShadow: '0 2px 8px rgba(102, 126, 234, 0.3)',
+                            boxShadow: '0 2px 8px rgba(59, 130, 246, 0.3)',
                             transition: 'all 0.2s ease'
                           }}
                           onMouseOver={(e) => {
                             e.currentTarget.style.transform = 'translateY(-2px)'
-                            e.currentTarget.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.4)'
+                            e.currentTarget.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.4)'
                           }}
                           onMouseOut={(e) => {
                             e.currentTarget.style.transform = 'translateY(0)'
@@ -573,143 +533,351 @@ export default function Transportation() {
             }
           }}
         >
-          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxHeight: '85vh', overflowY: 'auto', margin: 'auto', width: '100%', maxWidth: '600px' }}>
-            <h3 style={{ marginTop: 0 }}>{editingId ? 'Edit Vehicle' : 'Add New Vehicle'}</h3>
-            <form onSubmit={handleSubmit} style={{ display: 'grid', gap: 12 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              maxHeight: '85vh',
+              overflowY: 'auto',
+              margin: 'auto',
+              width: '100%',
+              maxWidth: '650px',
+              background: 'rgba(255, 255, 255, 0.05)',
+              backdropFilter: 'blur(20px)',
+              borderRadius: '20px',
+              padding: '32px',
+              border: '2px solid rgba(255, 255, 255, 0.1)',
+              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5)'
+            }}
+          >
+            {/* Modal Header with Gradient */}
+            <div style={{
+              background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
+              borderRadius: '12px',
+              padding: '20px 24px',
+              marginBottom: '28px',
+              boxShadow: '0 4px 16px rgba(59, 130, 246, 0.3)'
+            }}>
+              <h3 style={{
+                margin: 0,
+                color: 'white',
+                fontSize: '22px',
+                fontWeight: '700',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px'
+              }}>
+                {editingId ? '✏️ Edit Vehicle' : '➕ Add New Vehicle'}
+              </h3>
+            </div>
+
+            <form onSubmit={handleSubmit} style={{ display: 'grid', gap: 20 }}>
+              {/* 2x3 Grid Layout (2 columns, 3 rows - vertical) */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                {/* Row 1 - Column 1 */}
                 <label>
-                  <div className="label">Vehicle ID (Auto-generated)</div>
+                  <div style={{
+                    fontSize: '13px',
+                    fontWeight: '700',
+                    color: '#3b82f6',
+                    marginBottom: '10px',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}>
+                    Vehicle ID (Auto-generated)
+                  </div>
                   <input
                     className="input"
                     value={formData.vehicle_id}
                     readOnly
                     disabled
-                    style={{ backgroundColor: 'var(--gray-100)', cursor: 'not-allowed' }}
+                    style={{
+                      background: 'rgba(102, 126, 234, 0.1)',
+                      border: '2px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: '10px',
+                      padding: '14px 16px',
+                      color: 'rgba(255, 255, 255, 0.5)',
+                      fontSize: '15px',
+                      cursor: 'not-allowed'
+                    }}
                   />
                 </label>
+
+                {/* Row 1 - Column 2 */}
                 <label>
-                  <div className="label">Vehicle Type *</div>
+                  <div style={{
+                    fontSize: '13px',
+                    fontWeight: '700',
+                    color: '#3b82f6',
+                    marginBottom: '10px',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}>
+                    Vehicle Type *
+                  </div>
                   <select
                     className="input"
                     value={formData.vehicle_type}
                     onChange={(e) => setFormData({ ...formData, vehicle_type: e.target.value })}
                     required
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      border: '2px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: '10px',
+                      padding: '14px 16px',
+                      color: 'white',
+                      fontSize: '15px'
+                    }}
                   >
-                    <option value="">Select type...</option>
-                    <option value="Van">Van</option>
-                    <option value="Truck">Truck</option>
-                    <option value="Motorcycle">Motorcycle</option>
-                    <option value="Car">Car</option>
+                    <option value="" style={{ background: '#1f2937', color: 'white' }}>Select type...</option>
+                    <option value="Van" style={{ background: '#1f2937', color: 'white' }}>Van</option>
+                    <option value="Truck" style={{ background: '#1f2937', color: 'white' }}>Truck</option>
+                    <option value="Motorcycle" style={{ background: '#1f2937', color: 'white' }}>Motorcycle</option>
+                    <option value="Car" style={{ background: '#1f2937', color: 'white' }}>Car</option>
                   </select>
                 </label>
-              </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                {/* Row 2 - Column 1 */}
                 <label>
-                  <div className="label">Registration Number *</div>
+                  <div style={{
+                    fontSize: '13px',
+                    fontWeight: '700',
+                    color: '#3b82f6',
+                    marginBottom: '10px',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}>
+                    Registration Number *
+                  </div>
                   <input
                     className="input"
                     value={formData.registration_number}
                     onChange={(e) => setFormData({ ...formData, registration_number: e.target.value })}
                     placeholder="e.g. ABC-1234"
                     required
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      border: '2px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: '10px',
+                      padding: '14px 16px',
+                      color: 'white',
+                      fontSize: '15px'
+                    }}
                   />
                 </label>
+
+                {/* Row 2 - Column 2 */}
                 <label>
-                  <div className="label">Capacity *</div>
+                  <div style={{
+                    fontSize: '13px',
+                    fontWeight: '700',
+                    color: '#3b82f6',
+                    marginBottom: '10px',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}>
+                    Weight Capacity (kg) *
+                  </div>
                   <input
+                    type="number"
+                    step="0.1"
+                    min="0"
                     className="input"
                     value={formData.capacity}
                     onChange={(e) => setFormData({ ...formData, capacity: e.target.value })}
-                    placeholder="e.g. 1500 kg"
+                    placeholder="e.g. 1500"
                     required
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      border: '2px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: '10px',
+                      padding: '14px 16px',
+                      color: 'white',
+                      fontSize: '15px'
+                    }}
                   />
                 </label>
+
+                {/* Row 3 - Column 1 */}
+                <div>
+                  <label>
+                    <div style={{
+                      fontSize: '13px',
+                      fontWeight: '700',
+                      color: '#3b82f6',
+                      marginBottom: '10px',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px'
+                    }}>
+                      Volume Capacity (m³) *
+                    </div>
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      className="input"
+                      value={formData.volume_capacity}
+                      onChange={(e) => setFormData({ ...formData, volume_capacity: e.target.value })}
+                      placeholder="e.g. 30"
+                      required
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        border: '2px solid rgba(255, 255, 255, 0.1)',
+                        borderRadius: '10px',
+                        padding: '14px 16px',
+                        color: 'white',
+                        fontSize: '15px'
+                      }}
+                    />
+                  </label>
+                  <div style={{
+                    fontSize: '11px',
+                    marginTop: '6px',
+                    color: 'rgba(255, 255, 255, 0.5)',
+                    fontStyle: 'italic'
+                  }}>
+                    💡 Van: 10-15 | Truck: 25-35 | Large: 40-60
+                  </div>
+                </div>
+
+                {/* Row 3 - Column 2 */}
+                <div>
+                  <div style={{
+                    fontSize: '13px',
+                    fontWeight: '700',
+                    color: 'rgba(255, 255, 255, 0)',
+                    marginBottom: '10px',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px',
+                    userSelect: 'none'
+                  }}>
+                    .
+                  </div>
+                  <label style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12,
+                    cursor: 'pointer',
+                    padding: '14px 16px',
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    borderRadius: '10px',
+                    border: '2px solid rgba(255, 255, 255, 0.1)',
+                    transition: 'all 0.3s ease',
+                    height: '54px',
+                    boxSizing: 'border-box'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.background = 'rgba(102, 126, 234, 0.1)'
+                    e.currentTarget.style.borderColor = 'rgba(102, 126, 234, 0.3)'
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)'
+                  }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={formData.safety_compliance}
+                      onChange={(e) => setFormData({ ...formData, safety_compliance: e.target.checked })}
+                      style={{
+                        width: 20,
+                        height: 20,
+                        cursor: 'pointer',
+                        accentColor: '#3b82f6'
+                      }}
+                    />
+                    <span style={{
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      color: 'rgba(255, 255, 255, 0.9)'
+                    }}>
+                      ✓ Safety Compliance
+                    </span>
+                  </label>
+                </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <label>
-                  <div className="label">Driver *</div>
-                  <select
-                    className="input"
-                    value={formData.driver_id}
-                    onChange={(e) => setFormData({ ...formData, driver_id: e.target.value })}
-                    required
-                  >
-                    <option value="">Select driver...</option>
-                    {drivers.map(d => (
-                      <option key={d.id} value={d.id}>{d.username} ({d.email})</option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  <div className="label">Budget *</div>
-                  <select
-                    className="input"
-                    value={formData.budget_id}
-                    onChange={(e) => setFormData({ ...formData, budget_id: e.target.value })}
-                    required
-                  >
-                    <option value="">Select budget...</option>
-                    {budgets.map(b => (
-                      <option key={b.id} value={b.id}>{b.budget_name} (₱{b.total_budget.toLocaleString()})</option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-
-              <label>
-                <div className="label">Schedule *</div>
-                <select
-                  className="input"
-                  value={formData.schedule_id}
-                  onChange={(e) => setFormData({ ...formData, schedule_id: e.target.value })}
-                  required
-                >
-                  <option value="">Select schedule...</option>
-                  {schedules.map(s => (
-                    <option key={s.id} value={s.id}>
-                      {s.schedule_name} ({new Date(s.start_time).toLocaleDateString()})
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                <input
-                  type="checkbox"
-                  checked={formData.safety_compliance}
-                  onChange={(e) => setFormData({ ...formData, safety_compliance: e.target.checked })}
-                  style={{ width: 18, height: 18, cursor: 'pointer' }}
-                />
-                <span className="label" style={{ marginBottom: 0 }}>Safety Compliance Verified</span>
-              </label>
-
-              <div className="form-actions" style={{ marginTop: 8 }}>
+              <div style={{
+                display: 'flex',
+                gap: 12,
+                marginTop: 8,
+                justifyContent: 'flex-end'
+              }}>
                 <button
                   type="button"
-                  className="btn btn-primary"
+                  onClick={() => setShowModal(false)}
                   disabled={submitting}
-                  onClick={(e) => {
-                    console.log('Button clicked directly!');
-                    e.preventDefault();
-                    handleSubmit(e);
+                  style={{
+                    padding: '12px 24px',
+                    borderRadius: '10px',
+                    border: '2px solid rgba(255, 255, 255, 0.2)',
+                    background: 'transparent',
+                    color: 'rgba(255, 255, 255, 0.8)',
+                    fontSize: '15px',
+                    fontWeight: '600',
+                    cursor: submitting ? 'not-allowed' : 'pointer',
+                    transition: 'all 0.3s ease'
+                  }}
+                  onMouseOver={(e) => {
+                    if (!submitting) {
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'
+                      e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.3)'
+                    }
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.background = 'transparent'
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)'
                   }}
                 >
-                  {submitting ? 'Saving...' : editingId ? 'Update' : 'Create'}
+                  Cancel
                 </button>
                 <button
                   type="button"
-                  className="btn btn-outline"
-                  onClick={() => setShowModal(false)}
                   disabled={submitting}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    handleSubmit(e);
+                  }}
+                  style={{
+                    padding: '12px 32px',
+                    borderRadius: '10px',
+                    border: 'none',
+                    background: submitting
+                      ? 'rgba(102, 126, 234, 0.5)'
+                      : 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
+                    color: 'white',
+                    fontSize: '15px',
+                    fontWeight: '700',
+                    cursor: submitting ? 'not-allowed' : 'pointer',
+                    transition: 'all 0.3s ease',
+                    boxShadow: submitting ? 'none' : '0 4px 16px rgba(59, 130, 246, 0.4)'
+                  }}
+                  onMouseOver={(e) => {
+                    if (!submitting) {
+                      e.currentTarget.style.transform = 'translateY(-2px)'
+                      e.currentTarget.style.boxShadow = '0 6px 20px rgba(59, 130, 246, 0.6)'
+                    }
+                  }}
+                  onMouseOut={(e) => {
+                    if (!submitting) {
+                      e.currentTarget.style.transform = 'translateY(0)'
+                      e.currentTarget.style.boxShadow = '0 4px 16px rgba(59, 130, 246, 0.4)'
+                    }
+                  }}
                 >
-                  Cancel
+                  {submitting ? '⏳ Processing...' : '✓ Confirm'}
                 </button>
               </div>
             </form>
           </div>
         </div>
+      )}
+
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
       )}
     </div>
   )

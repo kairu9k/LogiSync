@@ -39,16 +39,23 @@ class WarehouseController extends Controller
         $warehouses = $query->limit($limit)->get();
 
         $data = $warehouses->map(function ($warehouse) {
+            $capacity = $warehouse->capacity ?? 1000;
             return [
                 'id' => $warehouse->warehouse_id,
+                'warehouse_id' => $warehouse->warehouse_id,
                 'name' => $warehouse->warehouse_name,
+                'warehouse_name' => $warehouse->warehouse_name,
                 'location' => $warehouse->location,
+                'capacity' => $capacity,
+                'current_capacity' => $warehouse->inventory_count,
                 'inventory_count' => $warehouse->inventory_count,
                 'available_space' => $warehouse->available_space,
                 'utilization_percentage' => $warehouse->inventory_count > 0
-                    ? round(($warehouse->inventory_count / 1000) * 100, 1)
+                    ? round(($warehouse->inventory_count / $capacity) * 100, 1)
                     : 0,
                 'status' => $warehouse->available_space <= 50 ? 'near_capacity' : 'available',
+                'latitude' => $warehouse->latitude,
+                'longitude' => $warehouse->longitude,
             ];
         });
 
@@ -84,10 +91,11 @@ class WarehouseController extends Controller
                 'customer' => $details['customer'],
                 'order_date' => $details['order_date'],
                 'storage_date' => $item->created_at ?? null,
-                // Package information from quote
+                // Package information from order and quote
                 'weight' => $quote ? $quote->weight : null,
                 'dimensions' => $quote ? $quote->dimensions : null,
                 'distance' => $quote ? $quote->distance : null,
+                'package_type' => $order ? ($order->package_type ?? ($quote ? $quote->package_type : null)) : null,
             ];
         });
 
@@ -121,6 +129,9 @@ class WarehouseController extends Controller
         $validator = Validator::make($data, [
             'warehouse_name' => 'required|string|max:255',
             'location' => 'required|string',
+            'capacity' => 'nullable|integer|min:1',
+            'latitude' => 'nullable|numeric|between:-90,90',
+            'longitude' => 'nullable|numeric|between:-180,180',
         ]);
 
         if ($validator->fails()) {
@@ -193,7 +204,7 @@ class WarehouseController extends Controller
 
         $search = $request->query('search');
         $status = $request->query('status');
-        $warehouseId = $request->query('warehouse_id');
+        $warehouseId = $request->query('warehouse_id') ? (int) $request->query('warehouse_id') : null;
         $limit = (int) ($request->query('limit', 50));
         $limit = max(1, min($limit, 200));
 
@@ -205,17 +216,41 @@ class WarehouseController extends Controller
                 $items = Inventory::getItemsByStatus($status, $orgUserId);
             } else {
                 // Get all items for this organization
-                $items = Inventory::with(['warehouse', 'order.organization', 'order.quote'])
+                // Exclude items that are already loaded in shipments
+                $query = Inventory::with(['warehouse', 'order.organization', 'order.quote'])
                     ->whereHas('order', function ($q) use ($orgUserId) {
                         $q->where('organization_id', $orgUserId);
                     })
-                    ->get();
+                    ->whereNotExists(function ($q) {
+                        $q->select(DB::raw(1))
+                          ->from('shipment_details')
+                          ->whereColumn('shipment_details.order_id', 'inventory.order_id');
+                    });
+
+                // Filter by warehouse_id in the query, not on the collection
+                if ($warehouseId) {
+                    $query->where('warehouse_id', $warehouseId);
+                }
+
+                $items = $query->get();
             }
         }
 
-        if ($warehouseId) {
-            $items = $items->where('warehouse_id', $warehouseId);
+        // Also filter search and status results by warehouse if specified
+        if ($warehouseId && ($search || $status)) {
+            $items = $items->filter(function ($item) use ($warehouseId) {
+                return $item->warehouse_id == $warehouseId;
+            });
         }
+
+        // Filter out items that are already in shipments for search and status queries too
+        $items = $items->filter(function ($item) {
+            // Check if this order is already in a shipment
+            $inShipment = DB::table('shipment_details')
+                ->where('order_id', $item->order_id)
+                ->exists();
+            return !$inShipment;
+        });
 
         $data = $items->take($limit)->map(function ($item) {
             $details = $item->full_details;
@@ -232,10 +267,11 @@ class WarehouseController extends Controller
                 'order_status' => $details['order_status'],
                 'customer' => $details['customer'],
                 'order_date' => $details['order_date'],
-                // Package information from quote
+                // Package information from order and quote
                 'weight' => $quote ? $quote->weight : null,
                 'dimensions' => $quote ? $quote->dimensions : null,
                 'distance' => $quote ? $quote->distance : null,
+                'package_type' => $order ? ($order->package_type ?? ($quote ? $quote->package_type : null)) : null,
             ];
         });
 

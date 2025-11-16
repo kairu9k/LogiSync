@@ -35,14 +35,15 @@ class InvoiceController extends Controller
                 'i.invoice_number',
                 'i.invoice_type',
                 'i.invoice_date',
+                'i.invoice_date as created_at',
                 'i.due_date',
                 'i.amount',
                 'i.status',
                 'i.payment_date',
                 'i.payment_method',
                 'o.customer_name',
-                's.tracking_number',
-                's.receiver_email'
+                'o.receiver_email',
+                's.master_tracking_number as tracking_number'
             )
             ->orderByDesc('i.invoice_date');
 
@@ -55,7 +56,8 @@ class InvoiceController extends Controller
                 $numeric = (int) preg_replace('/[^0-9]/', '', $search);
                 $q->where('o.customer_name', 'like', "%$search%")
                   ->orWhere('i.invoice_id', $numeric)
-                  ->orWhere('s.tracking_number', 'like', "%$search%");
+                  ->orWhere('s.master_tracking_number', 'like', "%$search%")
+                  ->orWhere('i.invoice_number', 'like', "%$search%");
             });
         }
 
@@ -123,14 +125,6 @@ class InvoiceController extends Controller
                 ->header('Access-Control-Allow-Origin', '*');
         }
 
-        // Get order details for itemization
-        $orderDetails = [];
-        if ($invoice->order_id) {
-            $orderDetails = DB::table('order_details')->where('order_id', $invoice->order_id)
-                ->select('product_id', 'quantity')
-                ->get()->toArray();
-        }
-
         $data = [
             'id' => (int) $invoice->invoice_id,
             'invoice_number' => $invoice->invoice_number ?? ('INV-' . str_pad((string) $invoice->invoice_id, 6, '0', STR_PAD_LEFT)),
@@ -151,7 +145,6 @@ class InvoiceController extends Controller
             'days_overdue' => $invoice->status === 'pending' && Carbon::parse($invoice->due_date)->lt(Carbon::now())
                 ? Carbon::now()->diffInDays(Carbon::parse($invoice->due_date)) : 0,
             'is_overdue' => $invoice->status === 'pending' && Carbon::parse($invoice->due_date)->lt(Carbon::now()),
-            'order_details' => $orderDetails,
         ];
 
         return response()->json(['data' => $data])

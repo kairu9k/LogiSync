@@ -27,6 +27,19 @@ const truckIcon = new L.Icon({
   popupAnchor: [0, -40],
 })
 
+// Custom warehouse icon
+const warehouseIcon = new L.Icon({
+  iconUrl: 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(`
+    <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">
+      <circle cx="20" cy="20" r="18" fill="#10b981" stroke="white" stroke-width="3"/>
+      <text x="20" y="28" font-size="20" text-anchor="middle" fill="white">🏢</text>
+    </svg>
+  `),
+  iconSize: [40, 40],
+  iconAnchor: [20, 40],
+  popupAnchor: [0, -40],
+})
+
 export default function Dashboard() {
   const navigate = useNavigate()
   const [dashboardData, setDashboardData] = useState({
@@ -45,6 +58,7 @@ export default function Dashboard() {
   const [showFullMap, setShowFullMap] = useState(false)
   const [selectedShipment, setSelectedShipment] = useState(null)
   const [locationHistory, setLocationHistory] = useState([])
+  const [warehouses, setWarehouses] = useState([])
 
   // Get user info from localStorage
   const user = (() => {
@@ -436,6 +450,23 @@ export default function Dashboard() {
     }
   }, [])
 
+  // Load warehouses with coordinates
+  useEffect(() => {
+    loadWarehouses()
+  }, [])
+
+  const loadWarehouses = async () => {
+    try {
+      const response = await apiGet('/api/warehouses')
+      const warehousesData = response?.data || []
+      // Filter warehouses that have coordinates
+      const warehousesWithCoords = warehousesData.filter(w => w.latitude && w.longitude)
+      setWarehouses(warehousesWithCoords)
+    } catch (e) {
+      console.error('Failed to load warehouses:', e)
+    }
+  }
+
   // Load active shipments with GPS tracking
   useEffect(() => {
     loadActiveShipments()
@@ -455,6 +486,7 @@ export default function Dashboard() {
       const shipments2 = response2?.data || []
 
       const allShipments = [...shipments1, ...shipments2]
+      console.log('[Dashboard] Active shipments (in_transit + out_for_delivery):', allShipments.length)
 
       // Get latest location for each shipment
       const shipmentsWithLocation = await Promise.all(
@@ -473,6 +505,7 @@ export default function Dashboard() {
 
       // Filter out shipments without GPS data
       const tracked = shipmentsWithLocation.filter(s => s.location !== null)
+      console.log('[Dashboard] Shipments with GPS locations:', tracked.length)
       setActiveShipments(tracked)
     } catch (e) {
       console.error('Failed to load active shipments:', e)
@@ -501,9 +534,9 @@ export default function Dashboard() {
       {user && (
         <div style={{
           padding: '32px',
-          background: 'linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)',
+          background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
           borderRadius: '16px',
-          boxShadow: '0 10px 30px rgba(168, 85, 247, 0.2)'
+          boxShadow: '0 10px 30px rgba(59, 130, 246, 0.3)'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
@@ -698,9 +731,9 @@ export default function Dashboard() {
       <div className="card" style={{ padding: 16 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
           <div>
-            <h3 style={{ margin: 0 }}>🗺️ Active Shipments - Live Tracking</h3>
+            <h3 style={{ margin: 0 }}>🗺️ Fleet & Facilities Map</h3>
             <div style={{ fontSize: '14px', color: '#666', marginTop: 4 }}>
-              {gpsLoading ? 'Loading...' : `${activeShipments.length} shipment${activeShipments.length !== 1 ? 's' : ''} with GPS tracking`}
+              {gpsLoading ? 'Loading...' : `${activeShipments.length} active shipment${activeShipments.length !== 1 ? 's' : ''} • ${warehouses.length} warehouse${warehouses.length !== 1 ? 's' : ''}`}
             </div>
           </div>
           <button
@@ -712,10 +745,16 @@ export default function Dashboard() {
           </button>
         </div>
 
-        {activeShipments.length > 0 ? (
+        {(activeShipments.length > 0 || warehouses.length > 0) ? (
           <div style={{ height: '350px', borderRadius: '8px', overflow: 'hidden' }}>
             <MapContainer
-              center={[activeShipments[0].location.latitude, activeShipments[0].location.longitude]}
+              center={
+                activeShipments.length > 0
+                  ? [activeShipments[0].location.latitude, activeShipments[0].location.longitude]
+                  : warehouses.length > 0
+                  ? [parseFloat(warehouses[0].latitude), parseFloat(warehouses[0].longitude)]
+                  : [14.5995, 120.9842] // Default: Manila, Philippines
+              }
               zoom={12}
               style={{ height: '100%', width: '100%' }}
             >
@@ -724,6 +763,40 @@ export default function Dashboard() {
                 attribution='&copy; <a href="https://stadiamaps.com/">Stadia Maps</a>, &copy; <a href="https://openmaptiles.org/">OpenMapTiles</a> &copy; <a href="http://openstreetmap.org">OpenStreetMap</a> contributors'
               />
 
+              {/* Warehouse markers */}
+              {warehouses.map(warehouse => {
+                const position = [parseFloat(warehouse.latitude), parseFloat(warehouse.longitude)]
+
+                return (
+                  <Marker
+                    key={`warehouse-${warehouse.warehouse_id}`}
+                    position={position}
+                    icon={warehouseIcon}
+                    eventHandlers={{
+                      click: () => navigate(`/app/warehouses`)
+                    }}
+                  >
+                    <Popup>
+                      <div style={{ minWidth: '200px' }}>
+                        <strong>🏢 {warehouse.warehouse_name}</strong>
+                        <div style={{ marginTop: '0.5rem', fontSize: '14px' }}>
+                          <div>📍 {warehouse.location}</div>
+                          <div>📦 Capacity: {warehouse.current_capacity || 0}/{warehouse.capacity || 1000}</div>
+                        </div>
+                        <button
+                          className="btn btn-primary"
+                          onClick={() => navigate(`/app/warehouses`)}
+                          style={{ marginTop: '0.5rem', width: '100%', fontSize: '12px' }}
+                        >
+                          View Warehouses
+                        </button>
+                      </div>
+                    </Popup>
+                  </Marker>
+                )
+              })}
+
+              {/* Active shipment markers */}
               {activeShipments.map(shipment => {
                 if (!shipment.location) return null
 
@@ -779,8 +852,8 @@ export default function Dashboard() {
           }}>
             <div>
               <div style={{ fontSize: '48px', marginBottom: '1rem' }}>🗺️</div>
-              <div style={{ fontSize: '16px', marginBottom: '0.5rem', color: 'var(--text)' }}>No active shipments with GPS tracking</div>
-              <div style={{ fontSize: '14px' }}>Shipments will appear here once drivers start GPS tracking</div>
+              <div style={{ fontSize: '16px', marginBottom: '0.5rem', color: 'var(--text)' }}>No locations to display</div>
+              <div style={{ fontSize: '14px' }}>Add warehouses with GPS coordinates or start shipment tracking to see locations on the map</div>
             </div>
           </div>
         )}
@@ -1000,9 +1073,9 @@ export default function Dashboard() {
               background: 'var(--bg-2)'
             }}>
               <div>
-                <h2 style={{ margin: 0, fontSize: '20px', color: 'var(--text)' }}>🗺️ Live Fleet Tracking</h2>
+                <h2 style={{ margin: 0, fontSize: '20px', color: 'var(--text)' }}>🗺️ Fleet & Facilities Map</h2>
                 <div style={{ fontSize: '14px', color: 'var(--muted)', marginTop: 4 }}>
-                  {activeShipments.length} active shipment{activeShipments.length !== 1 ? 's' : ''} with GPS tracking
+                  {activeShipments.length} active shipment{activeShipments.length !== 1 ? 's' : ''} • {warehouses.length} warehouse{warehouses.length !== 1 ? 's' : ''}
                 </div>
               </div>
               <button
@@ -1074,9 +1147,15 @@ export default function Dashboard() {
 
               {/* Map */}
               <div style={{ flex: 1 }}>
-                {activeShipments.length > 0 ? (
+                {(activeShipments.length > 0 || warehouses.length > 0) ? (
                   <MapContainer
-                    center={[activeShipments[0].location.latitude, activeShipments[0].location.longitude]}
+                    center={
+                      activeShipments.length > 0
+                        ? [activeShipments[0].location.latitude, activeShipments[0].location.longitude]
+                        : warehouses.length > 0
+                        ? [parseFloat(warehouses[0].latitude), parseFloat(warehouses[0].longitude)]
+                        : [14.5995, 120.9842] // Default: Manila, Philippines
+                    }
                     zoom={12}
                     style={{ height: '100%', width: '100%' }}
                   >
@@ -1084,6 +1163,39 @@ export default function Dashboard() {
                       url="https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png"
                       attribution='&copy; <a href="https://stadiamaps.com/">Stadia Maps</a>, &copy; <a href="https://openmaptiles.org/">OpenMapTiles</a> &copy; <a href="http://openstreetmap.org">OpenStreetMap</a> contributors'
                     />
+
+                    {/* Warehouse markers */}
+                    {warehouses.map(warehouse => {
+                      const position = [parseFloat(warehouse.latitude), parseFloat(warehouse.longitude)]
+
+                      return (
+                        <Marker
+                          key={`warehouse-${warehouse.warehouse_id}`}
+                          position={position}
+                          icon={warehouseIcon}
+                        >
+                          <Popup>
+                            <div style={{ minWidth: '200px' }}>
+                              <strong>🏢 {warehouse.warehouse_name}</strong>
+                              <div style={{ marginTop: '0.5rem' }}>
+                                <div>📍 {warehouse.location}</div>
+                                <div>📦 Capacity: {warehouse.current_capacity || 0}/{warehouse.capacity || 1000}</div>
+                              </div>
+                              <button
+                                className="btn btn-primary"
+                                onClick={() => {
+                                  setShowFullMap(false)
+                                  navigate(`/app/warehouses`)
+                                }}
+                                style={{ marginTop: '0.5rem', width: '100%', fontSize: '12px' }}
+                              >
+                                View Warehouses
+                              </button>
+                            </div>
+                          </Popup>
+                        </Marker>
+                      )
+                    })}
 
                     {activeShipments.map(shipment => {
                       if (!shipment.location) return null
@@ -1140,12 +1252,13 @@ export default function Dashboard() {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    background: '#f9fafb',
-                    color: '#666'
+                    background: 'var(--bg-2)',
+                    color: 'var(--muted)'
                   }}>
                     <div style={{ textAlign: 'center' }}>
                       <div style={{ fontSize: '64px', marginBottom: '1rem' }}>🗺️</div>
-                      <div style={{ fontSize: '18px' }}>No active shipments with GPS tracking</div>
+                      <div style={{ fontSize: '18px', color: 'var(--text)', marginBottom: '0.5rem' }}>No locations to display</div>
+                      <div style={{ fontSize: '14px' }}>Add warehouses with GPS coordinates or start shipment tracking</div>
                     </div>
                   </div>
                 )}

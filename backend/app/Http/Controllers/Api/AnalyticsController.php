@@ -346,12 +346,7 @@ class AnalyticsController extends Controller
                     ->join('warehouse as w', 'i.warehouse_id', '=', 'w.warehouse_id')
                     ->where('w.organization_id', $orgUserId)
                     ->count(),
-                'unassigned_items' => DB::table('order_details as od')
-                    ->join('orders as o', 'od.order_id', '=', 'o.order_id')
-                    ->leftJoin('inventory as i', 'od.order_details_id', '=', 'i.order_details_id')
-                    ->where('o.organization_id', $orgUserId)
-                    ->whereNull('i.inventory_id')
-                    ->count(),
+                'unassigned_items' => 0, // Removed - no longer tracking order details
                 'avg_items_per_warehouse' => round(
                     DB::table('inventory as i')
                         ->join('warehouse as w', 'i.warehouse_id', '=', 'w.warehouse_id')

@@ -1,7 +1,11 @@
 {
   "permissions": {
     "allow": [
-      "Read(//c/Users/PC/Downloads/**)"
+      "Read(//c/Users/PC/Downloads/**)",
+      "Bash(php artisan migrate:*)",
+      "Bash(md5sum:*)",
+      "Bash(cat:*)",
+      "Bash(php artisan:*)"
     ],
     "deny": [],
     "ask": []

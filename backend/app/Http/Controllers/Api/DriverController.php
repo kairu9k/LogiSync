@@ -13,6 +13,43 @@ use Illuminate\Support\Facades\Validator;
 
 class DriverController extends Controller
 {
+    public function index(Request $request)
+    {
+        $userId = request()->header('X-User-Id');
+        if (!$userId) {
+            return response()->json(['message' => 'Unauthorized - User ID required'], 401);
+        }
+
+        // Get the organization_id from the user
+        $user = DB::table('users')->where('user_id', $userId)->first();
+        $organizationId = $user ? $user->organization_id : null;
+
+        if (!$organizationId) {
+            return response()->json(['message' => 'User organization not found'], 404)
+                ->header('Access-Control-Allow-Origin', '*');
+        }
+
+        // Get all drivers from the same organization
+        $query = DB::table('users')
+            ->where('role', 'driver')
+            ->where('organization_id', $organizationId);
+
+        // If exclude_assigned parameter is true, exclude drivers assigned to active shipments
+        if ($request->query('exclude_assigned') === 'true') {
+            $query->whereNotIn('user_id', function($subquery) {
+                $subquery->select('driver_id')
+                    ->from('shipments')
+                    ->whereNotNull('driver_id')
+                    ->whereIn('status', ['pending', 'in_transit', 'out_for_delivery']);
+            });
+        }
+
+        $drivers = $query->select('user_id as id', 'username as name', 'email')->get();
+
+        return response()->json(['data' => $drivers])
+            ->header('Access-Control-Allow-Origin', '*');
+    }
+
     public function login(Request $request)
     {
         $data = $request->all();
@@ -64,21 +101,21 @@ class DriverController extends Controller
 
         $today = date('Y-m-d');
 
-        // Get driver's vehicle info with capacity
-        $driverVehicle = DB::table('transport as t')
-            ->where('t.driver_id', $driverId)
+        // Get driver's vehicle info with capacity from shipments
+        $driverVehicle = DB::table('shipments as s')
+            ->join('transport as t', 's.transport_id', '=', 't.transport_id')
+            ->where('s.driver_id', $driverId)
             ->select('t.transport_id', 't.capacity', 't.vehicle_id', 't.registration_number', 't.vehicle_type')
             ->first();
 
         $vehicleCapacity = null;
         if ($driverVehicle) {
-            // Calculate current load
+            // Calculate current load from shipment_details (all packages not yet delivered)
             $currentLoad = DB::table('shipments as s')
-                ->join('orders as o', 's.order_id', '=', 'o.order_id')
-                ->join('quotes as q', 'o.quote_id', '=', 'q.quote_id')
+                ->join('shipment_details as sd', 's.shipment_id', '=', 'sd.shipment_id')
                 ->where('s.transport_id', $driverVehicle->transport_id)
-                ->whereIn('s.status', ['pending', 'in_transit', 'out_for_delivery'])
-                ->sum('q.weight');
+                ->whereIn('sd.status', ['pending', 'picked_up', 'in_transit', 'out_for_delivery'])
+                ->sum('sd.weight');
 
             $currentLoad = $currentLoad ?? 0;
             $capacity = (float) $driverVehicle->capacity;
@@ -95,25 +132,23 @@ class DriverController extends Controller
             ];
         }
 
+        // Get master shipments for this driver
         $shipments = DB::table('shipments as s')
             ->join('transport as t', 's.transport_id', '=', 't.transport_id')
-            ->join('users as d', 't.driver_id', '=', 'd.user_id')
-            ->leftJoin('orders as o', 's.order_id', '=', 'o.order_id')
-            ->where('d.user_id', $driverId)
+            ->where('s.driver_id', $driverId)
             ->whereIn('s.status', ['pending', 'picked_up', 'in_transit', 'out_for_delivery'])
             ->select(
                 's.shipment_id',
-                's.tracking_number',
-                's.receiver_name',
-                's.receiver_address',
-                's.receiver_contact',
-                's.destination_address',
+                's.transport_id',
                 's.status',
                 's.creation_date',
                 's.departure_date',
-                'o.customer_name as customer',
+                's.origin_name',
+                's.origin_address',
                 't.registration_number',
-                't.vehicle_type'
+                't.vehicle_type',
+                't.capacity',
+                't.volume_capacity'
             )
             ->orderByRaw("FIELD(s.status, 'pending', 'picked_up', 'in_transit', 'out_for_delivery')")
             ->orderBy('s.departure_date')
@@ -121,34 +156,100 @@ class DriverController extends Controller
             ->get();
 
         $data = $shipments->map(function ($s) {
+            // Get all packages for this shipment
+            $packages = DB::table('shipment_details as sd')
+                ->leftJoin('orders as o', 'sd.order_id', '=', 'o.order_id')
+                ->where('sd.shipment_id', $s->shipment_id)
+                ->select(
+                    'sd.tracking_id',
+                    'sd.receiver_name',
+                    'sd.receiver_contact',
+                    'sd.receiver_email',
+                    'sd.receiver_address',
+                    'sd.weight',
+                    'sd.charges',
+                    'sd.status',
+                    'sd.notes',
+                    'o.customer_name'
+                )
+                ->get()
+                ->map(function ($pkg) {
+                    return [
+                        'tracking_id' => $pkg->tracking_id,
+                        'receiver_name' => $pkg->receiver_name,
+                        'receiver_contact' => $pkg->receiver_contact ?? 'N/A',
+                        'receiver_email' => $pkg->receiver_email ?? '',
+                        'receiver_address' => $pkg->receiver_address,
+                        'weight' => $pkg->weight ? round($pkg->weight, 1) : 0,
+                        'charges' => (int) $pkg->charges,
+                        'status' => $pkg->status,
+                        'notes' => $pkg->notes ?? '',
+                        'customer' => $pkg->customer_name ?? 'N/A'
+                    ];
+                });
+
+            // Get unique destinations count
+            $uniqueDestinations = $packages->pluck('receiver_address')->unique()->count();
+
+            // Calculate total weight and charges
+            $totalWeight = $packages->sum('weight');
+            $totalCharges = $packages->sum('charges');
+
+            // Calculate total volume from packages (L × W × H / 1000000 to convert cm³ to m³)
+            $totalVolume = 0;
+            foreach ($packages as $pkg) {
+                if ($pkg['weight'] > 0) {
+                    $length = (float) ($pkg['length'] ?? 0);
+                    $width = (float) ($pkg['width'] ?? 0);
+                    $height = (float) ($pkg['height'] ?? 0);
+
+                    if ($length > 0 && $width > 0 && $height > 0) {
+                        // Convert from cm³ to m³
+                        $volumeM3 = ($length * $width * $height) / 1000000;
+                        $totalVolume += $volumeM3;
+                    }
+                }
+            }
+
             return [
                 'id' => (int) $s->shipment_id,
-                'tracking_number' => $s->tracking_number,
-                'receiver_name' => $s->receiver_name,
-                'receiver_address' => $s->receiver_address,
-                'receiver_phone' => $s->receiver_contact ?? 'N/A',
-                'destination_address' => $s->destination_address,
+                'shipment_number' => 'SHP-' . str_pad($s->shipment_id, 6, '0', STR_PAD_LEFT),
                 'status' => $s->status,
-                'customer' => $s->customer ?? 'N/A',
+                'origin_name' => $s->origin_name ?? 'Warehouse',
+                'origin_address' => $s->origin_address ?? 'N/A',
                 'vehicle' => $s->registration_number . ' (' . $s->vehicle_type . ')',
+                'departure_date' => $s->departure_date,
+                'creation_date' => $s->creation_date,
+                'packages' => $packages,
+                'package_count' => $packages->count(),
+                'unique_destinations' => $uniqueDestinations,
+                'total_weight' => round($totalWeight, 1),
+                'total_volume' => round($totalVolume, 2),
+                'total_charges' => $totalCharges,
+                'vehicle_capacity' => (float) ($s->capacity ?? 0),
+                'vehicle_volume_capacity' => (float) ($s->volume_capacity ?? 0),
                 'priority' => $s->status === 'pending' ? 'high' : ($s->status === 'out_for_delivery' ? 'urgent' : 'normal')
             ];
         });
+
+        // Calculate package-level summary
+        $allPackages = $data->pluck('packages')->flatten(1);
 
         return response()->json([
             'data' => $data,
             'vehicle_capacity' => $vehicleCapacity,
             'summary' => [
-                'total' => $data->count(),
-                'pending' => $data->where('status', 'pending')->count(),
-                'picked_up' => $data->where('status', 'picked_up')->count(),
-                'in_transit' => $data->where('status', 'in_transit')->count(),
-                'out_for_delivery' => $data->where('status', 'out_for_delivery')->count(),
+                'total_shipments' => $data->count(),
+                'total_packages' => $allPackages->count(),
+                'pending' => $allPackages->where('status', 'pending')->count(),
+                'picked_up' => $allPackages->where('status', 'picked_up')->count(),
+                'in_transit' => $allPackages->where('status', 'in_transit')->count(),
+                'out_for_delivery' => $allPackages->where('status', 'out_for_delivery')->count(),
             ]
         ])->header('Access-Control-Allow-Origin', '*');
     }
 
-    public function updateShipmentStatus(Request $request, int $shipmentId)
+    public function updateShipmentStatus(Request $request, string $trackingId)
     {
         $data = $request->all();
         $validator = Validator::make($data, [
@@ -163,20 +264,21 @@ class DriverController extends Controller
                 ->header('Access-Control-Allow-Origin', '*');
         }
 
-        // Verify driver has access to this shipment
-        $shipment = DB::table('shipments as s')
-            ->join('transport as t', 's.transport_id', '=', 't.transport_id')
-            ->where('s.shipment_id', $shipmentId)
-            ->where('t.driver_id', $data['driver_id'])
+        // Get package details and verify driver access
+        $package = DB::table('shipment_details as sd')
+            ->join('shipments as s', 'sd.shipment_id', '=', 's.shipment_id')
+            ->where('sd.tracking_id', $trackingId)
+            ->where('s.driver_id', $data['driver_id'])
+            ->select('sd.*', 's.shipment_id', 's.driver_id')
             ->first();
 
-        if (!$shipment) {
-            return response()->json(['message' => 'Shipment not found or access denied'], 404)
+        if (!$package) {
+            return response()->json(['message' => 'Package not found or access denied'], 404)
                 ->header('Access-Control-Allow-Origin', '*');
         }
 
         // Store old status for event
-        $oldStatus = $shipment->status;
+        $oldStatus = $package->status;
 
         // Map driver status to system status
         $systemStatus = $this->mapDriverStatus($data['status']);
@@ -184,42 +286,56 @@ class DriverController extends Controller
         // Get better location info if generic location provided
         $location = $data['location'];
         if (in_array($location, ['Driver Location', 'In transit', 'Picked up from warehouse'])) {
-            $location = $this->getSmartLocation($shipmentId, $data['status']);
+            $location = $this->getSmartLocation($package->shipment_id, $data['status']);
         }
 
-        // Update shipment status
-        DB::table('shipments')->where('shipment_id', $shipmentId)->update([
+        // Update individual package status
+        DB::table('shipment_details')->where('tracking_id', $trackingId)->update([
             'status' => $systemStatus,
         ]);
 
-        // Add tracking history
+        // Add tracking history for this specific package
         DB::table('tracking_history')->insert([
-            'shipment_id' => $shipmentId,
+            'shipment_id' => $package->shipment_id,  // Keep for GPS reference
+            'tracking_id' => $trackingId,            // Individual package tracking
             'location' => $location,
             'status' => $systemStatus,
             'details' => $data['notes'] ?? $this->getDefaultStatusMessage($data['status']),
         ]);
 
-        // Auto-generate invoice when driver marks shipment as delivered
-        if ($systemStatus === 'delivered') {
-            $this->createInvoiceForDeliveredShipment($shipmentId);
+        // Check if all packages in shipment are delivered, then update shipment status
+        $allPackagesDelivered = DB::table('shipment_details')
+            ->where('shipment_id', $package->shipment_id)
+            ->where('status', '!=', 'delivered')
+            ->count() === 0;
+
+        if ($allPackagesDelivered) {
+            DB::table('shipments')->where('shipment_id', $package->shipment_id)->update([
+                'status' => 'delivered',
+            ]);
+        }
+
+        // Auto-generate invoice when ALL packages in shipment are delivered
+        if ($allPackagesDelivered) {
+            $this->createInvoiceForDeliveredShipment($package->shipment_id);
         }
 
         // Broadcast real-time status update
-        $shipmentModel = Shipment::find($shipmentId);
+        $shipmentModel = Shipment::find($package->shipment_id);
         if ($shipmentModel) {
-            \Log::info('Broadcasting shipment status update', [
-                'shipment_id' => $shipmentId,
+            \Log::info('Broadcasting package status update', [
+                'tracking_id' => $trackingId,
+                'shipment_id' => $package->shipment_id,
                 'old_status' => $oldStatus,
                 'new_status' => $systemStatus,
-                'organization_id' => $shipmentModel->order->organization_id ?? null
+                'organization_id' => $shipmentModel->organization_id ?? null
             ]);
             event(new ShipmentStatusUpdated($shipmentModel, $oldStatus, $systemStatus, 'driver'));
             \Log::info('Broadcast event fired');
         }
 
         return response()->json([
-            'message' => 'Status updated successfully',
+            'message' => 'Package status updated successfully',
             'new_status' => $systemStatus
         ])->header('Access-Control-Allow-Origin', '*');
     }
@@ -254,10 +370,10 @@ class DriverController extends Controller
 
     private function getSmartLocation($shipmentId, $status)
     {
-        // Get shipment with origin and destination info
+        // Get shipment with origin info only (destination fields no longer exist in shipments table)
         $shipment = DB::table('shipments')
             ->where('shipment_id', $shipmentId)
-            ->select('origin_name', 'origin_address', 'destination_address', 'receiver_name')
+            ->select('origin_name', 'origin_address')
             ->first();
 
         if (!$shipment) {
@@ -274,14 +390,13 @@ class DriverController extends Controller
                 return 'In transit to destination';
 
             case 'out_for_delivery':
-                // Use receiver name or destination
-                return $shipment->receiver_name ? "Out for delivery to {$shipment->receiver_name}" : 'Out for delivery';
+                return 'Out for delivery';
 
             case 'delivered':
-                return $shipment->receiver_name ? "Delivered to {$shipment->receiver_name}" : 'Delivered to customer';
+                return 'Delivered to customer';
 
             case 'delivery_attempted':
-                return $shipment->destination_address ?? 'Delivery attempted';
+                return 'Delivery attempted';
 
             case 'exception':
                 return 'Exception - requires attention';
@@ -311,8 +426,7 @@ class DriverController extends Controller
                 't.registration_number',
                 't.vehicle_type',
                 'q.weight',
-                'q.dimensions',
-                'q.distance'
+                'q.dimensions'
             )
             ->first();
 
@@ -342,7 +456,6 @@ class DriverController extends Controller
             'vehicle' => $shipment->registration_number . ' (' . $shipment->vehicle_type . ')',
             'weight' => $shipment->weight ? number_format($shipment->weight, 1) . ' kg' : 'N/A',
             'dimensions' => $shipment->dimensions ?? 'N/A',
-            'distance' => $shipment->distance ? number_format($shipment->distance, 1) . ' km' : 'N/A',
             'recent_updates' => $trackingHistory->map(function($item) {
                 return [
                     'timestamp' => $item->timestamp,

@@ -107,10 +107,10 @@ export default function Subscription() {
     <div className="grid" style={{ gap: 24 }}>
       {/* Header Section with Gradient */}
       <div style={{
-        background: 'linear-gradient(135deg, #ec4899 0%, #db2777 100%)',
+        background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
         borderRadius: '16px',
         padding: '32px',
-        boxShadow: '0 10px 30px rgba(236, 72, 153, 0.2)'
+        boxShadow: '0 10px 30px rgba(59, 130, 246, 0.3)'
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
@@ -207,16 +207,16 @@ export default function Subscription() {
                 backdropFilter: 'blur(10px)',
                 borderRadius: '16px',
                 padding: 28,
-                border: isCurrentPlan ? '3px solid #ec4899' : '2px solid rgba(255, 255, 255, 0.1)',
+                border: isCurrentPlan ? '3px solid #3b82f6' : '2px solid rgba(255, 255, 255, 0.1)',
                 position: 'relative',
                 transition: 'all 0.3s ease',
-                boxShadow: isCurrentPlan ? '0 8px 24px rgba(236, 72, 153, 0.3)' : '0 4px 20px rgba(0,0,0,0.3)'
+                boxShadow: isCurrentPlan ? '0 8px 24px rgba(59, 130, 246, 0.4)' : '0 4px 20px rgba(0,0,0,0.3)'
               }}
               onMouseOver={(e) => {
                 if (!isCurrentPlan) {
                   e.currentTarget.style.transform = 'translateY(-6px)'
-                  e.currentTarget.style.boxShadow = '0 12px 32px rgba(236, 72, 153, 0.2)'
-                  e.currentTarget.style.borderColor = 'rgba(236, 72, 153, 0.5)'
+                  e.currentTarget.style.boxShadow = '0 12px 32px rgba(59, 130, 246, 0.3)'
+                  e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.5)'
                 }
               }}
               onMouseOut={(e) => {
@@ -232,14 +232,14 @@ export default function Subscription() {
                   position: 'absolute',
                   top: 16,
                   right: 16,
-                  background: '#ec4899',
+                  background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
                   color: 'white',
                   padding: '8px 16px',
                   borderRadius: 20,
                   fontSize: 12,
                   fontWeight: 700,
                   letterSpacing: '0.8px',
-                  boxShadow: '0 4px 12px rgba(236, 72, 153, 0.4)'
+                  boxShadow: '0 4px 12px rgba(59, 130, 246, 0.5)'
                 }}>
                   ✓ CURRENT
                 </div>
@@ -263,7 +263,7 @@ export default function Subscription() {
                   <span style={{
                     fontSize: 42,
                     fontWeight: 700,
-                    color: isFree ? '#10b981' : '#ec4899'
+                    color: isFree ? '#10b981' : '#3b82f6'
                   }}>
                     {isFree ? 'Free' : formatMoney(plan.price)}
                   </span>
@@ -279,7 +279,7 @@ export default function Subscription() {
                 <div style={{
                   fontSize: '12px',
                   fontWeight: '700',
-                  color: '#ec4899',
+                  color: '#3b82f6',
                   marginBottom: '14px',
                   textTransform: 'uppercase',
                   letterSpacing: '0.8px'
@@ -319,25 +319,25 @@ export default function Subscription() {
                   border: 'none',
                   background: isCurrentPlan
                     ? 'rgba(255, 255, 255, 0.1)'
-                    : 'linear-gradient(135deg, #ec4899 0%, #db2777 100%)',
+                    : 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
                   color: 'white',
                   cursor: isCurrentPlan || subscribing ? 'not-allowed' : 'pointer',
                   opacity: isCurrentPlan || subscribing ? 0.6 : 1,
                   transition: 'all 0.3s ease',
-                  boxShadow: isCurrentPlan ? 'none' : '0 4px 16px rgba(236, 72, 153, 0.3)'
+                  boxShadow: isCurrentPlan ? 'none' : '0 4px 16px rgba(59, 130, 246, 0.4)'
                 }}
                 disabled={isCurrentPlan || subscribing}
                 onClick={() => handleSubscribe(plan)}
                 onMouseOver={(e) => {
                   if (!isCurrentPlan && !subscribing) {
                     e.currentTarget.style.transform = 'translateY(-2px)'
-                    e.currentTarget.style.boxShadow = '0 8px 24px rgba(236, 72, 153, 0.5)'
+                    e.currentTarget.style.boxShadow = '0 8px 24px rgba(59, 130, 246, 0.6)'
                   }
                 }}
                 onMouseOut={(e) => {
                   if (!isCurrentPlan && !subscribing) {
                     e.currentTarget.style.transform = 'translateY(0)'
-                    e.currentTarget.style.boxShadow = '0 4px 16px rgba(236, 72, 153, 0.3)'
+                    e.currentTarget.style.boxShadow = '0 4px 16px rgba(59, 130, 246, 0.4)'
                   }
                 }}
               >

@@ -10,6 +10,13 @@ export default function Invoices() {
   const [q, setQ] = useState('')
   const [status, setStatus] = useState('any')
   const [updating, setUpdating] = useState(null)
+  const [viewMode, setViewMode] = useState('card') // 'card' or 'table'
+  const [selectedInvoice, setSelectedInvoice] = useState(null) // For detail modal
+  const [showPaymentModal, setShowPaymentModal] = useState(null) // For payment form
+  const [dateRange, setDateRange] = useState({ start: '', end: '' })
+  const [amountRange, setAmountRange] = useState({ min: '', max: '' })
+  const [sortBy, setSortBy] = useState('date_desc') // date_desc, date_asc, amount_desc, amount_asc
+  const [selectedInvoices, setSelectedInvoices] = useState([]) // For bulk actions
   const navigate = useNavigate()
 
   async function fetchInvoices(params = {}) {
@@ -17,13 +24,43 @@ export default function Invoices() {
     setError('')
     try {
       const res = await getInvoices(params)
-      // Sort invoices: put paid invoices last
-      const sortedData = (res?.data || []).sort((a, b) => {
-        if (a.status === 'paid' && b.status !== 'paid') return 1
-        if (a.status !== 'paid' && b.status === 'paid') return -1
-        return 0
+      let data = res?.data || []
+
+      // Apply client-side filters
+      if (dateRange.start) {
+        data = data.filter(inv => new Date(inv.created_at) >= new Date(dateRange.start))
+      }
+      if (dateRange.end) {
+        data = data.filter(inv => new Date(inv.created_at) <= new Date(dateRange.end))
+      }
+      if (amountRange.min) {
+        data = data.filter(inv => inv.amount >= parseFloat(amountRange.min) * 100)
+      }
+      if (amountRange.max) {
+        data = data.filter(inv => inv.amount <= parseFloat(amountRange.max) * 100)
+      }
+
+      // Apply sorting
+      data = data.sort((a, b) => {
+        switch (sortBy) {
+          case 'date_desc':
+            return new Date(b.created_at) - new Date(a.created_at)
+          case 'date_asc':
+            return new Date(a.created_at) - new Date(b.created_at)
+          case 'amount_desc':
+            return b.amount - a.amount
+          case 'amount_asc':
+            return a.amount - b.amount
+          case 'customer':
+            return (a.customer || '').localeCompare(b.customer || '')
+          case 'overdue':
+            return (b.days_overdue || 0) - (a.days_overdue || 0)
+          default:
+            return 0
+        }
       })
-      setInvoices(sortedData)
+
+      setInvoices(data)
       setSummary(res?.summary || {})
     } catch (e) {
       setError(e.message || 'Failed to load invoices')
@@ -34,7 +71,7 @@ export default function Invoices() {
 
   useEffect(() => {
     fetchInvoices({ q, status })
-  }, [q, status])
+  }, [q, status, dateRange, amountRange, sortBy])
 
   const handleStatusUpdate = async (invoiceId, newStatus, paymentData = {}) => {
     try {
@@ -44,13 +81,15 @@ export default function Invoices() {
         await markInvoiceAsPaid(invoiceId, {
           payment_method: paymentData.method || 'Cash',
           payment_date: paymentData.date || new Date().toISOString().split('T')[0],
-          notes: paymentData.notes || ''
+          notes: paymentData.notes || '',
+          amount_paid: paymentData.amount_paid || null
         })
       } else {
         await updateInvoiceStatus(invoiceId, { status: newStatus })
       }
 
       await fetchInvoices({ q, status })
+      setShowPaymentModal(null)
     } catch (e) {
       alert(e.message || 'Failed to update status')
     } finally {
@@ -64,7 +103,6 @@ export default function Invoices() {
       const response = await apiPatch('/api/invoices/update-overdue')
       await fetchInvoices({ q, status })
 
-      // Show success message with update count
       if (response?.updated_count > 0) {
         alert(`Successfully updated ${response.updated_count} invoice${response.updated_count > 1 ? 's' : ''} to overdue status.`)
       } else {
@@ -75,8 +113,63 @@ export default function Invoices() {
     }
   }
 
+  const handleBulkMarkPaid = async () => {
+    if (selectedInvoices.length === 0) {
+      alert('Please select invoices first')
+      return
+    }
+
+    if (!confirm(`Mark ${selectedInvoices.length} invoice(s) as paid?`)) return
+
+    try {
+      setLoading(true)
+      for (const invoiceId of selectedInvoices) {
+        await markInvoiceAsPaid(invoiceId, {
+          payment_method: 'Cash',
+          payment_date: new Date().toISOString().split('T')[0],
+          notes: 'Bulk payment'
+        })
+      }
+      setSelectedInvoices([])
+      await fetchInvoices({ q, status })
+      alert(`Successfully marked ${selectedInvoices.length} invoice(s) as paid`)
+    } catch (e) {
+      alert('Failed to process bulk payment: ' + e.message)
+    }
+  }
+
+  const handleBulkDownloadPDF = () => {
+    if (selectedInvoices.length === 0) {
+      alert('Please select invoices first')
+      return
+    }
+
+    selectedInvoices.forEach(invoiceId => {
+      const invoice = invoices.find(inv => inv.id === invoiceId)
+      if (invoice) {
+        generateInvoicePDF(invoice)
+      }
+    })
+  }
+
+  const toggleSelectInvoice = (invoiceId) => {
+    setSelectedInvoices(prev =>
+      prev.includes(invoiceId)
+        ? prev.filter(id => id !== invoiceId)
+        : [...prev, invoiceId]
+    )
+  }
+
+  const toggleSelectAll = () => {
+    if (selectedInvoices.length === invoices.length) {
+      setSelectedInvoices([])
+    } else {
+      setSelectedInvoices(invoices.map(inv => inv.id))
+    }
+  }
+
   const generateInvoicePDF = (invoice) => {
-    // Create PDF content
+    // Keep existing PDF generation logic
     const pdfContent = `
 <!DOCTYPE html>
 <html>
@@ -92,309 +185,159 @@ export default function Invoices() {
             margin: 60px;
             color: #1f2937;
             line-height: 1.6;
-            font-size: 16px;
         }
         .header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 50px;
+            margin-bottom: 40px;
             border-bottom: 3px solid #2563eb;
-            padding-bottom: 30px;
+            padding-bottom: 20px;
         }
-        .logo-section {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-        .logo {
-            width: 80px;
-            height: 80px;
-            object-fit: contain;
-        }
-        .company-info {
-            text-align: left;
-        }
-        .company-name {
-            font-size: 32px;
-            font-weight: bold;
-            color: #2563eb;
-            margin: 0;
-        }
-        .company-tagline {
-            font-size: 14px;
-            color: #6b7280;
-            margin: 5px 0 0 0;
-        }
-        .invoice-header-right {
-            text-align: right;
-        }
-        .invoice-title {
-            font-size: 36px;
-            font-weight: bold;
-            color: #1f2937;
-            margin: 0;
-        }
-        .invoice-number-display {
-            font-size: 18px;
-            color: #6b7280;
-            margin-top: 5px;
-        }
-        .info-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 50px;
-            margin: 40px 0;
-        }
-        .info-section h3 {
-            margin: 0 0 20px 0;
-            color: #1f2937;
-            border-bottom: 2px solid #e5e7eb;
-            padding-bottom: 10px;
-            font-size: 20px;
-        }
-        .info-row {
-            margin: 12px 0;
-            font-size: 16px;
-            display: flex;
-            justify-content: space-between;
-        }
-        .label {
-            font-weight: 600;
-            color: #6b7280;
-            min-width: 120px;
-        }
-        .value {
-            color: #1f2937;
-            font-weight: 500;
-            text-align: right;
-        }
+        .company-name { font-size: 32px; font-weight: bold; color: #2563eb; }
+        .invoice-title { font-size: 36px; font-weight: bold; }
         .amount-section {
             text-align: center;
-            margin: 50px 0;
-            padding: 40px;
+            margin: 40px 0;
+            padding: 30px;
             background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
             border: 2px solid #2563eb;
             border-radius: 12px;
         }
-        .amount-label {
-            font-size: 18px;
-            color: #6b7280;
-            margin-bottom: 10px;
-        }
-        .amount {
-            font-size: 48px;
-            font-weight: bold;
-            color: #2563eb;
-            margin: 10px 0;
-        }
-        .status {
-            display: inline-block;
-            padding: 8px 20px;
-            border-radius: 20px;
-            font-size: 16px;
-            font-weight: bold;
-            margin-top: 10px;
-        }
-        .status.paid { background: #d1fae5; color: #065f46; }
-        .status.pending { background: #fef3c7; color: #92400e; }
-        .status.overdue { background: #fee2e2; color: #991b1b; }
-        .footer {
-            margin-top: 80px;
-            padding-top: 30px;
-            text-align: center;
-            color: #6b7280;
-            font-size: 14px;
-            border-top: 2px solid #e5e7eb;
-        }
-        .overdue-warning {
-            background: #fee2e2;
-            color: #991b1b;
-            padding: 20px;
-            border-radius: 8px;
-            margin: 30px 0;
-            text-align: center;
-            font-weight: bold;
-            font-size: 18px;
-            border: 2px solid #dc2626;
-        }
+        .amount { font-size: 48px; font-weight: bold; color: #2563eb; }
+        .info-row { margin: 10px 0; display: flex; justify-content: space-between; }
+        .label { font-weight: 600; color: #6b7280; }
+        .value { color: #1f2937; font-weight: 500; }
     </style>
 </head>
 <body>
     <div class="header">
-        <div class="logo-section">
-            <img src="/logo_for_logisync.png" alt="LogiSync Logo" class="logo">
-            <div class="company-info">
-                <div class="company-name">LogiSync</div>
-                <div class="company-tagline">Logistics Management System</div>
-            </div>
+        <div>
+            <div class="company-name">LogiSync</div>
+            <div style="color: #6b7280;">Logistics Management System</div>
         </div>
-        <div class="invoice-header-right">
+        <div style="text-align: right;">
             <div class="invoice-title">INVOICE</div>
-            <div class="invoice-number-display">${invoice.invoice_number}</div>
+            <div style="color: #6b7280;">${invoice.invoice_number}</div>
         </div>
     </div>
 
-    <div class="info-grid">
-        <div class="info-section">
-            <h3>Invoice Details</h3>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin: 30px 0;">
+        <div>
+            <h3>Bill To:</h3>
+            <div><strong>${invoice.customer}</strong></div>
+            ${invoice.customer_email ? `<div>${invoice.customer_email}</div>` : ''}
+        </div>
+        <div style="text-align: right;">
             <div class="info-row">
                 <span class="label">Invoice Date:</span>
-                <span class="value">${new Date(invoice.invoice_date).toLocaleDateString()}</span>
+                <span class="value">${new Date(invoice.created_at).toLocaleDateString()}</span>
             </div>
             <div class="info-row">
                 <span class="label">Due Date:</span>
                 <span class="value">${new Date(invoice.due_date).toLocaleDateString()}</span>
             </div>
             <div class="info-row">
-                <span class="label">Invoice Type:</span>
-                <span class="value">${invoice.invoice_type}</span>
+                <span class="label">Status:</span>
+                <span class="value" style="color: ${invoice.status === 'paid' ? '#10b981' : '#f59e0b'}; font-weight: bold;">
+                    ${invoice.status.toUpperCase()}
+                </span>
             </div>
-            ${invoice.tracking_number ? `
-            <div class="info-row">
-                <span class="label">Tracking #:</span>
-                <span class="value">${invoice.tracking_number}</span>
-            </div>` : ''}
-        </div>
-
-        <div class="info-section">
-            <h3>Customer Information</h3>
-            <div class="info-row">
-                <span class="label">Name:</span>
-                <span class="value">${invoice.customer}</span>
-            </div>
-            ${invoice.customer_email ? `
-            <div class="info-row">
-                <span class="label">Email:</span>
-                <span class="value">${invoice.customer_email}</span>
-            </div>` : `
-            <div class="info-row">
-                <span class="label">Email:</span>
-                <span class="value" style="color: #9ca3af; font-style: italic;">Not provided</span>
-            </div>`}
         </div>
     </div>
 
-    ${invoice.is_overdue ? `
-    <div class="overdue-warning">
-        ⚠️ PAYMENT OVERDUE - ${invoice.days_overdue} DAYS LATE
+    ${invoice.tracking_number ? `
+    <div style="margin: 20px 0; padding: 15px; background: #f9fafb; border-left: 4px solid #2563eb;">
+        <strong>Tracking Number:</strong> ${invoice.tracking_number}
     </div>
     ` : ''}
 
     <div class="amount-section">
-        <div class="amount-label">TOTAL AMOUNT DUE</div>
+        <div style="font-size: 18px; color: #6b7280; margin-bottom: 10px;">Total Amount</div>
         <div class="amount">${invoice.formatted_amount}</div>
-        <div style="margin-top: 15px;">
-            <span class="status ${invoice.status}">${invoice.status.toUpperCase()}</span>
+        <div style="margin-top: 10px; padding: 8px 20px; background: ${invoice.status === 'paid' ? '#d1fae5' : '#fef3c7'};
+             color: ${invoice.status === 'paid' ? '#065f46' : '#92400e'}; border-radius: 20px; display: inline-block; font-weight: bold;">
+            ${invoice.status.toUpperCase()}
         </div>
     </div>
 
     ${invoice.payment_date ? `
-    <div class="info-grid">
-        <div class="info-section">
-            <h3>Payment Information</h3>
-            <div class="info-row">
-                <span class="label">Payment Date:</span>
-                <span class="value">${new Date(invoice.payment_date).toLocaleDateString()}</span>
-            </div>
-            <div class="info-row">
-                <span class="label">Payment Method:</span>
-                <span class="value">${invoice.payment_method || 'Not specified'}</span>
-            </div>
+    <div style="margin: 20px 0;">
+        <h3>Payment Information</h3>
+        <div class="info-row">
+            <span class="label">Payment Date:</span>
+            <span class="value">${new Date(invoice.payment_date).toLocaleDateString()}</span>
         </div>
+        ${invoice.payment_method ? `
+        <div class="info-row">
+            <span class="label">Payment Method:</span>
+            <span class="value">${invoice.payment_method}</span>
+        </div>
+        ` : ''}
     </div>
     ` : ''}
 
-    <div class="footer">
-        <p>Generated on ${new Date().toLocaleDateString()} | LogiSync Invoice System</p>
-        ${!invoice.payment_date ? '<p><strong>Please remit payment by the due date to avoid late fees.</strong></p>' : ''}
+    <div style="margin-top: 60px; padding-top: 20px; border-top: 2px solid #e5e7eb; text-align: center; color: #6b7280; font-size: 14px;">
+        <p>Thank you for your business!</p>
+        <p>LogiSync - Logistics Management System</p>
+    </div>
+
+    <div class="no-print" style="margin-top: 30px; text-align: center;">
+        <button onclick="window.print()" style="background: #2563eb; color: white; border: none; padding: 12px 30px;
+                font-size: 16px; font-weight: 600; border-radius: 8px; cursor: pointer;">
+            Print Invoice
+        </button>
     </div>
 </body>
 </html>
     `
 
-    // Create and download PDF
-    const blob = new Blob([pdfContent], { type: 'text/html' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `Invoice_${invoice.invoice_number}.html`
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    URL.revokeObjectURL(url)
-
-    // Also open in new window for immediate viewing/printing
-    const newWindow = window.open('', '_blank')
-    newWindow.document.write(pdfContent)
-    newWindow.document.close()
+    const printWindow = window.open('', '', 'width=800,height=600')
+    printWindow.document.write(pdfContent)
+    printWindow.document.close()
   }
 
-  function getStatusBadgeClass(invoice) {
+  const getStatusBadgeClass = (invoice) => {
+    if (invoice.status === 'paid') return 'badge success'
     if (invoice.is_overdue) return 'badge danger'
-    switch (invoice.status) {
-      case 'paid': return 'badge success'
-      case 'pending': return 'badge warn'
-      case 'overdue': return 'badge danger'
-      case 'cancelled': return 'badge'
-      default: return 'badge'
-    }
+    if (invoice.status === 'pending') return 'badge warn'
+    if (invoice.status === 'cancelled') return 'badge'
+    return 'badge info'
   }
 
-  function getStatusText(invoice) {
-    if (invoice.is_overdue && invoice.status === 'pending') {
-      return `Overdue (${invoice.days_overdue} days)`
-    }
-    return invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)
+  const getStatusText = (invoice) => {
+    if (invoice.is_overdue && invoice.status !== 'paid') return 'Overdue'
+    return invoice.status
+  }
+
+  const clearFilters = () => {
+    setQ('')
+    setStatus('any')
+    setDateRange({ start: '', end: '' })
+    setAmountRange({ min: '', max: '' })
+    setSortBy('date_desc')
   }
 
   return (
     <div className="grid" style={{ gap: 24 }}>
-      {/* Header Section with Gradient */}
+      {/* Header */}
       <div style={{
-        background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+        background: 'linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%)',
         borderRadius: '16px',
         padding: '32px',
-        boxShadow: '0 10px 30px rgba(139, 92, 246, 0.2)'
+        boxShadow: '0 10px 30px rgba(139, 92, 246, 0.3)'
       }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
           <div>
             <h2 style={{ margin: 0, color: 'white', fontSize: '28px', fontWeight: '700', marginBottom: '8px' }}>
-              💰 Invoice Management
+              📄 Invoice Management
             </h2>
             <p style={{ margin: 0, color: 'rgba(255,255,255,0.9)', fontSize: '15px' }}>
-              Track payments and manage billing
+              Track payments, manage billing, and generate reports
             </p>
           </div>
-          <div style={{ display: 'flex', gap: '12px' }}>
+          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
             <button
-              className="btn btn-outline"
-              onClick={() => fetchInvoices({ q, status })}
-              disabled={loading}
-              style={{
-                background: 'rgba(255, 255, 255, 0.2)',
-                color: 'white',
-                border: '1px solid rgba(255, 255, 255, 0.3)',
-                padding: '10px 20px',
-                fontSize: '14px',
-                fontWeight: '600',
-                borderRadius: '10px',
-                backdropFilter: 'blur(10px)',
-                transition: 'all 0.3s ease'
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)'
-                e.currentTarget.style.transform = 'translateY(-2px)'
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'
-                e.currentTarget.style.transform = 'translateY(0)'
-              }}
-            >
-              {loading ? 'Refreshing...' : '🔄 Refresh'}
-            </button>
-            <button
-              className="btn btn-outline"
               onClick={updateOverdueStatuses}
               style={{
                 background: 'white',
@@ -405,19 +348,46 @@ export default function Invoices() {
                 fontWeight: '600',
                 borderRadius: '10px',
                 boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                transition: 'all 0.3s ease'
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.transform = 'translateY(-2px)'
-                e.currentTarget.style.boxShadow = '0 6px 20px rgba(0,0,0,0.2)'
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.transform = 'translateY(0)'
-                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)'
+                transition: 'all 0.3s ease',
+                cursor: 'pointer'
               }}
             >
               📊 Update Overdue
             </button>
+            {selectedInvoices.length > 0 && (
+              <>
+                <button
+                  onClick={handleBulkMarkPaid}
+                  style={{
+                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    color: 'white',
+                    border: 'none',
+                    padding: '10px 20px',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    borderRadius: '10px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  ✓ Mark {selectedInvoices.length} Paid
+                </button>
+                <button
+                  onClick={handleBulkDownloadPDF}
+                  style={{
+                    background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                    color: 'white',
+                    border: 'none',
+                    padding: '10px 20px',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    borderRadius: '10px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  📄 Download {selectedInvoices.length} PDFs
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -443,445 +413,938 @@ export default function Invoices() {
         </div>
       )}
 
-      {/* Filters */}
-      <div className="grid" style={{ gridTemplateColumns: 'repeat(2, minmax(0,1fr))', gap: 16 }}>
-        <div style={{ position: 'relative' }}>
-          <span style={{
-            position: 'absolute',
-            left: '16px',
-            top: '50%',
-            transform: 'translateY(-50%)',
-            fontSize: '18px',
-            color: 'var(--gray-400)'
-          }}>🔍</span>
-          <input
-            className="input"
-            placeholder="Search invoices or customers..."
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            style={{
-              paddingLeft: '48px',
-              width: '100%',
-              borderRadius: '12px',
-              border: '2px solid var(--gray-200)',
-              fontSize: '15px',
-              padding: '14px 14px 14px 48px',
-              transition: 'all 0.3s ease'
-            }}
-            onFocus={(e) => {
-              e.target.style.borderColor = '#8b5cf6'
-              e.target.style.boxShadow = '0 0 0 3px rgba(139, 92, 246, 0.1)'
-            }}
-            onBlur={(e) => {
-              e.target.style.borderColor = 'var(--gray-200)'
-              e.target.style.boxShadow = 'none'
-            }}
-          />
-        </div>
-        <select
-          className="input"
-          value={status}
-          onChange={(e) => setStatus(e.target.value)}
-          style={{
-            borderRadius: '12px',
-            border: '2px solid var(--gray-200)',
-            fontSize: '15px',
-            padding: '14px',
-            transition: 'all 0.3s ease'
-          }}
-          onFocus={(e) => {
-            e.target.style.borderColor = '#8b5cf6'
-            e.target.style.boxShadow = '0 0 0 3px rgba(139, 92, 246, 0.1)'
-          }}
-          onBlur={(e) => {
-            e.target.style.borderColor = 'var(--gray-200)'
-            e.target.style.boxShadow = 'none'
-          }}
-        >
-          <option value="any">Status: Any</option>
-          <option value="pending">Pending</option>
-          <option value="paid">Paid</option>
-          <option value="overdue">Overdue</option>
-          <option value="cancelled">Cancelled</option>
-        </select>
-      </div>
-
       {/* Stats Overview */}
       {summary && (
         <div className="grid" style={{ gridTemplateColumns: 'repeat(4, minmax(0,1fr))', gap: 16 }}>
-          <div style={{
-            background: 'rgba(255, 255, 255, 0.05)',
-            backdropFilter: 'blur(10px)',
-            borderRadius: '16px',
-            padding: '24px',
-            textAlign: 'center',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
-            transition: 'all 0.3s ease',
-            cursor: 'pointer'
-          }}
-          onMouseOver={(e) => {
-            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'
-            e.currentTarget.style.transform = 'translateY(-4px)'
-            e.currentTarget.style.boxShadow = '0 8px 20px rgba(0,0,0,0.3)'
-          }}
-          onMouseOut={(e) => {
-            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'
-            e.currentTarget.style.transform = 'translateY(0)'
-            e.currentTarget.style.boxShadow = 'none'
-          }}>
-            <div style={{ fontSize: '36px', fontWeight: 'bold', color: '#a78bfa', marginBottom: '8px' }}>
-              {summary.total || 0}
-            </div>
-            <div style={{ fontSize: '14px', color: 'rgba(255, 255, 255, 0.7)', fontWeight: '500' }}>Total Invoices</div>
-          </div>
-          <div style={{
-            background: 'rgba(255, 255, 255, 0.05)',
-            backdropFilter: 'blur(10px)',
-            borderRadius: '16px',
-            padding: '24px',
-            textAlign: 'center',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
-            transition: 'all 0.3s ease',
-            cursor: 'pointer'
-          }}
-          onMouseOver={(e) => {
-            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'
-            e.currentTarget.style.transform = 'translateY(-4px)'
-            e.currentTarget.style.boxShadow = '0 8px 20px rgba(0,0,0,0.3)'
-          }}
-          onMouseOut={(e) => {
-            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'
-            e.currentTarget.style.transform = 'translateY(0)'
-            e.currentTarget.style.boxShadow = 'none'
-          }}>
-            <div style={{ fontSize: '36px', fontWeight: 'bold', color: '#f59e0b', marginBottom: '8px' }}>
-              {summary.pending || 0}
-            </div>
-            <div style={{ fontSize: '14px', color: 'rgba(255, 255, 255, 0.7)', fontWeight: '500' }}>Pending</div>
-          </div>
-          <div style={{
-            background: 'rgba(255, 255, 255, 0.05)',
-            backdropFilter: 'blur(10px)',
-            borderRadius: '16px',
-            padding: '24px',
-            textAlign: 'center',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
-            transition: 'all 0.3s ease',
-            cursor: 'pointer'
-          }}
-          onMouseOver={(e) => {
-            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'
-            e.currentTarget.style.transform = 'translateY(-4px)'
-            e.currentTarget.style.boxShadow = '0 8px 20px rgba(0,0,0,0.3)'
-          }}
-          onMouseOut={(e) => {
-            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'
-            e.currentTarget.style.transform = 'translateY(0)'
-            e.currentTarget.style.boxShadow = 'none'
-          }}>
-            <div style={{ fontSize: '36px', fontWeight: 'bold', color: '#10b981', marginBottom: '8px' }}>
-              {summary.paid || 0}
-            </div>
-            <div style={{ fontSize: '14px', color: 'rgba(255, 255, 255, 0.7)', fontWeight: '500' }}>Paid</div>
-          </div>
-          <div style={{
-            background: 'rgba(255, 255, 255, 0.05)',
-            backdropFilter: 'blur(10px)',
-            borderRadius: '16px',
-            padding: '24px',
-            textAlign: 'center',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
-            transition: 'all 0.3s ease',
-            cursor: 'pointer'
-          }}
-          onMouseOver={(e) => {
-            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'
-            e.currentTarget.style.transform = 'translateY(-4px)'
-            e.currentTarget.style.boxShadow = '0 8px 20px rgba(0,0,0,0.3)'
-          }}
-          onMouseOut={(e) => {
-            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'
-            e.currentTarget.style.transform = 'translateY(0)'
-            e.currentTarget.style.boxShadow = 'none'
-          }}>
-            <div style={{ fontSize: '36px', fontWeight: 'bold', color: '#ef4444', marginBottom: '8px' }}>
-              {summary.overdue || 0}
-            </div>
-            <div style={{ fontSize: '14px', color: 'rgba(255, 255, 255, 0.7)', fontWeight: '500' }}>Overdue</div>
-          </div>
+          <StatsCard icon="📊" value={summary.total || 0} label="Total Invoices" color="#a78bfa" />
+          <StatsCard icon="⏳" value={summary.pending || 0} label="Pending" color="#f59e0b" />
+          <StatsCard icon="✓" value={summary.paid || 0} label="Paid" color="#10b981" />
+          <StatsCard icon="⚠️" value={summary.overdue || 0} label="Overdue" color="#ef4444" />
         </div>
       )}
+
+      {/* Filters and View Toggle */}
+      <div style={{
+        background: 'rgba(255, 255, 255, 0.05)',
+        borderRadius: '16px',
+        padding: '20px',
+        border: '1px solid rgba(255, 255, 255, 0.1)'
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+          <h3 style={{ margin: 0, color: 'white', fontSize: '16px' }}>🔍 Filters & Search</h3>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button
+              onClick={clearFilters}
+              style={{
+                background: 'rgba(255, 255, 255, 0.1)',
+                color: 'white',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                padding: '6px 12px',
+                fontSize: '13px',
+                borderRadius: '8px',
+                cursor: 'pointer'
+              }}
+            >
+              Clear All
+            </button>
+            <button
+              onClick={() => setViewMode('card')}
+              style={{
+                background: viewMode === 'card' ? '#3b82f6' : 'rgba(255, 255, 255, 0.1)',
+                color: 'white',
+                border: 'none',
+                padding: '6px 12px',
+                fontSize: '13px',
+                borderRadius: '8px',
+                cursor: 'pointer'
+              }}
+            >
+              🃏 Cards
+            </button>
+            <button
+              onClick={() => setViewMode('table')}
+              style={{
+                background: viewMode === 'table' ? '#3b82f6' : 'rgba(255, 255, 255, 0.1)',
+                color: 'white',
+                border: 'none',
+                padding: '6px 12px',
+                fontSize: '13px',
+                borderRadius: '8px',
+                cursor: 'pointer'
+              }}
+            >
+              📋 Table
+            </button>
+          </div>
+        </div>
+
+        <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
+          {/* Search */}
+          <div style={{ position: 'relative' }}>
+            <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', fontSize: '16px' }}>🔍</span>
+            <input
+              className="input"
+              placeholder="Search..."
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              style={{ paddingLeft: '40px', width: '100%', fontSize: '14px', padding: '10px 10px 10px 40px' }}
+            />
+          </div>
+
+          {/* Status Filter */}
+          <select
+            className="input"
+            value={status}
+            onChange={(e) => setStatus(e.target.value)}
+            style={{ fontSize: '14px', padding: '10px' }}
+          >
+            <option value="any">All Status</option>
+            <option value="pending">Pending</option>
+            <option value="paid">Paid</option>
+            <option value="overdue">Overdue</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+
+          {/* Sort By */}
+          <select
+            className="input"
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            style={{ fontSize: '14px', padding: '10px' }}
+          >
+            <option value="date_desc">Newest First</option>
+            <option value="date_asc">Oldest First</option>
+            <option value="amount_desc">Highest Amount</option>
+            <option value="amount_asc">Lowest Amount</option>
+            <option value="customer">Customer A-Z</option>
+            <option value="overdue">Most Overdue</option>
+          </select>
+
+          {/* Date Range */}
+          <input
+            type="date"
+            className="input"
+            placeholder="Start Date"
+            value={dateRange.start}
+            onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
+            style={{ fontSize: '14px', padding: '10px' }}
+          />
+          <input
+            type="date"
+            className="input"
+            placeholder="End Date"
+            value={dateRange.end}
+            onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
+            style={{ fontSize: '14px', padding: '10px' }}
+          />
+
+          {/* Amount Range */}
+          <input
+            type="number"
+            className="input"
+            placeholder="Min Amount"
+            value={amountRange.min}
+            onChange={(e) => setAmountRange({ ...amountRange, min: e.target.value })}
+            style={{ fontSize: '14px', padding: '10px' }}
+          />
+          <input
+            type="number"
+            className="input"
+            placeholder="Max Amount"
+            value={amountRange.max}
+            onChange={(e) => setAmountRange({ ...amountRange, max: e.target.value })}
+            style={{ fontSize: '14px', padding: '10px' }}
+          />
+        </div>
+      </div>
 
       {loading && (
         <div style={{
           background: 'rgba(255, 255, 255, 0.05)',
-          backdropFilter: 'blur(10px)',
           borderRadius: '16px',
           padding: '40px',
           textAlign: 'center',
-          color: 'rgba(255, 255, 255, 0.7)',
-          border: '1px solid rgba(255, 255, 255, 0.1)'
+          color: 'rgba(255, 255, 255, 0.7)'
         }}>
           Loading invoices…
         </div>
       )}
+
       {error && (
         <div style={{
           background: 'rgba(239, 68, 68, 0.1)',
-          backdropFilter: 'blur(10px)',
           borderRadius: '16px',
           padding: '16px',
-          color: '#ef4444',
-          border: '1px solid rgba(239, 68, 68, 0.3)'
+          color: '#ef4444'
         }}>
           {error}
         </div>
       )}
 
-      {!loading && !error && (
-        <div className="grid" style={{ gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 16 }}>
-          {invoices.map((invoice) => (
-            <div
-              key={invoice.id}
-              style={{
-                background: 'rgba(255, 255, 255, 0.05)',
-                backdropFilter: 'blur(10px)',
-                borderRadius: '16px',
-                padding: '20px',
-                opacity: invoice.status === 'paid' ? 0.6 : 1,
-                position: 'relative',
-                overflow: 'hidden',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                transition: 'all 0.3s ease'
-              }}
-              onMouseOver={(e) => {
-                if (invoice.status !== 'paid') {
-                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'
-                  e.currentTarget.style.transform = 'translateY(-4px)'
-                  e.currentTarget.style.boxShadow = '0 8px 20px rgba(0,0,0,0.3)'
-                }
-              }}
-              onMouseOut={(e) => {
-                if (invoice.status !== 'paid') {
-                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'
-                  e.currentTarget.style.transform = 'translateY(0)'
-                  e.currentTarget.style.boxShadow = 'none'
-                }
-              }}
-            >
-              {invoice.status === 'paid' && (
-                <div style={{
-                  position: 'absolute',
-                  top: '50%',
-                  left: '50%',
-                  transform: 'translate(-50%, -50%) rotate(-25deg)',
-                  fontSize: '24px',
-                  fontWeight: 'bold',
-                  color: 'var(--success-300)',
-                  pointerEvents: 'none',
-                  zIndex: 1,
-                  userSelect: 'none'
-                }}>
-                  ✓ PAID
-                </div>
-              )}
-              <div style={{ fontFamily: 'monospace', fontSize: '13px', color: 'rgba(255, 255, 255, 0.6)', marginBottom: '8px' }}>
-                {invoice.invoice_number}
-              </div>
-              <div style={{ fontWeight: 'bold', margin: '8px 0', fontSize: '16px', color: 'rgba(255, 255, 255, 0.95)' }}>
-                👤 {invoice.customer}
-              </div>
-
-              <div style={{ margin: '12px 0', fontSize: '24px', fontWeight: 'bold', color: invoice.status === 'paid' ? '#10b981' : '#a78bfa' }}>
-                {invoice.formatted_amount}
-              </div>
-
-              <div style={{ margin: '8px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span className={getStatusBadgeClass(invoice)}>
-                  {getStatusText(invoice)}
-                </span>
-                {invoice.is_overdue && invoice.days_overdue > 0 && (
-                  <span className="muted" style={{ fontSize: '0.75rem', color: 'var(--danger-600)' }}>
-                    {invoice.days_overdue} days late
-                  </span>
-                )}
-              </div>
-
-              {invoice.tracking_number && (
-                <div style={{ fontSize: '13px', margin: '8px 0', color: 'rgba(255, 255, 255, 0.7)' }}>
-                  📦 Tracking: {invoice.tracking_number}
-                </div>
-              )}
-
-              <div style={{ fontSize: '13px', margin: '8px 0', color: 'rgba(255, 255, 255, 0.7)' }}>
-                📅 Due: {new Date(invoice.due_date).toLocaleDateString()}
-                {invoice.is_overdue && (
-                  <span style={{ color: '#ef4444', marginLeft: 4 }}>
-                    ⚠️
-                  </span>
-                )}
-              </div>
-
-              <div style={{ fontSize: '13px', margin: '8px 0', color: 'rgba(255, 255, 255, 0.7)' }}>
-                📊 Type: {invoice.invoice_type}
-              </div>
-
-              {invoice.payment_date && (
-                <div style={{ fontSize: '13px', margin: '8px 0', color: 'rgba(255, 255, 255, 0.7)' }}>
-                  ✓ Paid: {new Date(invoice.payment_date).toLocaleDateString()}
-                  {invoice.payment_method && ` via ${invoice.payment_method}`}
-                </div>
-              )}
-
-              <div style={{ marginTop: 12 }}>
-                {/* Customer Contact Info for Collections */}
-                {(invoice.is_overdue || invoice.status === 'pending') && (
-                  <div style={{
-                    marginBottom: 12,
-                    padding: '12px',
-                    background: invoice.is_overdue ? 'rgba(239, 68, 68, 0.1)' : 'rgba(245, 158, 11, 0.1)',
-                    borderRadius: '8px',
-                    border: `1px solid ${invoice.is_overdue ? 'rgba(239, 68, 68, 0.3)' : 'rgba(245, 158, 11, 0.3)'}`
-                  }}>
-                    <div style={{ fontSize: '12px', marginBottom: 6, fontWeight: '600', color: invoice.is_overdue ? '#ef4444' : '#f59e0b' }}>
-                      {invoice.is_overdue ? '🚨 Collection Required' : '💰 Payment Pending'}
-                    </div>
-                    {invoice.customer_email && (
-                      <div style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.7)' }}>
-                        📧 {invoice.customer_email}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  <button
-                    className="btn btn-outline"
-                    onClick={() => generateInvoicePDF(invoice)}
-                    style={{
-                      flex: 1,
-                      minWidth: '80px',
-                      zIndex: 2,
-                      position: 'relative',
-                      background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '8px',
-                      fontWeight: '600',
-                      fontSize: '13px',
-                      padding: '8px',
-                      boxShadow: '0 2px 8px rgba(139, 92, 246, 0.3)',
-                      transition: 'all 0.2s ease'
-                    }}
-                    onMouseOver={(e) => {
-                      e.currentTarget.style.transform = 'translateY(-2px)'
-                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(139, 92, 246, 0.4)'
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.transform = 'translateY(0)'
-                      e.currentTarget.style.boxShadow = '0 2px 8px rgba(139, 92, 246, 0.3)'
-                    }}
-                  >
-                    📄 PDF
-                  </button>
-
-                  {invoice.status === 'pending' && (
-                    <button
-                      className="btn btn-success"
-                      onClick={() => {
-                        const method = prompt('Payment method:', 'Cash')
-                        if (method) {
-                          handleStatusUpdate(invoice.id, 'paid', { method })
-                        }
-                      }}
-                      disabled={updating === invoice.id}
-                      style={{
-                        flex: 1,
-                        minWidth: '80px',
-                        zIndex: 2,
-                        position: 'relative',
-                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '8px',
-                        fontWeight: '600',
-                        fontSize: '13px',
-                        padding: '8px',
-                        boxShadow: '0 2px 8px rgba(16, 185, 129, 0.3)',
-                        transition: 'all 0.2s ease'
-                      }}
-                      onMouseOver={(e) => {
-                        e.currentTarget.style.transform = 'translateY(-2px)'
-                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.4)'
-                      }}
-                      onMouseOut={(e) => {
-                        e.currentTarget.style.transform = 'translateY(0)'
-                        e.currentTarget.style.boxShadow = '0 2px 8px rgba(16, 185, 129, 0.3)'
-                      }}
-                    >
-                      {updating === invoice.id ? 'Processing...' : '✓ Mark Paid'}
-                    </button>
-                  )}
-
-                  {invoice.is_overdue && (
-                    <button
-                      className="btn btn-danger"
-                      onClick={() => {
-                        const contact = invoice.customer_email ?
-                          `Email: ${invoice.customer_email}` :
-                          'Customer contact info not available'
-                        alert(`Follow up required for ${invoice.invoice_number}\nCustomer: ${invoice.customer}\n${contact}\nAmount: ${invoice.formatted_amount}\nDays overdue: ${invoice.days_overdue}`)
-                      }}
-                      style={{
-                        flex: 1,
-                        minWidth: '80px',
-                        zIndex: 2,
-                        position: 'relative',
-                        background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '8px',
-                        fontWeight: '600',
-                        fontSize: '13px',
-                        padding: '8px',
-                        boxShadow: '0 2px 8px rgba(239, 68, 68, 0.3)',
-                        transition: 'all 0.2s ease'
-                      }}
-                      onMouseOver={(e) => {
-                        e.currentTarget.style.transform = 'translateY(-2px)'
-                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(239, 68, 68, 0.4)'
-                      }}
-                      onMouseOut={(e) => {
-                        e.currentTarget.style.transform = 'translateY(0)'
-                        e.currentTarget.style.boxShadow = '0 2px 8px rgba(239, 68, 68, 0.3)'
-                      }}
-                    >
-                      📞 Follow Up
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-          ))}
-
-          {invoices.length === 0 && (
-            <div style={{
-              background: 'rgba(255, 255, 255, 0.05)',
-              backdropFilter: 'blur(10px)',
-              borderRadius: '16px',
-              padding: '60px 32px',
-              gridColumn: '1 / -1',
-              textAlign: 'center',
-              border: '1px solid rgba(255, 255, 255, 0.1)'
-            }}>
-              <div style={{ fontSize: '64px', marginBottom: 20 }}>💰</div>
-              <h3 style={{ margin: '0 0 12px 0', color: 'rgba(255, 255, 255, 0.9)', fontSize: '20px' }}>No invoices found</h3>
-              <p style={{ color: 'rgba(255, 255, 255, 0.6)', margin: 0 }}>Invoices will appear here when shipments are delivered.</p>
-            </div>
-          )}
+      {!loading && !error && invoices.length === 0 && (
+        <div style={{
+          background: 'rgba(255, 255, 255, 0.05)',
+          borderRadius: '16px',
+          padding: '40px',
+          textAlign: 'center',
+          color: 'rgba(255, 255, 255, 0.7)'
+        }}>
+          <div style={{ fontSize: '48px', marginBottom: '16px' }}>📄</div>
+          <div style={{ fontSize: '18px', marginBottom: '8px', color: 'white' }}>No invoices found</div>
+          <div style={{ fontSize: '14px' }}>Try adjusting your filters</div>
         </div>
       )}
 
+      {!loading && !error && invoices.length > 0 && (
+        viewMode === 'card' ? (
+          <CardView
+            invoices={invoices}
+            selectedInvoices={selectedInvoices}
+            toggleSelectInvoice={toggleSelectInvoice}
+            setSelectedInvoice={setSelectedInvoice}
+            setShowPaymentModal={setShowPaymentModal}
+            generateInvoicePDF={generateInvoicePDF}
+            getStatusBadgeClass={getStatusBadgeClass}
+            getStatusText={getStatusText}
+            updating={updating}
+          />
+        ) : (
+          <TableView
+            invoices={invoices}
+            selectedInvoices={selectedInvoices}
+            toggleSelectInvoice={toggleSelectInvoice}
+            toggleSelectAll={toggleSelectAll}
+            setSelectedInvoice={setSelectedInvoice}
+            setShowPaymentModal={setShowPaymentModal}
+            generateInvoicePDF={generateInvoicePDF}
+            getStatusBadgeClass={getStatusBadgeClass}
+            getStatusText={getStatusText}
+            updating={updating}
+          />
+        )
+      )}
+
+      {/* Invoice Detail Modal */}
+      {selectedInvoice && (
+        <InvoiceDetailModal
+          invoice={selectedInvoice}
+          onClose={() => setSelectedInvoice(null)}
+          onMarkPaid={(invoice) => {
+            setSelectedInvoice(null)
+            setShowPaymentModal(invoice)
+          }}
+          generatePDF={generateInvoicePDF}
+        />
+      )}
+
+      {/* Payment Modal */}
+      {showPaymentModal && (
+        <PaymentModal
+          invoice={showPaymentModal}
+          onClose={() => setShowPaymentModal(null)}
+          onSubmit={handleStatusUpdate}
+          updating={updating}
+        />
+      )}
+    </div>
+  )
+}
+
+// Stats Card Component
+function StatsCard({ icon, value, label, color }) {
+  return (
+    <div style={{
+      background: 'rgba(255, 255, 255, 0.05)',
+      backdropFilter: 'blur(10px)',
+      borderRadius: '16px',
+      padding: '24px',
+      textAlign: 'center',
+      border: '1px solid rgba(255, 255, 255, 0.1)',
+      transition: 'all 0.3s ease',
+      cursor: 'pointer'
+    }}
+    onMouseOver={(e) => {
+      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'
+      e.currentTarget.style.transform = 'translateY(-4px)'
+      e.currentTarget.style.boxShadow = '0 8px 20px rgba(0,0,0,0.3)'
+    }}
+    onMouseOut={(e) => {
+      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'
+      e.currentTarget.style.transform = 'translateY(0)'
+      e.currentTarget.style.boxShadow = 'none'
+    }}>
+      <div style={{ fontSize: '24px', marginBottom: '8px' }}>{icon}</div>
+      <div style={{ fontSize: '36px', fontWeight: 'bold', color, marginBottom: '8px' }}>
+        {value}
+      </div>
+      <div style={{ fontSize: '14px', color: 'rgba(255, 255, 255, 0.7)', fontWeight: '500' }}>{label}</div>
+    </div>
+  )
+}
+
+// Card View Component
+function CardView({ invoices, selectedInvoices, toggleSelectInvoice, setSelectedInvoice, setShowPaymentModal, generateInvoicePDF, getStatusBadgeClass, getStatusText, updating }) {
+  return (
+    <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16 }}>
+      {invoices.map((invoice) => (
+        <div
+          key={invoice.id}
+          style={{
+            background: 'rgba(255, 255, 255, 0.05)',
+            backdropFilter: 'blur(10px)',
+            borderRadius: '16px',
+            padding: '20px',
+            opacity: invoice.status === 'paid' ? 0.7 : 1,
+            position: 'relative',
+            overflow: 'hidden',
+            border: selectedInvoices.includes(invoice.id) ? '2px solid #3b82f6' : '1px solid rgba(255, 255, 255, 0.1)',
+            transition: 'all 0.3s ease',
+            cursor: 'pointer'
+          }}
+          onClick={() => setSelectedInvoice(invoice)}
+          onMouseOver={(e) => {
+            if (invoice.status !== 'paid') {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'
+              e.currentTarget.style.transform = 'translateY(-4px)'
+              e.currentTarget.style.boxShadow = '0 8px 20px rgba(0,0,0,0.3)'
+            }
+          }}
+          onMouseOut={(e) => {
+            if (invoice.status !== 'paid') {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'
+              e.currentTarget.style.transform = 'translateY(0)'
+              e.currentTarget.style.boxShadow = 'none'
+            }
+          }}
+        >
+          {/* Checkbox */}
+          <div
+            onClick={(e) => {
+              e.stopPropagation()
+              toggleSelectInvoice(invoice.id)
+            }}
+            style={{
+              position: 'absolute',
+              top: '12px',
+              right: '12px',
+              width: '20px',
+              height: '20px',
+              border: '2px solid rgba(255, 255, 255, 0.3)',
+              borderRadius: '4px',
+              background: selectedInvoices.includes(invoice.id) ? '#3b82f6' : 'transparent',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              zIndex: 10
+            }}
+          >
+            {selectedInvoices.includes(invoice.id) && <span style={{ color: 'white', fontSize: '14px' }}>✓</span>}
+          </div>
+
+          {invoice.status === 'paid' && (
+            <div style={{
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%) rotate(-25deg)',
+              fontSize: '24px',
+              fontWeight: 'bold',
+              color: '#10b981',
+              pointerEvents: 'none',
+              zIndex: 1
+            }}>
+              ✓ PAID
+            </div>
+          )}
+
+          <div style={{ fontFamily: 'monospace', fontSize: '13px', color: 'rgba(255, 255, 255, 0.6)', marginBottom: '8px' }}>
+            {invoice.invoice_number}
+          </div>
+
+          <div style={{ fontWeight: 'bold', margin: '8px 0', fontSize: '16px', color: 'rgba(255, 255, 255, 0.95)' }}>
+            👤 {invoice.customer}
+          </div>
+
+          <div style={{ margin: '12px 0', fontSize: '24px', fontWeight: 'bold', color: invoice.status === 'paid' ? '#10b981' : '#a78bfa' }}>
+            {invoice.formatted_amount}
+          </div>
+
+          <div style={{ margin: '8px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span className={getStatusBadgeClass(invoice)}>
+              {getStatusText(invoice)}
+            </span>
+            {invoice.is_overdue && invoice.days_overdue > 0 && (
+              <span style={{ fontSize: '12px', color: '#ef4444', fontWeight: '600' }}>
+                {invoice.days_overdue} days late
+              </span>
+            )}
+          </div>
+
+          <div style={{ fontSize: '13px', margin: '8px 0', color: 'rgba(255, 255, 255, 0.7)' }}>
+            📅 Due: {new Date(invoice.due_date).toLocaleDateString()}
+          </div>
+
+          {invoice.tracking_number && (
+            <div style={{ fontSize: '13px', margin: '8px 0', color: 'rgba(255, 255, 255, 0.7)' }}>
+              📦 {invoice.tracking_number}
+            </div>
+          )}
+
+          <div style={{ marginTop: 12, display: 'flex', gap: 8, flexWrap: 'wrap' }} onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => generateInvoicePDF(invoice)}
+              style={{
+                flex: 1,
+                minWidth: '80px',
+                background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                fontWeight: '600',
+                fontSize: '13px',
+                padding: '8px',
+                cursor: 'pointer'
+              }}
+            >
+              📄 PDF
+            </button>
+
+            {invoice.status === 'pending' && (
+              <button
+                onClick={() => setShowPaymentModal(invoice)}
+                disabled={updating === invoice.id}
+                style={{
+                  flex: 1,
+                  minWidth: '80px',
+                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontWeight: '600',
+                  fontSize: '13px',
+                  padding: '8px',
+                  cursor: 'pointer'
+                }}
+              >
+                {updating === invoice.id ? 'Processing...' : '✓ Mark Paid'}
+              </button>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// Table View Component
+function TableView({ invoices, selectedInvoices, toggleSelectInvoice, toggleSelectAll, setSelectedInvoice, setShowPaymentModal, generateInvoicePDF, getStatusBadgeClass, getStatusText, updating }) {
+  return (
+    <div style={{
+      background: 'rgba(255, 255, 255, 0.05)',
+      borderRadius: '16px',
+      overflow: 'hidden',
+      border: '1px solid rgba(255, 255, 255, 0.1)'
+    }}>
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr style={{ background: 'rgba(255, 255, 255, 0.05)', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>
+              <th style={{ padding: '16px', textAlign: 'left' }}>
+                <input
+                  type="checkbox"
+                  checked={selectedInvoices.length === invoices.length && invoices.length > 0}
+                  onChange={toggleSelectAll}
+                  style={{ cursor: 'pointer' }}
+                />
+              </th>
+              <th style={{ padding: '16px', textAlign: 'left', color: 'white', fontWeight: '600' }}>Invoice #</th>
+              <th style={{ padding: '16px', textAlign: 'left', color: 'white', fontWeight: '600' }}>Customer</th>
+              <th style={{ padding: '16px', textAlign: 'left', color: 'white', fontWeight: '600' }}>Amount</th>
+              <th style={{ padding: '16px', textAlign: 'left', color: 'white', fontWeight: '600' }}>Status</th>
+              <th style={{ padding: '16px', textAlign: 'left', color: 'white', fontWeight: '600' }}>Due Date</th>
+              <th style={{ padding: '16px', textAlign: 'left', color: 'white', fontWeight: '600' }}>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {invoices.map((invoice) => (
+              <tr
+                key={invoice.id}
+                style={{
+                  borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+                  background: selectedInvoices.includes(invoice.id) ? 'rgba(59, 130, 246, 0.1)' : 'transparent',
+                  opacity: invoice.status === 'paid' ? 0.6 : 1,
+                  cursor: 'pointer',
+                  transition: 'background 0.2s'
+                }}
+                onClick={() => setSelectedInvoice(invoice)}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.background = selectedInvoices.includes(invoice.id) ? 'rgba(59, 130, 246, 0.15)' : 'rgba(255, 255, 255, 0.05)'
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.background = selectedInvoices.includes(invoice.id) ? 'rgba(59, 130, 246, 0.1)' : 'transparent'
+                }}
+              >
+                <td style={{ padding: '16px' }} onClick={(e) => e.stopPropagation()}>
+                  <input
+                    type="checkbox"
+                    checked={selectedInvoices.includes(invoice.id)}
+                    onChange={() => toggleSelectInvoice(invoice.id)}
+                    style={{ cursor: 'pointer' }}
+                  />
+                </td>
+                <td style={{ padding: '16px', color: 'rgba(255, 255, 255, 0.9)', fontFamily: 'monospace', fontSize: '13px' }}>
+                  {invoice.invoice_number}
+                </td>
+                <td style={{ padding: '16px', color: 'rgba(255, 255, 255, 0.9)', fontWeight: '500' }}>
+                  {invoice.customer}
+                </td>
+                <td style={{ padding: '16px', color: invoice.status === 'paid' ? '#10b981' : '#a78bfa', fontWeight: '700', fontSize: '16px' }}>
+                  {invoice.formatted_amount}
+                </td>
+                <td style={{ padding: '16px' }}>
+                  <span className={getStatusBadgeClass(invoice)} style={{ fontSize: '12px' }}>
+                    {getStatusText(invoice)}
+                  </span>
+                  {invoice.is_overdue && invoice.days_overdue > 0 && (
+                    <div style={{ fontSize: '11px', color: '#ef4444', marginTop: '4px' }}>
+                      {invoice.days_overdue} days late
+                    </div>
+                  )}
+                </td>
+                <td style={{ padding: '16px', color: 'rgba(255, 255, 255, 0.7)', fontSize: '14px' }}>
+                  {new Date(invoice.due_date).toLocaleDateString()}
+                </td>
+                <td style={{ padding: '16px' }} onClick={(e) => e.stopPropagation()}>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button
+                      onClick={() => generateInvoicePDF(invoice)}
+                      style={{
+                        background: '#3b82f6',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '6px',
+                        padding: '6px 12px',
+                        fontSize: '12px',
+                        cursor: 'pointer',
+                        fontWeight: '600'
+                      }}
+                      title="Download PDF"
+                    >
+                      📄
+                    </button>
+                    {invoice.status === 'pending' && (
+                      <button
+                        onClick={() => setShowPaymentModal(invoice)}
+                        disabled={updating === invoice.id}
+                        style={{
+                          background: '#10b981',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '6px',
+                          padding: '6px 12px',
+                          fontSize: '12px',
+                          cursor: 'pointer',
+                          fontWeight: '600'
+                        }}
+                        title="Mark as Paid"
+                      >
+                        {updating === invoice.id ? '...' : '✓'}
+                      </button>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+// Invoice Detail Modal Component
+function InvoiceDetailModal({ invoice, onClose, onMarkPaid, generatePDF }) {
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: 'rgba(0, 0, 0, 0.7)',
+        backdropFilter: 'blur(5px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 1000,
+        padding: '20px'
+      }}
+      onClick={onClose}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: 'rgba(31, 41, 55, 0.95)',
+          backdropFilter: 'blur(20px)',
+          borderRadius: '20px',
+          padding: '32px',
+          maxWidth: '600px',
+          width: '100%',
+          maxHeight: '90vh',
+          overflowY: 'auto',
+          border: '2px solid rgba(255, 255, 255, 0.1)',
+          boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5)'
+        }}
+      >
+        {/* Header */}
+        <div style={{
+          background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
+          borderRadius: '12px',
+          padding: '20px 24px',
+          marginBottom: '28px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}>
+          <div>
+            <h3 style={{ margin: 0, fontSize: '20px', fontWeight: '700', color: 'white' }}>
+              Invoice Details
+            </h3>
+            <div style={{ fontSize: '14px', color: 'rgba(255, 255, 255, 0.8)', marginTop: '4px', fontFamily: 'monospace' }}>
+              {invoice.invoice_number}
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            style={{
+              background: 'rgba(255, 255, 255, 0.2)',
+              color: 'white',
+              border: 'none',
+              borderRadius: '50%',
+              width: '32px',
+              height: '32px',
+              fontSize: '18px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+          >
+            ×
+          </button>
+        </div>
+
+        {/* Invoice Info */}
+        <div style={{ display: 'grid', gap: '16px' }}>
+          <InfoRow label="Customer" value={invoice.customer} icon="👤" />
+          {invoice.customer_email && <InfoRow label="Email" value={invoice.customer_email} icon="📧" />}
+          <InfoRow label="Amount" value={invoice.formatted_amount} icon="💰" valueColor={invoice.status === 'paid' ? '#10b981' : '#a78bfa'} />
+          <InfoRow label="Invoice Type" value={invoice.invoice_type} icon="📊" />
+          <InfoRow label="Created" value={new Date(invoice.created_at).toLocaleDateString()} icon="📅" />
+          <InfoRow label="Due Date" value={new Date(invoice.due_date).toLocaleDateString()} icon="⏰" />
+
+          {invoice.tracking_number && <InfoRow label="Tracking" value={invoice.tracking_number} icon="📦" />}
+
+          <div style={{
+            background: 'rgba(255, 255, 255, 0.05)',
+            padding: '16px',
+            borderRadius: '12px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center'
+          }}>
+            <span style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '14px' }}>Status</span>
+            <span className={invoice.status === 'paid' ? 'badge success' : invoice.is_overdue ? 'badge danger' : 'badge warn'}>
+              {invoice.is_overdue && invoice.status !== 'paid' ? 'Overdue' : invoice.status}
+            </span>
+          </div>
+
+          {invoice.is_overdue && invoice.days_overdue > 0 && (
+            <div style={{
+              background: 'rgba(239, 68, 68, 0.1)',
+              padding: '12px 16px',
+              borderRadius: '12px',
+              border: '1px solid rgba(239, 68, 68, 0.3)',
+              color: '#ef4444',
+              fontSize: '14px',
+              fontWeight: '600'
+            }}>
+              ⚠️ {invoice.days_overdue} days overdue
+            </div>
+          )}
+
+          {invoice.payment_date && (
+            <>
+              <InfoRow label="Payment Date" value={new Date(invoice.payment_date).toLocaleDateString()} icon="✓" valueColor="#10b981" />
+              {invoice.payment_method && <InfoRow label="Payment Method" value={invoice.payment_method} icon="💳" />}
+            </>
+          )}
+        </div>
+
+        {/* Actions */}
+        <div style={{ marginTop: '28px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+          <button
+            onClick={() => generatePDF(invoice)}
+            style={{
+              flex: 1,
+              background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+              color: 'white',
+              border: 'none',
+              borderRadius: '12px',
+              padding: '14px 24px',
+              fontSize: '15px',
+              fontWeight: '600',
+              cursor: 'pointer',
+              boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)'
+            }}
+          >
+            📄 Download PDF
+          </button>
+          {invoice.status === 'pending' && (
+            <button
+              onClick={() => onMarkPaid(invoice)}
+              style={{
+                flex: 1,
+                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '12px',
+                padding: '14px 24px',
+                fontSize: '15px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)'
+              }}
+            >
+              ✓ Mark as Paid
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function InfoRow({ label, value, icon, valueColor }) {
+  return (
+    <div style={{
+      background: 'rgba(255, 255, 255, 0.05)',
+      padding: '12px 16px',
+      borderRadius: '12px',
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center'
+    }}>
+      <span style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+        {icon && <span>{icon}</span>}
+        {label}
+      </span>
+      <span style={{ color: valueColor || 'white', fontWeight: '600', fontSize: '14px' }}>
+        {value}
+      </span>
+    </div>
+  )
+}
+
+// Payment Modal Component
+function PaymentModal({ invoice, onClose, onSubmit, updating }) {
+  const [paymentData, setPaymentData] = useState({
+    method: 'Cash',
+    date: new Date().toISOString().split('T')[0],
+    notes: '',
+    amount_paid: invoice.amount / 100
+  })
+
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    onSubmit(invoice.id, 'paid', paymentData)
+  }
+
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: 'rgba(0, 0, 0, 0.7)',
+        backdropFilter: 'blur(5px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 1000,
+        padding: '20px'
+      }}
+      onClick={onClose}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: 'rgba(31, 41, 55, 0.95)',
+          backdropFilter: 'blur(20px)',
+          borderRadius: '20px',
+          padding: '32px',
+          maxWidth: '500px',
+          width: '100%',
+          border: '2px solid rgba(255, 255, 255, 0.1)',
+          boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5)'
+        }}
+      >
+        <div style={{
+          background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+          borderRadius: '12px',
+          padding: '20px 24px',
+          marginBottom: '28px'
+        }}>
+          <h3 style={{ margin: 0, fontSize: '20px', fontWeight: '700', color: 'white' }}>
+            💳 Record Payment
+          </h3>
+          <div style={{ fontSize: '14px', color: 'rgba(255, 255, 255, 0.9)', marginTop: '4px' }}>
+            {invoice.invoice_number}
+          </div>
+        </div>
+
+        <form onSubmit={handleSubmit}>
+          <div style={{ display: 'grid', gap: '20px' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#10b981', marginBottom: '10px' }}>
+                Payment Method *
+              </label>
+              <select
+                value={paymentData.method}
+                onChange={(e) => setPaymentData({ ...paymentData, method: e.target.value })}
+                required
+                style={{
+                  width: '100%',
+                  padding: '12px 16px',
+                  fontSize: '15px',
+                  borderRadius: '10px',
+                  border: '2px solid rgba(255, 255, 255, 0.1)',
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  color: 'white'
+                }}
+              >
+                <option value="Cash">Cash</option>
+                <option value="Bank Transfer">Bank Transfer</option>
+                <option value="GCash">GCash</option>
+                <option value="PayMaya">PayMaya</option>
+                <option value="Check">Check</option>
+                <option value="Credit Card">Credit Card</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#10b981', marginBottom: '10px' }}>
+                Payment Date *
+              </label>
+              <input
+                type="date"
+                value={paymentData.date}
+                onChange={(e) => setPaymentData({ ...paymentData, date: e.target.value })}
+                required
+                style={{
+                  width: '100%',
+                  padding: '12px 16px',
+                  fontSize: '15px',
+                  borderRadius: '10px',
+                  border: '2px solid rgba(255, 255, 255, 0.1)',
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  color: 'white'
+                }}
+              />
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#10b981', marginBottom: '10px' }}>
+                Amount Paid (₱)
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                value={paymentData.amount_paid}
+                onChange={(e) => setPaymentData({ ...paymentData, amount_paid: e.target.value })}
+                style={{
+                  width: '100%',
+                  padding: '12px 16px',
+                  fontSize: '15px',
+                  borderRadius: '10px',
+                  border: '2px solid rgba(255, 255, 255, 0.1)',
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  color: 'white'
+                }}
+              />
+              <div style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.6)', marginTop: '6px' }}>
+                Invoice amount: {invoice.formatted_amount}
+              </div>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#10b981', marginBottom: '10px' }}>
+                Notes / Reference Number
+              </label>
+              <textarea
+                value={paymentData.notes}
+                onChange={(e) => setPaymentData({ ...paymentData, notes: e.target.value })}
+                placeholder="Optional notes or transaction reference..."
+                rows={3}
+                style={{
+                  width: '100%',
+                  padding: '12px 16px',
+                  fontSize: '15px',
+                  borderRadius: '10px',
+                  border: '2px solid rgba(255, 255, 255, 0.1)',
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  color: 'white',
+                  resize: 'vertical',
+                  fontFamily: 'inherit'
+                }}
+              />
+            </div>
+          </div>
+
+          <div style={{ marginTop: '28px', display: 'flex', gap: '12px' }}>
+            <button
+              type="button"
+              onClick={onClose}
+              style={{
+                flex: 1,
+                background: 'rgba(255, 255, 255, 0.1)',
+                color: 'white',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                borderRadius: '12px',
+                padding: '14px 24px',
+                fontSize: '15px',
+                fontWeight: '600',
+                cursor: 'pointer'
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={updating === invoice.id}
+              style={{
+                flex: 1,
+                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '12px',
+                padding: '14px 24px',
+                fontSize: '15px',
+                fontWeight: '600',
+                cursor: updating === invoice.id ? 'not-allowed' : 'pointer',
+                boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)'
+              }}
+            >
+              {updating === invoice.id ? '⏳ Processing...' : '✓ Confirm Payment'}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   )
 }

@@ -41,10 +41,19 @@ Route::post('/driver/login', [DriverController::class, 'login']);
 Route::middleware(['role:admin'])->group(function () {
     // User Management (Team Management) - Admin only
     Route::get('/users', [UserController::class, 'index']);
+    Route::get('/users/check-username', [UserController::class, 'checkUsername']);
+    Route::get('/users/check-email', [UserController::class, 'checkEmail']);
     Route::get('/users/{id}', [UserController::class, 'show']);
     Route::post('/users', [UserController::class, 'store']);
     Route::patch('/users/{id}', [UserController::class, 'update']);
     Route::delete('/users/{id}', [UserController::class, 'destroy']);
+
+    // Subscription Management - Admin only
+    Route::get('/subscriptions/all', [SubscriptionController::class, 'getAllSubscriptions']);
+    Route::patch('/subscriptions/{id}/status', [SubscriptionController::class, 'updateSubscriptionStatus']);
+    Route::post('/subscriptions/{id}/extend', [SubscriptionController::class, 'extendSubscription']);
+    Route::post('/subscriptions/check-expired', [SubscriptionController::class, 'checkExpiredSubscriptions']);
+    Route::post('/subscriptions/send-reminders', [SubscriptionController::class, 'sendRenewalReminders']);
 
     // Analytics - Admin only
     Route::get('/analytics/overview', [AnalyticsController::class, 'getOverviewMetrics']);
@@ -61,16 +70,16 @@ Route::middleware(['role:admin,booking_manager'])->group(function () {
     // Quotes - Write Operations
     Route::post('/quotes', [QuoteController::class, 'store']);
     Route::post('/quotes/calculate', [QuoteController::class, 'calculate']);
+    Route::patch('/quotes/{id}', [QuoteController::class, 'update']);
     Route::patch('/quotes/{id}/status', [QuoteController::class, 'updateStatus']);
     Route::post('/quotes/{id}/convert-to-order', [QuoteController::class, 'convertToOrder']);
 
     // Orders - Write Operations
     Route::post('/orders', [OrderController::class, 'store']);
     Route::patch('/orders/{id}/status', [OrderController::class, 'updateStatus']);
+    Route::patch('/orders/{id}/receiver', [OrderController::class, 'updateReceiverInfo']);
     Route::patch('/orders/{id}', [OrderController::class, 'update']);
-    Route::post('/orders/{id}/items', [OrderController::class, 'addItems']);
-    Route::patch('/orders/{id}/items/{itemId}', [OrderController::class, 'updateItem']);
-    Route::delete('/orders/{id}/items/{itemId}', [OrderController::class, 'deleteItem']);
+    // Order items routes removed - not used in logistics system
 
     // Invoices - Write Operations
     Route::post('/invoices', [InvoiceController::class, 'store']);
@@ -127,8 +136,12 @@ Route::middleware(['role:admin,booking_manager,warehouse_manager'])->group(funct
     // Shipments - All staff can view/manage
     Route::get('/shipments', [ShipmentController::class, 'index']);
     Route::get('/shipments/{id}', [ShipmentController::class, 'show']);
+    Route::post('/shipments/batch', [ShipmentController::class, 'createBatchShipment']);
     Route::post('/orders/{orderId}/shipments', [ShipmentController::class, 'createFromOrder']);
+    Route::patch('/shipments/{id}', [ShipmentController::class, 'update']);
     Route::patch('/shipments/{id}/status', [ShipmentController::class, 'updateStatus']);
+    Route::post('/shipments/{id}/packages', [ShipmentController::class, 'addPackage']);
+    Route::delete('/shipments/{id}/packages/{orderId}', [ShipmentController::class, 'removePackage']);
 
     // GPS Tracking
     Route::get('/shipments/{id}/location', [ShipmentController::class, 'getLocation']);
@@ -146,6 +159,9 @@ Route::middleware(['role:admin,booking_manager,warehouse_manager'])->group(funct
     Route::get('/transport/helpers/drivers', [TransportController::class, 'getDrivers']);
     Route::get('/transport/helpers/budgets', [TransportController::class, 'getBudgets']);
     Route::get('/transport/helpers/schedules', [TransportController::class, 'getSchedules']);
+
+    // Driver Management
+    Route::get('/drivers', [DriverController::class, 'index']);
 
     // Schedule Management (All staff can view/manage)
     Route::get('/schedules', [ScheduleController::class, 'index']);

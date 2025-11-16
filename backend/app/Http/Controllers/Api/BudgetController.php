@@ -31,8 +31,6 @@ class BudgetController extends Controller
             return [
                 'id' => (int) $budget->budget_id,
                 'budget_name' => $budget->budget_name,
-                'start_date' => $budget->start_date,
-                'end_date' => $budget->end_date,
                 'total_budget' => (int) $budget->total_budget,
             ];
         });
@@ -62,8 +60,6 @@ class BudgetController extends Controller
         return response()->json(['data' => [
             'id' => (int) $budget->budget_id,
             'budget_name' => $budget->budget_name,
-            'start_date' => $budget->start_date,
-            'end_date' => $budget->end_date,
             'total_budget' => (int) $budget->total_budget,
         ]])->header('Access-Control-Allow-Origin', '*');
     }
@@ -78,8 +74,6 @@ class BudgetController extends Controller
         $orgUserId = UserHelper::getOrganizationUserId($userId);
         $validator = Validator::make($request->all(), [
             'budget_name' => 'required|string|max:255',
-            'start_date' => 'required|date',
-            'end_date' => 'required|date|after_or_equal:start_date',
             'total_budget' => 'required|integer|min:0',
         ]);
 
@@ -90,8 +84,6 @@ class BudgetController extends Controller
 
         $id = DB::table('budgets')->insertGetId([
             'budget_name' => $request->budget_name,
-            'start_date' => $request->start_date,
-            'end_date' => $request->end_date,
             'total_budget' => $request->total_budget,
             'organization_id' => $orgUserId,
         ]);
@@ -112,8 +104,6 @@ class BudgetController extends Controller
         $orgUserId = UserHelper::getOrganizationUserId($userId);
         $validator = Validator::make($request->all(), [
             'budget_name' => 'required|string|max:255',
-            'start_date' => 'required|date',
-            'end_date' => 'required|date|after_or_equal:start_date',
             'total_budget' => 'required|integer|min:0',
         ]);
 
@@ -127,8 +117,6 @@ class BudgetController extends Controller
             ->where('organization_id', $orgUserId)
             ->update([
             'budget_name' => $request->budget_name,
-            'start_date' => $request->start_date,
-            'end_date' => $request->end_date,
             'total_budget' => $request->total_budget,
         ]);
 

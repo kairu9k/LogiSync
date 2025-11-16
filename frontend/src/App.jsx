@@ -1,4 +1,4 @@
-import { Routes, Route, useLocation } from 'react-router-dom'
+import { Routes, Route, useLocation, Navigate } from 'react-router-dom'
 import Landing from './pages/Landing.jsx'
 import SignIn from './pages/SignIn.jsx'
 import GetStarted from './pages/GetStarted.jsx'
@@ -15,12 +15,14 @@ import Invoices from './pages/app/Invoices.jsx'
 import InvoiceDetail from './pages/app/InvoiceDetail.jsx'
 import Warehouses from './pages/app/Warehouses.jsx'
 import Inventory from './pages/app/Inventory.jsx'
+import WarehouseInventory from './pages/app/WarehouseInventory.jsx'
 import Reports from './pages/app/Reports.jsx'
 import TeamManagement from './pages/app/TeamManagement.jsx'
 import SubscriptionPlan from './pages/app/SubscriptionPlan.jsx'
+import ManageSubscription from './pages/app/ManageSubscription.jsx'
 import SystemSettings from './pages/app/SystemSettings.jsx'
+import PaymentSuccess from './pages/PaymentSuccess.jsx'
 import Transportation from './pages/app/Transportation.jsx'
-import Schedules from './pages/app/Schedules.jsx'
 import Budgets from './pages/app/Budgets.jsx'
 import DriverLogin from './pages/DriverLogin.jsx'
 import DriverDashboard from './pages/DriverDashboard.jsx'
@@ -44,15 +46,19 @@ function App() {
         <Route path="invoices" element={<Invoices />} />
         <Route path="invoices/:id" element={<InvoiceDetail />} />
         <Route path="warehouses" element={<Warehouses />} />
-        <Route path="warehouses/inventory" element={<Inventory />} />
+        <Route path="warehouses/:id/inventory" element={<WarehouseInventory />} />
+        <Route path="warehouses/inventory" element={<Navigate to="/app/warehouses" replace />} />
         <Route path="transportation" element={<Transportation />} />
-        <Route path="schedules" element={<Schedules />} />
         <Route path="reports" element={<Reports />} />
         <Route path="settings/budgets" element={<Budgets />} />
         <Route path="settings/team" element={<TeamManagement />} />
         <Route path="settings/subscription" element={<SubscriptionPlan />} />
+        <Route path="settings/subscription/manage" element={<ManageSubscription />} />
         <Route path="settings/system" element={<SystemSettings />} />
       </Route>
+
+      {/* Payment Success Page (outside AppLayout for popup) */}
+      <Route path="/payment/success" element={<PaymentSuccess />} />
 
       {/* Driver Mobile Interface Routes */}
       <Route path="/driver/login" element={<DriverLogin />} />

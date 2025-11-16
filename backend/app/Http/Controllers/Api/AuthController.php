@@ -53,17 +53,7 @@ class AuthController extends Controller
 
         // Send verification email
         try {
-            $emailBody = "Hello " . ($data['name'] ?? 'there') . ",\n\n";
-            $emailBody .= "Welcome to LogiSync! To complete your registration, please verify your email address.\n\n";
-            $emailBody .= "Your verification code is: {$verificationCode}\n\n";
-            $emailBody .= "This code will expire in 15 minutes.\n\n";
-            $emailBody .= "If you didn't create a LogiSync account, please ignore this email.\n\n";
-            $emailBody .= "Best regards,\nThe LogiSync Team\nDavao City, Philippines";
-
-            Mail::raw($emailBody, function ($message) use ($data) {
-                $message->to($data['email'])
-                    ->subject('Verify your LogiSync account');
-            });
+            $this->sendVerificationEmail($data['email'], $data['name'] ?? 'there', $verificationCode);
         } catch (\Exception $e) {
             // Log error but don't fail registration
             \Log::error('Failed to send verification email: ' . $e->getMessage());
@@ -164,17 +154,8 @@ class AuthController extends Controller
 
         // Send verification email
         try {
-            $emailBody = "Hello,\n\n";
-            $emailBody .= "We received a request to resend your verification code.\n\n";
-            $emailBody .= "Your new verification code is: {$verificationCode}\n\n";
-            $emailBody .= "This code will expire in 15 minutes.\n\n";
-            $emailBody .= "If you didn't request this, please ignore this email.\n\n";
-            $emailBody .= "Best regards,\nThe LogiSync Team\nDavao City, Philippines";
-
-            Mail::raw($emailBody, function ($message) use ($data) {
-                $message->to($data['email'])
-                    ->subject('LogiSync - New Verification Code');
-            });
+            $userName = $user->username ?? 'there';
+            $this->sendVerificationEmail($data['email'], $userName, $verificationCode);
         } catch (\Exception $e) {
             return response()->json(['message' => 'Failed to send email'], 500)
                 ->header('Access-Control-Allow-Origin', '*');
@@ -189,7 +170,7 @@ class AuthController extends Controller
     {
         $data = $request->all();
         $validator = Validator::make($data, [
-            'email' => 'required|email',
+            'email' => 'required|string', // Accept username or email
             'password' => 'required',
         ]);
         if ($validator->fails()) {
@@ -197,14 +178,17 @@ class AuthController extends Controller
                 ->header('Access-Control-Allow-Origin', '*');
         }
 
-        $user = DB::table('users')->where('email', $data['email'])->first();
+        // Check if input is email or username
+        $loginField = filter_var($data['email'], FILTER_VALIDATE_EMAIL) ? 'email' : 'username';
+
+        $user = DB::table('users')->where($loginField, $data['email'])->first();
         if (!$user || !Hash::check($data['password'], $user->password)) {
             return response()->json(['message' => 'Invalid credentials'], 401)
                 ->header('Access-Control-Allow-Origin', '*');
         }
 
-        // Check if email is verified
-        if (!$user->email_verified) {
+        // Check if email is verified (only for admin accounts)
+        if ($user->role === 'admin' && !$user->email_verified) {
             return response()->json([
                 'message' => 'Email not verified. Please verify your email first.',
                 'email_verified' => false,
@@ -222,5 +206,213 @@ class AuthController extends Controller
             ],
             'token' => 'demo',
         ])->header('Access-Control-Allow-Origin', '*');
+    }
+
+    private function sendVerificationEmail($email, $userName, $verificationCode)
+    {
+        $createdDate = Carbon::now()->format('F d, Y h:i A');
+        $frontendUrl = env('FRONTEND_URL', 'http://localhost:5173');
+
+        $emailBody = "
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+    <meta charset='UTF-8'>
+    <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-color: #f5f5f5;
+            line-height: 1.6;
+        }
+        .email-container {
+            max-width: 600px;
+            margin: 40px auto;
+            background: white;
+        }
+        .header {
+            background: #5469d4;
+            padding: 40px 40px 30px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            color: white;
+            font-size: 24px;
+            font-weight: 600;
+        }
+        .content {
+            padding: 40px;
+        }
+        .status-section {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .status-section h2 {
+            margin: 0 0 8px;
+            font-size: 20px;
+            color: #1a1a1a;
+            font-weight: 600;
+        }
+        .status-section p {
+            margin: 0;
+            color: #6b7280;
+            font-size: 14px;
+        }
+        .status-badge {
+            display: inline-block;
+            background: #10b981;
+            color: white;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            margin-bottom: 16px;
+        }
+        .code-box {
+            background: #f9fafb;
+            border: 2px solid #5469d4;
+            border-radius: 12px;
+            padding: 24px;
+            margin: 24px 0;
+            text-align: center;
+        }
+        .verification-code {
+            font-size: 42px;
+            font-weight: 700;
+            color: #5469d4;
+            font-family: monospace;
+            letter-spacing: 8px;
+            margin: 8px 0;
+        }
+        .code-label {
+            margin: 0 0 8px 0;
+            color: #6b7280;
+            font-size: 13px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .divider {
+            border: 0;
+            border-top: 1px solid #e5e7eb;
+            margin: 24px 0;
+        }
+        .info-box {
+            background: #dbeafe;
+            border-left: 4px solid #3b82f6;
+            padding: 16px;
+            border-radius: 6px;
+            margin: 20px 0;
+        }
+        .info-box p {
+            margin: 0;
+            color: #1e40af;
+            font-size: 14px;
+        }
+        .warning-box {
+            background: #fef3c7;
+            border-left: 4px solid #f59e0b;
+            padding: 16px;
+            border-radius: 6px;
+            margin: 20px 0;
+        }
+        .warning-box p {
+            margin: 0;
+            color: #92400e;
+            font-size: 14px;
+        }
+        .footer {
+            text-align: center;
+            padding: 30px 40px;
+            background: #f9fafb;
+            border-top: 1px solid #e5e7eb;
+        }
+        .footer p {
+            margin: 4px 0;
+            color: #6b7280;
+            font-size: 13px;
+        }
+        .footer a {
+            color: #5469d4;
+            text-decoration: none;
+        }
+        .merchant-name {
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 14px;
+            margin-top: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class='email-container'>
+        <div class='header'>
+            <h1>🔐 Email Verification</h1>
+            <p class='merchant-name'>LogiSync Logistics</p>
+        </div>
+
+        <div class='content'>
+            <div class='status-section'>
+                <span class='status-badge'>VERIFY EMAIL</span>
+                <h2>Welcome to LogiSync!</h2>
+                <p>{$createdDate}</p>
+            </div>
+
+            <p style='color: #6b7280; font-size: 15px; line-height: 1.6;'>
+                Hello <strong>{$userName}</strong>,
+            </p>
+
+            <p style='color: #6b7280; font-size: 15px; line-height: 1.6; margin-top: 16px;'>
+                Thank you for creating a LogiSync account! To complete your registration and start managing your logistics operations, please verify your email address using the code below.
+            </p>
+
+            <div class='code-box'>
+                <p class='code-label'>Your Verification Code</p>
+                <div class='verification-code'>{$verificationCode}</div>
+            </div>
+
+            <div class='warning-box'>
+                <p>
+                    <strong>⏱️ This code will expire in 15 minutes.</strong> Please verify your email as soon as possible.
+                </p>
+            </div>
+
+            <hr class='divider'>
+
+            <div class='info-box'>
+                <p>
+                    <strong>📧 How to Verify:</strong> Enter this 6-digit code on the verification page to activate your account and access the full features of LogiSync.
+                </p>
+            </div>
+
+            <hr class='divider'>
+
+            <p style='color: #6b7280; font-size: 14px; line-height: 1.6;'>
+                If you didn't create a LogiSync account, you can safely ignore this email. Your information is secure with us.
+            </p>
+
+            <p style='color: #6b7280; font-size: 14px; line-height: 1.6; margin-top: 16px;'>
+                Need help? Feel free to reach out to our support team.
+            </p>
+        </div>
+
+        <div class='footer'>
+            <p>LogiSync - Davao City, Philippines</p>
+        </div>
+    </div>
+</body>
+</html>
+";
+
+        Mail::send([], [], function ($message) use ($email, $verificationCode, $emailBody) {
+            $message->to($email)
+                ->subject("🔐 Verify Your LogiSync Account - Code: {$verificationCode}")
+                ->html($emailBody);
+        });
+
+        \Log::info("Verification email sent to: {$email}");
     }
 }

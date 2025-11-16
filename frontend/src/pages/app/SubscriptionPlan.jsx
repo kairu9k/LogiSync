@@ -1,14 +1,33 @@
 import { useEffect, useState } from 'react'
-import { apiGet, apiPost } from '../../lib/api'
+import { useNavigate } from 'react-router-dom'
+import { apiGet, apiPost, apiPatch } from '../../lib/api'
+import { can } from '../../lib/permissions'
 
 function formatMoney(amount) { return `₱${amount.toFixed(2)}` }
 
+// Add CSS animation for breathing effect
+const style = document.createElement('style')
+style.textContent = `
+  @keyframes breathingGlow {
+    0%, 100% {
+      box-shadow: 0 0 20px rgba(59, 130, 246, 0.5), 0 0 40px rgba(59, 130, 246, 0.3);
+    }
+    50% {
+      box-shadow: 0 0 30px rgba(59, 130, 246, 0.8), 0 0 60px rgba(59, 130, 246, 0.5);
+    }
+  }
+`
+document.head.appendChild(style)
+
 export default function SubscriptionPlan() {
+  const navigate = useNavigate()
   const [plans, setPlans] = useState([])
   const [currentSubscription, setCurrentSubscription] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [subscribing, setSubscribing] = useState(false)
+  const [paymentProcessed, setPaymentProcessed] = useState(false)
+
 
   async function loadData() {
     setLoading(true)
@@ -29,24 +48,6 @@ export default function SubscriptionPlan() {
 
   useEffect(() => {
     loadData()
-
-    // Check if returning from PayMongo
-    const urlParams = new URLSearchParams(window.location.search)
-    const paymentStatus = urlParams.get("payment")
-    const subscriptionId = urlParams.get("subscription_id")
-
-    if (paymentStatus === "success" && subscriptionId) {
-      apiPost("/api/subscriptions/payment-success", { subscription_id: subscriptionId })
-        .then(() => {
-          alert("✅ Payment successful! Your subscription is now active.")
-          window.history.replaceState({}, "", window.location.pathname)
-          loadData()
-        })
-        .catch(() => alert("Payment done but activation failed. Contact support."))
-    } else if (paymentStatus === "cancelled") {
-      alert("❌ Payment cancelled.")
-      window.history.replaceState({}, "", window.location.pathname)
-    }
   }, [])
 
   async function handleSubscribe(plan) {
@@ -66,18 +67,53 @@ export default function SubscriptionPlan() {
         alert(res.message)
         await loadData()
       } else {
-        // Paid plan - redirect to PayMongo checkout
+        // Paid plan - open PayMongo in popup and poll for completion
         if (res.checkout_url) {
-          window.open(res.checkout_url, '_blank')
-          alert('✅ PayMongo checkout opened in new window!\n\n📝 Test Card:\nCard: 4343 4343 4343 4343\nExpiry: 12/25 | CVC: 123\n\nComplete payment and click OK to refresh.')
-          await loadData()
+          // Calculate center position
+          const width = 600
+          const height = 800
+          const left = (window.screen.width - width) / 2
+          const top = (window.screen.height - height) / 2
+
+          // Open PayMongo in a centered popup window
+          const popup = window.open(
+            res.checkout_url,
+            'PayMongo Checkout',
+            `width=${width},height=${height},left=${left},top=${top},scrollbars=yes`
+          )
+
+          // Poll to check if payment is complete
+          const pollInterval = setInterval(async () => {
+            try {
+              // Check if popup is closed
+              if (popup && popup.closed) {
+                clearInterval(pollInterval)
+                // Refresh subscription data
+                await loadData()
+                setSubscribing(false)
+              }
+            } catch (e) {
+              clearInterval(pollInterval)
+              setSubscribing(false)
+            }
+          }, 1000)
+
+          // Timeout after 10 minutes
+          setTimeout(() => {
+            clearInterval(pollInterval)
+            if (popup && !popup.closed) {
+              popup.close()
+            }
+            setSubscribing(false)
+          }, 600000)
+
         } else {
           alert('Failed to create checkout session')
+          setSubscribing(false)
         }
       }
     } catch (e) {
       alert(e.message || 'Failed to subscribe')
-    } finally {
       setSubscribing(false)
     }
   }
@@ -94,6 +130,7 @@ export default function SubscriptionPlan() {
       alert(e.message || 'Failed to cancel subscription')
     }
   }
+
 
   if (loading) {
     return (
@@ -117,10 +154,10 @@ export default function SubscriptionPlan() {
     <div className="grid" style={{ gap: 24 }}>
       {/* Header Section with Gradient */}
       <div style={{
-        background: 'linear-gradient(135deg, #9FA2B2 0%, #7a7d8f 100%)',
+        background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
         borderRadius: '16px',
         padding: '32px',
-        boxShadow: '0 10px 30px rgba(159, 162, 178, 0.2)'
+        boxShadow: '0 10px 30px rgba(59, 130, 246, 0.3)'
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 20 }}>
           <div>
@@ -132,60 +169,39 @@ export default function SubscriptionPlan() {
             </p>
           </div>
 
-          {/* Current Active Plan on the right side */}
+          {/* Manage Subscription Button */}
           {currentSubscription && currentSubscription.status === 'active' && (
-            <div style={{
-              padding: '16px 20px',
-              background: 'rgba(255, 255, 255, 0.15)',
-              backdropFilter: 'blur(10px)',
-              borderRadius: '12px',
-              border: '1px solid rgba(255, 255, 255, 0.2)',
-              minWidth: '280px'
-            }}>
-              <div style={{ marginBottom: 8 }}>
-                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.8)', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                  ✓ CURRENT ACTIVE PLAN
-                </div>
-                <div style={{ fontSize: 22, fontWeight: 700, color: 'white', marginBottom: 4 }}>
-                  {currentSubscription.plan_name}
-                </div>
-                <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.8)' }}>
-                  {currentSubscription.expires_at
-                    ? `Renews on ${new Date(currentSubscription.expires_at).toLocaleDateString()}`
-                    : 'Active subscription'}
-                </div>
-              </div>
-              <button
-                onClick={handleCancel}
-                style={{
-                  width: '100%',
-                  padding: '10px 20px',
-                  borderRadius: '10px',
-                  border: '2px solid rgba(255, 255, 255, 0.3)',
-                  background: 'rgba(239, 68, 68, 0.2)',
-                  color: 'white',
-                  fontSize: '14px',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                  transition: 'all 0.3s ease'
-                }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.background = 'rgba(239, 68, 68, 0.4)'
-                  e.currentTarget.style.transform = 'translateY(-2px)'
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)'
-                  e.currentTarget.style.transform = 'translateY(0)'
-                }}
-              >
-                Cancel Subscription
-              </button>
-            </div>
+            <button
+              onClick={() => navigate('/app/settings/subscription/manage')}
+              style={{
+                padding: '10px 24px',
+                borderRadius: '10px',
+                border: '2px solid rgba(255, 255, 255, 0.3)',
+                background: 'rgba(255, 255, 255, 0.2)',
+                color: 'white',
+                fontSize: '14px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                transition: 'all 0.3s ease',
+                whiteSpace: 'nowrap'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)'
+                e.currentTarget.style.transform = 'translateY(-2px)'
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'
+                e.currentTarget.style.transform = 'translateY(0)'
+              }}
+            >
+              Manage Subscription
+            </button>
           )}
         </div>
       </div>
 
-      {!currentSubscription || currentSubscription.status !== 'active' ? (
+      {/* No Active Subscription Warning */}
+      {(!currentSubscription || currentSubscription.status !== 'active') && (
         <div className="card" style={{
           background: 'rgba(255, 171, 0, 0.1)',
           border: '2px solid rgba(255, 171, 0, 0.3)',
@@ -199,7 +215,7 @@ export default function SubscriptionPlan() {
             Choose a plan below to unlock all features and start managing your logistics operations
           </div>
         </div>
-      ) : null}
+      )}
 
       {/* Plans Grid */}
       <div style={{
@@ -221,25 +237,26 @@ export default function SubscriptionPlan() {
                 borderRadius: '16px',
                 padding: 28,
                 border: isCurrentPlan
-                  ? '3px solid #9FA2B2'
+                  ? '3px solid #3b82f6'
                   : isPopular
                     ? '3px solid #8b5cf6'
                     : '2px solid rgba(255, 255, 255, 0.1)',
                 position: 'relative',
                 transition: 'all 0.3s ease',
                 boxShadow: isCurrentPlan
-                  ? '0 8px 24px rgba(159, 162, 178, 0.3)'
+                  ? '0 8px 24px rgba(59, 130, 246, 0.4)'
                   : isPopular
                     ? '0 8px 24px rgba(139, 92, 246, 0.2)'
-                    : '0 4px 20px rgba(0,0,0,0.3)'
+                    : '0 4px 20px rgba(0,0,0,0.3)',
+                animation: isCurrentPlan ? 'breathingGlow 3s ease-in-out infinite' : 'none'
               }}
               onMouseOver={(e) => {
                 if (!isCurrentPlan) {
                   e.currentTarget.style.transform = 'translateY(-6px)'
                   e.currentTarget.style.boxShadow = isPopular
                     ? '0 12px 32px rgba(139, 92, 246, 0.3)'
-                    : '0 12px 32px rgba(159, 162, 178, 0.2)'
-                  e.currentTarget.style.borderColor = isPopular ? '#8b5cf6' : 'rgba(159, 162, 178, 0.5)'
+                    : '0 12px 32px rgba(59, 130, 246, 0.3)'
+                  e.currentTarget.style.borderColor = isPopular ? '#8b5cf6' : 'rgba(59, 130, 246, 0.5)'
                 }
               }}
               onMouseOut={(e) => {
@@ -257,14 +274,14 @@ export default function SubscriptionPlan() {
                   position: 'absolute',
                   top: 16,
                   right: 16,
-                  background: '#9FA2B2',
+                  background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
                   color: 'white',
                   padding: '8px 16px',
                   borderRadius: 20,
                   fontSize: 12,
                   fontWeight: 700,
                   letterSpacing: '0.8px',
-                  boxShadow: '0 4px 12px rgba(159, 162, 178, 0.4)'
+                  boxShadow: '0 4px 12px rgba(59, 130, 246, 0.5)'
                 }}>
                   ✓ YOUR PLAN
                 </div>
@@ -309,7 +326,7 @@ export default function SubscriptionPlan() {
                   <span style={{
                     fontSize: 42,
                     fontWeight: 700,
-                    color: isFree ? '#10b981' : isPopular ? '#8b5cf6' : '#9FA2B2'
+                    color: isFree ? '#10b981' : isPopular ? '#8b5cf6' : '#3b82f6'
                   }}>
                     {isFree ? 'Free' : formatMoney(plan.price)}
                   </span>
@@ -325,7 +342,7 @@ export default function SubscriptionPlan() {
                 <div style={{
                   fontSize: '12px',
                   fontWeight: '700',
-                  color: isPopular ? '#8b5cf6' : '#9FA2B2',
+                  color: isPopular ? '#8b5cf6' : '#3b82f6',
                   marginBottom: '14px',
                   textTransform: 'uppercase',
                   letterSpacing: '0.8px'
@@ -367,7 +384,7 @@ export default function SubscriptionPlan() {
                     ? 'rgba(255, 255, 255, 0.1)'
                     : isPopular
                       ? 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)'
-                      : 'linear-gradient(135deg, #9FA2B2 0%, #7a7d8f 100%)',
+                      : 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
                   color: 'white',
                   cursor: isCurrentPlan || subscribing ? 'not-allowed' : 'pointer',
                   opacity: isCurrentPlan || subscribing ? 0.6 : 1,
@@ -376,7 +393,7 @@ export default function SubscriptionPlan() {
                     ? 'none'
                     : isPopular
                       ? '0 4px 16px rgba(139, 92, 246, 0.3)'
-                      : '0 4px 16px rgba(159, 162, 178, 0.3)'
+                      : '0 4px 16px rgba(59, 130, 246, 0.4)'
                 }}
                 disabled={isCurrentPlan || subscribing}
                 onClick={() => handleSubscribe(plan)}
@@ -385,7 +402,7 @@ export default function SubscriptionPlan() {
                     e.currentTarget.style.transform = 'translateY(-2px)'
                     e.currentTarget.style.boxShadow = isPopular
                       ? '0 8px 24px rgba(139, 92, 246, 0.5)'
-                      : '0 8px 24px rgba(159, 162, 178, 0.5)'
+                      : '0 8px 24px rgba(59, 130, 246, 0.6)'
                   }
                 }}
                 onMouseOut={(e) => {
@@ -393,7 +410,7 @@ export default function SubscriptionPlan() {
                     e.currentTarget.style.transform = 'translateY(0)'
                     e.currentTarget.style.boxShadow = isPopular
                       ? '0 4px 16px rgba(139, 92, 246, 0.3)'
-                      : '0 4px 16px rgba(159, 162, 178, 0.3)'
+                      : '0 4px 16px rgba(59, 130, 246, 0.4)'
                   }
                 }}
               >
@@ -428,6 +445,7 @@ export default function SubscriptionPlan() {
           </p>
         </div>
       )}
+
     </div>
   )
 }

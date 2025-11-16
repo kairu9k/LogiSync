@@ -22,24 +22,35 @@ class OrderController extends Controller
         $orgUserId = UserHelper::getOrganizationUserId($userId);
         // Basic listing with optional status filter and search by PO (order_id) or username
         $status = $request->query('status');
+        $withoutShipment = $request->query('without_shipment');
         $search = $request->query('q');
         $limit = (int) ($request->query('limit', 20));
         $limit = max(1, min($limit, 100));
 
         $query = DB::table('orders as o')
-            ->leftJoin('order_details as od', 'o.order_id', '=', 'od.order_id')
-            ->leftJoin('shipments as s', 'o.order_id', '=', 's.order_id')
+            ->leftJoin('quotes as q', 'o.quote_id', '=', 'q.quote_id')
+            ->leftJoin('inventory as inv', 'o.order_id', '=', 'inv.order_id')
+            ->leftJoin('warehouse as w', 'inv.warehouse_id', '=', 'w.warehouse_id')
             ->where('o.organization_id', $orgUserId)
             ->select(
                 'o.order_id',
-                'o.order_number',
                 'o.order_status',
                 'o.order_date',
                 'o.customer_name',
-                DB::raw('COUNT(DISTINCT od.order_details_id) as items'),
-                DB::raw('COUNT(DISTINCT s.shipment_id) as shipment_count')
+                'o.package_type',
+                'o.receiver_name',
+                'o.receiver_contact',
+                'o.receiver_email',
+                'o.receiver_address',
+                'q.weight',
+                'q.delivery_zone',
+                'q.dimensions',
+                'q.package_type as quote_package_type',
+                DB::raw('COALESCE(q.items, 0) as items'),
+                DB::raw('MAX(w.warehouse_name) as warehouse'),
+                DB::raw('MAX(inv.location_in_warehouse) as warehouse_location')
             )
-            ->groupBy('o.order_id', 'o.order_number', 'o.order_status', 'o.order_date', 'o.customer_name')
+            ->groupBy('o.order_id', 'o.order_status', 'o.order_date', 'o.customer_name', 'o.package_type', 'o.receiver_name', 'o.receiver_contact', 'o.receiver_email', 'o.receiver_address', 'q.items', 'q.weight', 'q.delivery_zone', 'q.dimensions', 'q.package_type')
             ->orderByDesc('o.order_date');
 
         if ($status && $status !== 'any') {
@@ -54,18 +65,34 @@ class OrderController extends Controller
             });
         }
 
+        if ($withoutShipment === 'true') {
+            $query->whereNotExists(function ($subQuery) {
+                $subQuery->select(DB::raw(1))
+                    ->from('shipment_details')
+                    ->whereRaw('shipment_details.order_id = o.order_id');
+            });
+        }
+
         $rows = $query->limit($limit)->get();
 
         $data = $rows->map(function ($row) {
             return [
                 'id' => (int) $row->order_id,
-                'order_number' => $row->order_number,
-                'po' => $row->order_number ?? ('PO-' . str_pad((string) $row->order_id, 5, '0', STR_PAD_LEFT)),
+                'po' => 'PO-' . str_pad((string) $row->order_id, 5, '0', STR_PAD_LEFT),
                 'customer' => $row->customer_name ?? 'N/A',
                 'items' => (int) $row->items,
                 'status' => $row->order_status,
                 'order_date' => $row->order_date,
-                'has_shipment' => (int) $row->shipment_count > 0,
+                'package_type' => $row->package_type ?? $row->quote_package_type ?? null,
+                'weight' => $row->weight,
+                'delivery_zone' => $row->delivery_zone,
+                'dimensions' => $row->dimensions,
+                'receiver_name' => $row->receiver_name,
+                'receiver_contact' => $row->receiver_contact,
+                'receiver_email' => $row->receiver_email,
+                'receiver_address' => $row->receiver_address,
+                'warehouse' => $row->warehouse,
+                'warehouse_location' => $row->warehouse_location,
             ];
         });
 
@@ -86,15 +113,21 @@ class OrderController extends Controller
             ->leftJoin('quotes as q', 'o.quote_id', '=', 'q.quote_id')
             ->select(
                 'o.order_id',
-                'o.order_number',
                 'o.order_status',
                 'o.order_date',
                 'o.customer_name',
+                'o.package_type',
+                'o.receiver_name',
+                'o.receiver_contact',
+                'o.receiver_email',
+                'o.receiver_address',
                 'o.quote_id',
                 'q.weight',
                 'q.dimensions',
-                'q.distance',
-                'q.estimated_cost'
+                'q.estimated_cost',
+                'q.items',
+                'q.delivery_zone',
+                'q.package_type as quote_package_type'
             )
             ->where('o.order_id', $id)
             ->where('o.organization_id', $orgUserId)
@@ -107,16 +140,21 @@ class OrderController extends Controller
 
         $data = [
             'id' => (int) $row->order_id,
-            'order_number' => $row->order_number,
-            'po' => $row->order_number ?? ('PO-' . str_pad((string) $row->order_id, 5, '0', STR_PAD_LEFT)),
+            'po' => 'PO-' . str_pad((string) $row->order_id, 5, '0', STR_PAD_LEFT),
             'customer' => $row->customer_name ?? 'N/A',
             'status' => $row->order_status,
             'order_date' => $row->order_date,
             'quote_id' => $row->quote_id,
             'weight' => $row->weight,
             'dimensions' => $row->dimensions,
-            'distance' => $row->distance,
             'estimated_cost' => $row->estimated_cost,
+            'items' => $row->items,
+            'delivery_zone' => $row->delivery_zone,
+            'package_type' => $row->package_type ?? $row->quote_package_type ?? 'Standard',
+            'receiver_name' => $row->receiver_name,
+            'receiver_contact' => $row->receiver_contact,
+            'receiver_email' => $row->receiver_email,
+            'receiver_address' => $row->receiver_address,
         ];
 
         return response()->json(['data' => $data])
@@ -146,12 +184,8 @@ class OrderController extends Controller
 
         $status = $data['status'] ?? 'pending';
 
-        // Generate unique order number
-        $orderNumber = UserHelper::generateOrderNumber();
-
         $payload = [
             'organization_id' => $orgUserId,
-            'order_number' => $orderNumber,
             'order_status' => $status,
         ];
         if (!empty($data['quote_id'])) {
@@ -181,7 +215,6 @@ class OrderController extends Controller
         return response()->json([
             'message' => 'Order created',
             'order_id' => $id,
-            'order_number' => $orderNumber,
         ], 201)->header('Access-Control-Allow-Origin', '*');
     }
 
@@ -216,6 +249,19 @@ class OrderController extends Controller
         $oldStatus = $order->order_status;
         $newStatus = $data['status'];
 
+        // Validate: Cannot mark as "fulfilled" if no warehouse assignment
+        if ($newStatus === 'fulfilled') {
+            $inventoryCount = DB::table('inventory')
+                ->where('order_id', $id)
+                ->count();
+
+            if ($inventoryCount === 0) {
+                return response()->json([
+                    'message' => 'Cannot mark order as Ready to Ship. Packages must be assigned to a warehouse first. Please go to Inventory page to assign items.'
+                ], 400)->header('Access-Control-Allow-Origin', '*');
+            }
+        }
+
         DB::table('orders')
             ->where('order_id', $id)
             ->where('organization_id', $orgUserId)
@@ -237,6 +283,54 @@ class OrderController extends Controller
         }
 
         return response()->json(['message' => 'Status updated'])
+            ->header('Access-Control-Allow-Origin', '*');
+    }
+
+    public function updateReceiverInfo(Request $request, int $id)
+    {
+        $userId = request()->header('X-User-Id');
+        if (!$userId) {
+            return response()->json(['message' => 'Unauthorized - User ID required'], 401);
+        }
+
+        $orgUserId = UserHelper::getOrganizationUserId($userId);
+        $data = $request->all();
+        $validator = Validator::make($data, [
+            'receiver_name' => 'required|string|max:255',
+            'receiver_contact' => 'required|string|max:255',
+            'receiver_email' => 'nullable|email|max:255',
+            'receiver_address' => 'required|string|max:1000',
+            'receiver_lat' => 'nullable|numeric|between:-90,90',
+            'receiver_lng' => 'nullable|numeric|between:-180,180',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['errors' => $validator->errors()], 422)
+                ->header('Access-Control-Allow-Origin', '*');
+        }
+
+        $order = DB::table('orders')
+            ->where('order_id', $id)
+            ->where('organization_id', $orgUserId)
+            ->first();
+
+        if (!$order) {
+            return response()->json(['message' => 'Order not found'], 404)
+                ->header('Access-Control-Allow-Origin', '*');
+        }
+
+        DB::table('orders')
+            ->where('order_id', $id)
+            ->where('organization_id', $orgUserId)
+            ->update([
+                'receiver_name' => $data['receiver_name'],
+                'receiver_contact' => $data['receiver_contact'],
+                'receiver_email' => $data['receiver_email'] ?? null,
+                'receiver_address' => $data['receiver_address'],
+                'receiver_lat' => $data['receiver_lat'] ?? null,
+                'receiver_lng' => $data['receiver_lng'] ?? null,
+            ]);
+
+        return response()->json(['message' => 'Receiver information updated successfully'])
             ->header('Access-Control-Allow-Origin', '*');
     }
 
@@ -304,134 +398,6 @@ class OrderController extends Controller
             ->header('Access-Control-Allow-Origin', '*');
     }
 
-    public function addItems(Request $request, int $id)
-    {
-        $userId = request()->header('X-User-Id');
-        if (!$userId) {
-            return response()->json(['message' => 'Unauthorized - User ID required'], 401);
-        }
 
-        $orgUserId = UserHelper::getOrganizationUserId($userId);
-        // Accept either items[] or a single product_id + quantity
-        $data = $request->all();
 
-        $exists = DB::table('orders')
-            ->where('order_id', $id)
-            ->where('organization_id', $orgUserId)
-            ->exists();
-        if (!$exists) {
-            return response()->json(['message' => 'Order not found'], 404)
-                ->header('Access-Control-Allow-Origin', '*');
-        }
-
-        $rules = [
-            'items' => 'sometimes|array|min:1',
-            'items.*.product_id' => 'required_with:items|integer',
-            'items.*.quantity' => 'required_with:items|integer|min:1',
-            'product_id' => 'sometimes|integer',
-            'quantity' => 'sometimes|integer|min:1',
-        ];
-        $validator = Validator::make($data, $rules);
-        if ($validator->fails()) {
-            return response()->json(['errors' => $validator->errors()], 422)
-                ->header('Access-Control-Allow-Origin', '*');
-        }
-
-        $rows = [];
-        if (!empty($data['items']) && is_array($data['items'])) {
-            foreach ($data['items'] as $it) {
-                if (!isset($it['product_id']) || !isset($it['quantity'])) continue;
-                $rows[] = [
-                    'order_id' => $id,
-                    'product_id' => (int) $it['product_id'],
-                    'quantity' => (int) $it['quantity'],
-                ];
-            }
-        } elseif (isset($data['product_id'], $data['quantity'])) {
-            $rows[] = [
-                'order_id' => $id,
-                'product_id' => (int) $data['product_id'],
-                'quantity' => (int) $data['quantity'],
-            ];
-        }
-
-        if (empty($rows)) {
-            return response()->json(['message' => 'No items to add'], 400)
-                ->header('Access-Control-Allow-Origin', '*');
-        }
-
-        DB::table('order_details')->insert($rows);
-
-        return response()->json(['message' => 'Items added', 'count' => count($rows)])
-            ->header('Access-Control-Allow-Origin', '*');
-    }
-
-    public function updateItem(Request $request, int $id, int $itemId)
-    {
-        $userId = request()->header('X-User-Id');
-        if (!$userId) {
-            return response()->json(['message' => 'Unauthorized - User ID required'], 401);
-        }
-
-        $orgUserId = UserHelper::getOrganizationUserId($userId);
-        // Ensure item belongs to order and user owns the order
-        $item = DB::table('order_details as od')
-            ->join('orders as o', 'od.order_id', '=', 'o.order_id')
-            ->where('od.order_details_id', $itemId)
-            ->where('od.order_id', $id)
-            ->where('o.organization_id', $orgUserId)
-            ->first();
-        if (!$item) {
-            return response()->json(['message' => 'Order item not found'], 404)
-                ->header('Access-Control-Allow-Origin', '*');
-        }
-
-        $data = $request->all();
-        $validator = Validator::make($data, [
-            'product_id' => 'sometimes|integer',
-            'quantity' => 'sometimes|integer|min:1',
-        ]);
-        if ($validator->fails()) {
-            return response()->json(['errors' => $validator->errors()], 422)
-                ->header('Access-Control-Allow-Origin', '*');
-        }
-
-        $updates = [];
-        if (array_key_exists('product_id', $data)) $updates['product_id'] = (int) $data['product_id'];
-        if (array_key_exists('quantity', $data)) $updates['quantity'] = (int) $data['quantity'];
-        if (empty($updates)) {
-            return response()->json(['message' => 'No changes provided'], 400)
-                ->header('Access-Control-Allow-Origin', '*');
-        }
-
-        DB::table('order_details')->where('order_details_id', $itemId)->update($updates);
-
-        return response()->json(['message' => 'Item updated'])
-            ->header('Access-Control-Allow-Origin', '*');
-    }
-
-    public function deleteItem(int $id, int $itemId)
-    {
-        $userId = request()->header('X-User-Id');
-        if (!$userId) {
-            return response()->json(['message' => 'Unauthorized - User ID required'], 401);
-        }
-
-        $orgUserId = UserHelper::getOrganizationUserId($userId);
-        // Ensure item belongs to order and user owns the order
-        $item = DB::table('order_details as od')
-            ->join('orders as o', 'od.order_id', '=', 'o.order_id')
-            ->where('od.order_details_id', $itemId)
-            ->where('od.order_id', $id)
-            ->where('o.organization_id', $orgUserId)
-            ->first();
-        if (!$item) {
-            return response()->json(['message' => 'Order item not found'], 404)
-                ->header('Access-Control-Allow-Origin', '*');
-        }
-
-        DB::table('order_details')->where('order_details_id', $itemId)->delete();
-        return response()->json(['message' => 'Item deleted'])
-            ->header('Access-Control-Allow-Origin', '*');
-    }
 }

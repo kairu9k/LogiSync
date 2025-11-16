@@ -63,6 +63,28 @@ export default function DriverShipment() {
     }
   }
 
+  const parseDimensions = (dimStr) => {
+    if (!dimStr || dimStr === 'N/A') return 'N/A'
+    try {
+      const dims = typeof dimStr === 'string' ? JSON.parse(dimStr) : dimStr
+      return `${dims.L} × ${dims.W} × ${dims.H} cm`
+    } catch (e) {
+      return dimStr
+    }
+  }
+
+  const extractShelfLocation = (originAddress, originName) => {
+    if (!originAddress) return null
+    // If origin_address contains "warehouse - shelf", extract just the shelf
+    if (originAddress.includes(' - ')) {
+      const parts = originAddress.split(' - ')
+      return parts[parts.length - 1] // Get the last part (shelf location)
+    }
+    // If origin_address is same as origin_name, return null
+    if (originAddress === originName) return null
+    return originAddress
+  }
+
 
   if (loading) {
     return (
@@ -98,15 +120,36 @@ export default function DriverShipment() {
       <header className="driver-header">
         <div className="driver-header-content">
           <button
-            className="driver-btn driver-btn-outline"
             onClick={() => navigate('/driver/dashboard')}
+            style={{
+              minWidth: 'auto',
+              padding: '10px 16px',
+              borderRadius: '8px',
+              border: 'none',
+              background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
+              color: 'white',
+              fontSize: '18px',
+              fontWeight: '600',
+              cursor: 'pointer',
+              transition: 'all 0.3s ease',
+              boxShadow: '0 2px 8px rgba(59, 130, 246, 0.3)'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.transform = 'translateY(-2px)'
+              e.currentTarget.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.5)'
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)'
+              e.currentTarget.style.boxShadow = '0 2px 8px rgba(59, 130, 246, 0.3)'
+            }}
           >
-            ← Back
+            ←
           </button>
-          <div>
+          <div style={{ flex: 1, textAlign: 'center' }}>
             <h1>Shipment Details</h1>
             <p>{shipment.tracking_number}</p>
           </div>
+          <div style={{ width: '60px' }}></div>
         </div>
       </header>
 
@@ -141,21 +184,25 @@ export default function DriverShipment() {
             <div className="detail-info">
               <div className="info-row">
                 <span className="info-label">Pickup From:</span>
-                <span className="info-value">{shipment.origin_name}</span>
-              </div>
-              <div className="info-row">
-                <span className="info-label">Pickup Address:</span>
-                <span className="info-value">{shipment.origin_address}</span>
+                <span className="info-value" style={{ fontWeight: '600' }}>
+                  {shipment.origin_name}
+                  {(() => {
+                    const shelfLocation = extractShelfLocation(shipment.origin_address, shipment.origin_name)
+                    return shelfLocation ? (
+                      <span style={{ color: 'var(--muted)', fontSize: '0.9em', fontWeight: '600' }}> (Shelf: {shelfLocation})</span>
+                    ) : null
+                  })()}
+                </span>
               </div>
               <div className="info-row">
                 <span className="info-label">Deliver To:</span>
-                <span className="info-value">{shipment.receiver_name}</span>
+                <span className="info-value" style={{ fontWeight: '600' }}>{shipment.receiver_name}</span>
               </div>
               <div className="info-row">
                 <span className="info-label">Contact Number:</span>
                 <span className="info-value">
                   {shipment.receiver_contact !== 'N/A' ? (
-                    <a href={`tel:${shipment.receiver_contact}`} style={{ color: 'var(--primary-600)', textDecoration: 'none' }}>
+                    <a href={`tel:${shipment.receiver_contact}`} style={{ color: 'var(--primary-600)', textDecoration: 'none', fontWeight: '600' }}>
                       📞 {shipment.receiver_contact}
                     </a>
                   ) : (
@@ -165,7 +212,7 @@ export default function DriverShipment() {
               </div>
               <div className="info-row">
                 <span className="info-label">Delivery Address:</span>
-                <span className="info-value">{shipment.destination_address}</span>
+                <span className="info-value" style={{ fontWeight: '600' }}>{shipment.destination_address}</span>
               </div>
             </div>
           </div>
@@ -179,7 +226,12 @@ export default function DriverShipment() {
               </div>
               <div className="info-row">
                 <span className="info-label">Dimensions:</span>
-                <span className="info-value">{shipment.dimensions}</span>
+                <span className="info-value">
+                  {parseDimensions(shipment.dimensions)}
+                  <div style={{ fontSize: '0.75rem', color: 'var(--muted)', marginTop: '2px', fontStyle: 'italic' }}>
+                    (Length × Width × Height)
+                  </div>
+                </span>
               </div>
               <div className="info-row">
                 <span className="info-label">Distance:</span>

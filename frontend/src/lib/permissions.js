@@ -80,6 +80,7 @@ export const can = {
   // Team Management - Admin only
   viewTeam: () => isAdmin(),
   manageTeam: () => isAdmin(),
+  manageUsers: () => isAdmin(), // Alias for team management
 
   // Settings - Subscription is admin only (company-wide subscription, not per-user)
   viewSubscription: () => isAdmin(),

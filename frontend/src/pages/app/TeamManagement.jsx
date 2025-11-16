@@ -13,6 +13,9 @@ export default function TeamManagement() {
     role: 'booking_manager'
   })
   const [filter, setFilter] = useState('all')
+  const [usernameError, setUsernameError] = useState('')
+  const [emailError, setEmailError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
 
   const roles = [
     { value: 'admin', label: 'Admin', description: 'Full system access and management' },
@@ -41,17 +44,94 @@ export default function TeamManagement() {
   function openAddModal() {
     setEditingUser(null)
     setFormData({ username: '', email: '', password: '', role: 'booking_manager' })
+    setUsernameError('')
+    setEmailError('')
     setShowAddModal(true)
   }
 
   function openEditModal(user) {
     setEditingUser(user)
     setFormData({ username: user.username, email: user.email, password: '', role: user.role })
+    setUsernameError('')
+    setEmailError('')
     setShowAddModal(true)
+  }
+
+  async function checkUsernameAvailability(username) {
+    if (!username.trim()) {
+      setUsernameError('')
+      return
+    }
+
+    try {
+      // Check against backend to validate globally
+      const response = await apiGet(`/api/users/check-username?username=${encodeURIComponent(username)}&exclude_id=${editingUser?.id || ''}`)
+
+      if (response.available === false) {
+        setUsernameError('❌ Username is already taken')
+      } else {
+        setUsernameError('')
+      }
+    } catch (error) {
+      // Fallback to local check if API fails
+      const existingUser = users.find(user =>
+        user.username.toLowerCase() === username.toLowerCase() &&
+        (!editingUser || user.id !== editingUser.id)
+      )
+
+      if (existingUser) {
+        setUsernameError('❌ Username is already taken')
+      } else {
+        setUsernameError('')
+      }
+    }
+  }
+
+  async function checkEmailAvailability(email) {
+    if (!email.trim()) {
+      setEmailError('')
+      return
+    }
+
+    try {
+      // Check against backend to validate globally
+      const response = await apiGet(`/api/users/check-email?email=${encodeURIComponent(email)}&exclude_id=${editingUser?.id || ''}`)
+
+      if (response.available === false) {
+        setEmailError('❌ Email is already taken')
+      } else {
+        setEmailError('')
+      }
+    } catch (error) {
+      // Fallback to local check if API fails
+      const existingUser = users.find(user =>
+        user.email.toLowerCase() === email.toLowerCase() &&
+        (!editingUser || user.id !== editingUser.id)
+      )
+
+      if (existingUser) {
+        setEmailError('❌ Email is already taken')
+      } else {
+        setEmailError('')
+      }
+    }
   }
 
   async function handleSubmit(e) {
     e.preventDefault()
+
+    // Prevent submission if username or email is already taken
+    if (usernameError) {
+      alert(usernameError)
+      return
+    }
+
+    if (emailError) {
+      alert(emailError)
+      return
+    }
+
+    setSubmitting(true)
     try {
       if (editingUser) {
         // Update existing user
@@ -69,6 +149,8 @@ export default function TeamManagement() {
     } catch (e) {
       console.error('Failed to save user:', e)
       alert('Failed to save user. Please check the form and try again.')
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -97,10 +179,10 @@ export default function TeamManagement() {
     <div className="grid" style={{ gap: 24 }}>
       {/* Header Section with Gradient */}
       <div style={{
-        background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+        background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
         borderRadius: '16px',
         padding: '32px',
-        boxShadow: '0 10px 30px rgba(139, 92, 246, 0.2)'
+        boxShadow: '0 10px 30px rgba(59, 130, 246, 0.3)'
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
@@ -118,7 +200,7 @@ export default function TeamManagement() {
               borderRadius: '10px',
               border: 'none',
               background: 'white',
-              color: '#7c3aed',
+              color: '#3b82f6',
               fontSize: '15px',
               fontWeight: '600',
               cursor: 'pointer',
@@ -154,8 +236,8 @@ export default function TeamManagement() {
             transition: 'all 0.3s ease'
           }}
           onFocus={(e) => {
-            e.target.style.borderColor = '#8b5cf6'
-            e.target.style.boxShadow = '0 0 0 3px rgba(139, 92, 246, 0.1)'
+            e.target.style.borderColor = '#3b82f6'
+            e.target.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)'
           }}
           onBlur={(e) => {
             e.target.style.borderColor = 'var(--gray-200)'
@@ -199,15 +281,15 @@ export default function TeamManagement() {
             <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0 }}>
               <thead>
                 <tr style={{
-                  background: 'rgba(139, 92, 246, 0.1)',
-                  borderBottom: '2px solid rgba(139, 92, 246, 0.2)'
+                  background: 'rgba(59, 130, 246, 0.1)',
+                  borderBottom: '2px solid rgba(59, 130, 246, 0.2)'
                 }}>
                   <th style={{
                     padding: '18px 24px',
                     textAlign: 'left',
                     fontWeight: '700',
                     fontSize: '13px',
-                    color: '#8b5cf6',
+                    color: '#3b82f6',
                     textTransform: 'uppercase',
                     letterSpacing: '0.8px'
                   }}>Username</th>
@@ -216,7 +298,7 @@ export default function TeamManagement() {
                     textAlign: 'left',
                     fontWeight: '700',
                     fontSize: '13px',
-                    color: '#8b5cf6',
+                    color: '#3b82f6',
                     textTransform: 'uppercase',
                     letterSpacing: '0.8px'
                   }}>Email</th>
@@ -225,7 +307,7 @@ export default function TeamManagement() {
                     textAlign: 'left',
                     fontWeight: '700',
                     fontSize: '13px',
-                    color: '#8b5cf6',
+                    color: '#3b82f6',
                     textTransform: 'uppercase',
                     letterSpacing: '0.8px'
                   }}>Role</th>
@@ -234,7 +316,7 @@ export default function TeamManagement() {
                     textAlign: 'right',
                     fontWeight: '700',
                     fontSize: '13px',
-                    color: '#8b5cf6',
+                    color: '#3b82f6',
                     textTransform: 'uppercase',
                     letterSpacing: '0.8px'
                   }}>Actions</th>
@@ -250,7 +332,7 @@ export default function TeamManagement() {
                       background: 'transparent'
                     }}
                     onMouseOver={(e) => {
-                      e.currentTarget.style.background = 'rgba(139, 92, 246, 0.05)'
+                      e.currentTarget.style.background = 'rgba(59, 130, 246, 0.05)'
                     }}
                     onMouseOut={(e) => {
                       e.currentTarget.style.background = 'transparent'
@@ -293,9 +375,9 @@ export default function TeamManagement() {
                           transition: 'all 0.2s ease'
                         }}
                         onMouseOver={(e) => {
-                          e.currentTarget.style.background = 'rgba(139, 92, 246, 0.3)'
+                          e.currentTarget.style.background = 'rgba(59, 130, 246, 0.3)'
                           e.currentTarget.style.transform = 'translateY(-1px)'
-                          e.currentTarget.style.borderColor = '#8b5cf6'
+                          e.currentTarget.style.borderColor = '#3b82f6'
                         }}
                         onMouseOut={(e) => {
                           e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'
@@ -452,26 +534,43 @@ export default function TeamManagement() {
                 <input
                   type="text"
                   value={formData.username}
-                  onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, username: e.target.value })
+                    checkUsernameAvailability(e.target.value)
+                  }}
                   required
                   style={{
                     width: '100%',
                     padding: '12px 16px',
                     fontSize: '15px',
                     borderRadius: '10px',
-                    border: '2px solid var(--border)',
+                    border: usernameError ? '2px solid #ef4444' : '2px solid var(--border)',
                     transition: 'all 0.3s ease',
                     background: 'var(--surface-50)'
                   }}
                   onFocus={(e) => {
-                    e.target.style.borderColor = 'var(--primary-500)'
-                    e.target.style.boxShadow = '0 0 0 3px var(--primary-100)'
+                    if (!usernameError) {
+                      e.target.style.borderColor = 'var(--primary-500)'
+                      e.target.style.boxShadow = '0 0 0 3px var(--primary-100)'
+                    }
                   }}
                   onBlur={(e) => {
-                    e.target.style.borderColor = 'var(--border)'
-                    e.target.style.boxShadow = 'none'
+                    if (!usernameError) {
+                      e.target.style.borderColor = 'var(--border)'
+                      e.target.style.boxShadow = 'none'
+                    }
                   }}
                 />
+                {usernameError && (
+                  <div style={{
+                    marginTop: '8px',
+                    fontSize: '13px',
+                    color: '#ef4444',
+                    fontWeight: '500'
+                  }}>
+                    {usernameError}
+                  </div>
+                )}
               </div>
               <div style={{ marginBottom: 20 }}>
                 <label style={{
@@ -486,26 +585,43 @@ export default function TeamManagement() {
                 <input
                   type="email"
                   value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, email: e.target.value })
+                    checkEmailAvailability(e.target.value)
+                  }}
                   required
                   style={{
                     width: '100%',
                     padding: '12px 16px',
                     fontSize: '15px',
                     borderRadius: '10px',
-                    border: '2px solid var(--border)',
+                    border: emailError ? '2px solid #ef4444' : '2px solid var(--border)',
                     transition: 'all 0.3s ease',
                     background: 'var(--surface-50)'
                   }}
                   onFocus={(e) => {
-                    e.target.style.borderColor = 'var(--primary-500)'
-                    e.target.style.boxShadow = '0 0 0 3px var(--primary-100)'
+                    if (!emailError) {
+                      e.target.style.borderColor = 'var(--primary-500)'
+                      e.target.style.boxShadow = '0 0 0 3px var(--primary-100)'
+                    }
                   }}
                   onBlur={(e) => {
-                    e.target.style.borderColor = 'var(--border)'
-                    e.target.style.boxShadow = 'none'
+                    if (!emailError) {
+                      e.target.style.borderColor = 'var(--border)'
+                      e.target.style.boxShadow = 'none'
+                    }
                   }}
                 />
+                {emailError && (
+                  <div style={{
+                    marginTop: '8px',
+                    fontSize: '13px',
+                    color: '#ef4444',
+                    fontWeight: '500'
+                  }}>
+                    {emailError}
+                  </div>
+                )}
               </div>
               <div style={{ marginBottom: 20 }}>
                 <label style={{
@@ -577,7 +693,7 @@ export default function TeamManagement() {
                   }}
                 >
                   {roles.map((role) => (
-                    <option key={role.value} value={role.value}>
+                    <option key={role.value} value={role.value} style={{ background: '#1f2937', color: 'white' }}>
                       {role.label}
                     </option>
                   ))}
@@ -607,23 +723,33 @@ export default function TeamManagement() {
                 <button
                   type="submit"
                   className="btn btn-primary"
+                  disabled={submitting}
                   style={{
                     padding: '10px 24px',
                     fontSize: '14px',
                     fontWeight: '600',
                     borderRadius: '10px',
-                    transition: 'all 0.2s ease'
+                    transition: 'all 0.2s ease',
+                    cursor: submitting ? 'not-allowed' : 'pointer',
+                    opacity: submitting ? 0.6 : 1,
                   }}
                   onMouseOver={(e) => {
-                    e.currentTarget.style.transform = 'translateY(-1px)'
-                    e.currentTarget.style.boxShadow = '0 6px 20px rgba(0,0,0,0.15)'
+                    if (!submitting) {
+                      e.currentTarget.style.transform = 'translateY(-1px)'
+                      e.currentTarget.style.boxShadow = '0 6px 20px rgba(0,0,0,0.15)'
+                    }
                   }}
                   onMouseOut={(e) => {
-                    e.currentTarget.style.transform = 'translateY(0)'
-                    e.currentTarget.style.boxShadow = 'none'
+                    if (!submitting) {
+                      e.currentTarget.style.transform = 'translateY(0)'
+                      e.currentTarget.style.boxShadow = 'none'
+                    }
                   }}
                 >
-                  {editingUser ? '✓ Update' : '✓ Create'}
+                  {submitting
+                    ? (editingUser ? '⏳ Updating...' : '⏳ Creating...')
+                    : (editingUser ? '✓ Update' : '✓ Create')
+                  }
                 </button>
               </div>
             </form>
