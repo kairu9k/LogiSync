@@ -1,4 +1,8 @@
-export const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
+// Auto-detect API URL: use env var if set, otherwise use current domain
+const envApiUrl = import.meta.env.VITE_API_URL;
+export const API_BASE = envApiUrl === "" || envApiUrl === undefined
+  ? "" // Production: use relative URLs (same domain)
+  : envApiUrl; // Development: use localhost:8000
 
 function getAuthHeaders() {
   const headers = { "Content-Type": "application/json" };
